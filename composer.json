@@ -13,6 +13,7 @@
         "flowframe/laravel-trend": "^0.3.0",
         "guzzlehttp/guzzle": "^7.9",
         "illuminate/contracts": "^11.32",
+        "kreait/firebase-php": "^7.18",
         "laravel/framework": "^11.32",
         "laravel/passport": "^12.3",
         "laravel/sanctum": "^4.0",

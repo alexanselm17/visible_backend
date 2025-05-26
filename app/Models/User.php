@@ -57,6 +57,8 @@ class User extends Authenticatable implements FilamentUser
     'occupation',
     'location',
     'gender',
+    'fcm_token',
+
 
   ];
 

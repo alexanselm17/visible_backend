@@ -7,6 +7,7 @@ use App\Models\Drum;
 use App\Models\Pump;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use App\Http\Controllers\NotificationController;
 
 use App\Http\Requests\ProductRequest;
 use App\Http\Requests\UpdateProductRequest;
@@ -384,6 +385,10 @@ public function uploadAdvertProducts(ProductAdvertRequest $request, $campaignId)
             $advert->selling_price = "0.00";
             $advert->campaign_id = $campaignId;
             $advert->save();
+
+         $title = "📢 New Product posted!";
+         $body = "🔥 {$advert->name} is now live. Check it out before it’s gone!";
+            app(NotificationController::class)->notifyAllUsers($title, $body);
 
             return response()->json([
                 'ok' => true,

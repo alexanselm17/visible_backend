@@ -3,14 +3,19 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomersController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\SetupController;
 use App\Http\Middleware\CheckActiveUser;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'v1'], function () {
+
+
     //Auth Routes
     Route::group(['prefix' => 'auth'], function () {
+         Route::post('/fcm-token', [NotificationController::class, 'updateFcmToken']);
+
 
           //Admin and manager only
           Route::post('/signup', [AuthController::class, 'signup']);
