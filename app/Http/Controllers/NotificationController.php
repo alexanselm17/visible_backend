@@ -28,10 +28,15 @@ class NotificationController extends Controller
 }
 
 
-    // Send a notification to all users
-   public function notifyAllUsers($title, $body)
+
+public function notifyAllUsers($title, $body)
 {
-    $tokens = User::whereNotNull('fcm_token')->pluck('fcm_token')->toArray();
+    $tokens = User::whereHas('role', function ($query) {
+            $query->where('slug', '!=', 'admin');
+        })
+        ->whereNotNull('fcm_token')
+        ->pluck('fcm_token')
+        ->toArray();
 
     $firebase = new FirebaseService();
 
@@ -39,30 +44,8 @@ class NotificationController extends Controller
         try {
             $firebase->sendToDevice($token, $title, $body);
         } catch (\Exception $e) {
-            // Handle failures
-            \Log::error("FCM error: " . $e->getMessage());
+            \Log::error("FCM error for token [$token]: " . $e->getMessage());
         }
     }
 }
-
-
-// public function notifyAllUsers($title, $body)
-// {
-//     $tokens = User::whereHas('role', function ($query) {
-//             $query->where('slug', '!=', 'admin');
-//         })
-//         ->whereNotNull('fcm_token')
-//         ->pluck('fcm_token')
-//         ->toArray();
-
-//     $firebase = new FirebaseService();
-
-//     foreach ($tokens as $token) {
-//         try {
-//             $firebase->sendToDevice($token, $title, $body);
-//         } catch (\Exception $e) {
-//             \Log::error("FCM error for token [$token]: " . $e->getMessage());
-//         }
-//     }
-// }
 }
