@@ -806,7 +806,7 @@ public function getDashboardData(Request $request, $userId)
                     $query->where('processed_by', $userId)
                           ->orderBy('created_at', 'asc');
                 },
-                'campaign:id,valid_until'
+                'campaign:id,valid_until,reward'
             ])
             ->paginate(10);
 
@@ -819,6 +819,8 @@ public function getDashboardData(Request $request, $userId)
 
                 $screenshotCount = $advert->user_screenshot_count ?? 0;
 
+
+
                 return [
                     'id' => $advert->id,
                     'category' => $advert->category,
@@ -826,6 +828,7 @@ public function getDashboardData(Request $request, $userId)
                     'name' => $advert->name,
                     'updated_at' => $advert->updated_at,
                     'valid_until' => $advert->campaign?->valid_until,
+                    'reward' => $advert->campaign?->reward,
                     'image_path' => $advert->image_path,
                     'image_url' => asset($imagePath),
                     'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
