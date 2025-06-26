@@ -67,9 +67,9 @@ class User extends Authenticatable implements FilamentUser
 
 
   public function user()
-{
+  {
     return $this->belongsTo(User::class, 'processed_by');
-}
+  }
 
   public $incrementing = false;
   protected $keyType = 'string';
@@ -218,5 +218,27 @@ class User extends Authenticatable implements FilamentUser
   public function getPermissionsByCategory($category)
   {
     return $this->getAllPermissions()->where('category', $category);
+  }
+
+
+  public function notifications(): HasMany
+  {
+    return $this->hasMany(Notification::class)->orderBy('created_at', 'desc');
+  }
+
+  /**
+   * Get unread notifications for the user.
+   */
+  public function unreadNotifications(): HasMany
+  {
+    return $this->hasMany(Notification::class)->where('is_read', false)->orderBy('created_at', 'desc');
+  }
+
+  /**
+   * Get the count of unread notifications.
+   */
+  public function getUnreadNotificationsCountAttribute(): int
+  {
+    return $this->unreadNotifications()->count();
   }
 }
