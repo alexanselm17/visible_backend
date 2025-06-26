@@ -7,6 +7,8 @@ use App\Models\Notification;
 use App\Services\FirebaseService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
+
 
 class NotificationController extends Controller
 {
@@ -38,24 +40,10 @@ class NotificationController extends Controller
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'per_page' => 'nullable|integer|min:1|max:100',
-            'type' => 'nullable|in:system,security,info,warning,success,error',
-            'is_read' => 'nullable|boolean',
         ]);
 
         $query = Notification::where('user_id', $request->user_id)
             ->orderBy('created_at', 'desc');
-
-        if ($request->has('type')) {
-            $query->ofType($request->type);
-        }
-
-        if ($request->has('is_read')) {
-            if ($request->is_read) {
-                $query->read();
-            } else {
-                $query->unread();
-            }
-        }
 
         $notifications = $query->paginate($request->per_page ?? 20);
 
@@ -68,7 +56,9 @@ class NotificationController extends Controller
                 'total' => $notifications->total(),
                 'has_more' => $notifications->hasMorePages(),
             ],
-            'unread_count' => Notification::where('user_id', $request->user_id)->unread()->count(),
+            'unread_count' => Notification::where('user_id', $request->user_id)
+                ->where('is_read', false)
+                ->count(),
         ]);
     }
 
