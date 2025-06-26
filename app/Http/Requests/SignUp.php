@@ -38,6 +38,9 @@ class SignUp extends FormRequest
             'occupation'=>'required|string',
             'location'=>'required|string',
             'gender' => 'required|in:Male,Female',
+            'town'=>"required|string",
+            'estate'=>"required|string",
+            'county'=>'required|string'
         ];
     }
 }

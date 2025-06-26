@@ -58,10 +58,18 @@ class User extends Authenticatable implements FilamentUser
     'location',
     'gender',
     'fcm_token',
+    'town',
+    'estate',
+    'county'
 
 
   ];
 
+
+  public function user()
+{
+    return $this->belongsTo(User::class, 'processed_by');
+}
 
   public $incrementing = false;
   protected $keyType = 'string';

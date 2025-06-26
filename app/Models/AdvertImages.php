@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class AdvertImages extends Model
 {
     protected $table="advert_images";
-    protected $fillable=['image_path','category','name','selling_price','campaign_id'];
+    protected $fillable=['image_path','category','name','selling_price','campaign_id','reward','description','badge'];
 
     public function screenshots()
 {
@@ -35,6 +35,9 @@ protected static function boot()
         }
     });
 }
+protected $casts = [
+    'badge' => 'array',
+];
 
 
 

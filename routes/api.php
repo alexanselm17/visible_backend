@@ -88,9 +88,19 @@ Route::get('/download/advert/{path}', function ($path) {
         Route::post('/upload_product_advert/{campaignId}', [ProductController::class, 'uploadAdvertProducts']);
         Route::get('/get_product_advert', [ProductController::class, 'getAdvertProducts']);
         Route::post('/upload_screenshot/{advert_id}', [ProductController::class, 'uploadScreenShotPlusCompare']);
-    
+        Route::get('/dashboard/{userId}', [ProductController::class, 'getDashboardData']);
+        Route::get('/admin_dashboard', [ProductController::class, 'getAdminDashboardData']);
+      
      });
  });
+ Route::group(['prefix' => 'campaign/report'], function () {
+    Route::get('/campaign_report', [ProductController::class, 'getCampaignReports']);
+    Route::get('/timely_campaign_report', [ProductController::class, 'getCampaignTimelyReports']);
+    Route::get('/timely_individual_campaign_report', [ProductController::class, 'getCampaignTimelyPersionalReports']);
+    Route::get('/excell_payment', [ProductController::class, 'getExcellFileForPayment']);
+    Route::get('/timely_response', [ProductController::class, 'getCampaignTimelyPersional']);
+ 
+});
 
 
 

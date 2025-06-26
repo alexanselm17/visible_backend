@@ -80,8 +80,39 @@ class ProductController extends Controller
     }
 
 
+    public function getDashboardData(Request $request,$userId){
+        return $this->productRepository->getDashboardData($request,$userId);
+    }
 
 
+    public function getAdminDashboardData(Request $request){
+        return $this->productRepository->getAdminDashboardData($request);
+    }
+
+
+    public function getCampaignReports(Request $request){
+        return $this->productRepository->getCampaignReports($request);
+    }
+
+
+    public function getCampaignTimelyReports(Request $request){
+        return $this->productRepository->getCampaignTimelyReports($request);
+    }
+
+    public function getCampaignTimelyPersionalReports(Request $request){
+        return $this->productRepository->getCampaignTimelyPersionalReports($request);
+    }
+
+
+    public function getCampaignTimelyPersional(Request $request){
+        return $this->productRepository->getCampaignTimelyPersional($request);
+    }
+
+
+
+    public function getExcellFileForPayment(Request $request){
+        return $this->productRepository->getExcellFileForPayment($request);
+    }
 
 
 

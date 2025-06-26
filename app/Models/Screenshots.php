@@ -24,5 +24,10 @@ protected static function boot()
         }
     });
 }
+public function user()
+{
+    return $this->belongsTo(User::class, 'processed_by');
+}
+
 
 }

@@ -22,10 +22,12 @@ class ProductAdvertRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048',
-          
-            'name'=>'required|string',
-           
+            'image' => 'required|file|mimes:jpeg,png,jpg|max:20480', 
+            'name' => 'required|string',
+            'category' => 'required|string',
+            'video' => 'nullable|file|mimes:mp4,mov,avi|max:20480',
+            'badge' => 'required|array',
+            'badge.*' => 'string'
         ];
     }
 }

@@ -30,6 +30,9 @@ public function signUpUser(Request $request){
         "occupation"=> $request['occupation'],
         "location" => $request['location'],
         "gender" => $request['gender'],
+        "town"=>$request['town'],
+        "estate"=>$request['estate'],
+        "county"=>$request['county'],
         "is_active"=>false
     ]);
      return response()->json([
@@ -51,18 +54,18 @@ public function signUpUser(Request $request){
 public function signInUser(Request $request)
 {
     try {
+      
         $request->validate([
             'username' => 'required|string',
             'password' => 'required|string',
             'app_version' => 'nullable|string',
         ]);
-
+      
         $user = User::where(function ($query) use ($request) {
             $query->where('username', $request->username)
                   ->orWhere('email', $request->username)
                   ->orWhere('phone', $request->username);
         })->first();
-
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'ok' => false,
@@ -70,7 +73,7 @@ public function signInUser(Request $request)
                 'message' => "Invalid login Credetials.",
             ], Response::HTTP_UNAUTHORIZED);
         }
-
+   
         if (!$user->is_active) {
             return response()->json([
                 'ok' => false,
@@ -133,8 +136,6 @@ public function signInUser(Request $request)
         'slug' => $user->role?->slug
     ],
 ];
-
-
         return response()->json([
             'ok' => true,
             'status' => 'success',
@@ -145,7 +146,6 @@ public function signInUser(Request $request)
         ]);
     } catch (\Throwable $th) {
         Log::error('Sign In Error: ' . $th->getMessage());
-
         return response()->json([
             'ok' => false,
             'status' => 'error',

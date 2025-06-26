@@ -22,6 +22,9 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->uuid('role_id')->nullable();
             $table->foreign('role_id')->references('id')->on('roles')->onDelete('set null'); // Foreign key constraint
+            $table->string('town');
+            $table->string('estate');
+            $table->string('county');
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();

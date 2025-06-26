@@ -24,5 +24,17 @@ interface ProductRepositoryInterface
     public function getCampaigns(Request $request);
     public function getAdvertCampaigns(Request $request,$campaignId);
 
+    public function getDashboardData(Request $request,$userId);
+
+    public function getAdminDashboardData(Request $request);
+
+    public function getCampaignReports(Request $request);
+    public function getCampaignTimelyReports(Request $request);
+
+    public function getCampaignTimelyPersionalReports(Request $request);
+
+    public function getCampaignTimelyPersional(Request $request);
+
+    public function getExcellFileForPayment(Request $request);
 
 }

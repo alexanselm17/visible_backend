@@ -21,19 +21,15 @@ class Invoice extends Model
     'banking',
   ];
 
+// App\Models\Invoice.php
+
+public function processedByUser()
+{
+    return $this->belongsTo(User::class, 'processed_by');
+}
 
 
-  /**
-   * Get the transaction associated with the invoice.
-   */
-  public function transaction(): BelongsTo
-  {
-    return $this->belongsTo(Transaction::class, 'invoice_number');
-  }
 
-  /**
-   * Get the customer associated with the invoice.
-   */
   public function customer(): BelongsTo
   {
     return $this->belongsTo(Customers::class, 'customer_id');
