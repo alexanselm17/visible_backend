@@ -1696,7 +1696,7 @@ public function getExcellFileForPayment(Request $request)
     } catch (\Throwable $th) {
         return response()->json([
             'success' => false,
-            'message' => 'Error fetching Excel Payment sheet',
+            'message' => 'Error fetching Excel sheet',
             'error' => $th->getMessage(),
         ], 500);
     }
