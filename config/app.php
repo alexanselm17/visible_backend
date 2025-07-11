@@ -69,7 +69,7 @@ return [
     |
     */
 
-   'timezone' => 'Africa/Nairobi',
+    'timezone' => 'Africa/Nairobi',
 
 
     /*
@@ -157,6 +157,8 @@ return [
 
     'providers' => [
         Barryvdh\DomPDF\ServiceProvider::class,
+        App\Providers\ObserverServiceProvider::class,
+
 
         /*
          * Laravel Framework Service Providers...
@@ -215,7 +217,7 @@ return [
     'aliases' => Facade::defaultAliases()->merge([
         // 'ExampleClass' => App\Example\ExampleClass::class,
 
-    'PDF' => Barryvdh\DomPDF\Facade::class,
+        'PDF' => Barryvdh\DomPDF\Facade::class,
     ])->toArray(),
 
 ];
