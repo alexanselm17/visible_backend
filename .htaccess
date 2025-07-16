@@ -1,0 +1,10 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine on
+
+    # Redirect everything to public/
+    RewriteCond %{REQUEST_URI} !^public
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Custom error document for 500 errors
+    ErrorDocument 500 /public/500.html
+</IfModule>
