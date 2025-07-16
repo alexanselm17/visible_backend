@@ -1,0 +1,35 @@
+# Ignore .env and .htaccess
+.env
+.htaccess
+
+# Ignore node modules
+node_modules/
+
+# Ignore vendor (if you're not committing dependencies)
+vendor/
+
+# Laravel storage and logs
+storage/*.key
+storage/app/public/*
+storage/debugbar/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*.log
+
+# Ignore compiled files
+/public/storage
+/public/hot
+/public/mix-manifest.json
+/public/js/*.map
+/public/css/*.map
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+
+# Composer dump files
+composer.lock
+phpunit.result.cache
