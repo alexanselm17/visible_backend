@@ -24,6 +24,8 @@ interface ProductRepositoryInterface
     public function getCampaigns(Request $request);
     public function getAdvertCampaigns(Request $request,$campaignId);
 
+    public function getAdvertCampaignsFraud(Request $request,$campaignId);
+
     public function getDashboardData(Request $request,$userId);
 
     public function getAdminDashboardData(Request $request);

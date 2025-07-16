@@ -120,8 +120,12 @@ class ProductController extends Controller
         return $this->productRepository->getExcellFileForPayment($request);
     }
     
-    public function updateAdvertProduct(ProductAdvertRequest $request, $advertId){
-        return $this->productRepository->updateAdvertProduct($request,$advertId);
+    // public function updateAdvertProduct(ProductAdvertRequest $request, $advertId){
+    //     return $this->productRepository->updateAdvertProduct($request,$advertId);
+    // }
+
+    public function  getAdvertCampaignsFraud(Request $request,$campaignId){
+        return $this->productRepository->getAdvertCampaignsFraud($request,$campaignId);
     }
 
 
