@@ -3,17 +3,76 @@
 namespace App\Filament\Resources\CampaignResource\Pages;
 
 use App\Filament\Resources\CampaignResource;
-use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Carbon;
+use App\Http\Controllers\ProductController;
+use App\Repositories\Products\ProductRepositoryInterface;
+use Illuminate\Http\Request;
 
 class EditCampaign extends EditRecord
 {
     protected static string $resource = CampaignResource::class;
 
-    protected function getHeaderActions(): array
+    protected function handleRecordUpdate($record, array $data): \Illuminate\Database\Eloquent\Model
     {
-        return [
-            Actions\DeleteAction::make(),
-        ];
+        try {
+            $validUntil = isset($data['valid_until_date'], $data['valid_until_time'])
+                ? Carbon::parse("{$data['valid_until_date']} {$data['valid_until_time']}")->toDateTimeString()
+                : null;
+
+            $request = new Request();
+            $request->merge([
+                'name' => $data['name'],
+                'capital_invested' => $data['capital_invested'],
+                'reward' => $data['reward'],
+                'capacity' => $data['capacity'],
+                'valid_until' => $validUntil,
+            ]);
+
+            $productRepository = app(ProductRepositoryInterface::class);
+            $controller = new ProductController($productRepository);
+            $response = $controller->updateCampaign($request, $record->id);
+            $responseData = $response->getData();
+
+            if ($responseData->ok === true) {
+                Notification::make()
+                    ->title($responseData->message ?? 'Campaign updated successfully')
+                    ->success()
+                    ->send();
+            } else {
+                Notification::make()
+                    ->title($responseData->error ?? 'Failed to update campaign')
+                    ->danger()
+                    ->send();
+            }
+
+            $record->refresh();
+            return $record;
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('An unexpected error occurred')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return $record;
+        }
+    }
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        if (isset($data['valid_until'])) {
+            $validUntil = Carbon::parse($data['valid_until']);
+            $data['valid_until_date'] = $validUntil->toDateString();  // e.g. 2025-07-16
+            $data['valid_until_time'] = $validUntil->format('H:i');   // e.g. 14:30
+        }
+
+        return $data;
+    }
+
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return $data;
     }
 }

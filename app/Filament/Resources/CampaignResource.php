@@ -20,7 +20,10 @@ use Filament\Forms\Components\Textarea;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Actions\Action;
 use Filament\Notifications\Notification;
+use Filament\Forms\Components\DateTimePicker;
+
 use Carbon\Carbon;
+use Filament\Forms\Components\TimePicker;
 
 class CampaignResource extends Resource
 {
@@ -47,34 +50,53 @@ class CampaignResource extends Resource
                         TextInput::make('capital_invested')
                             ->required()
                             ->numeric()
-                            ->prefix('$')
+                            ->prefix('Ksh')
                             ->placeholder('0.00')
                             ->minValue(0)
                             ->step(0.01)
-                            ->helperText('Total capital invested in this campaign'),
+                            ->helperText('Total capital invested in this campaign')
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                $reward = $get('reward');
+                                if ($reward > 0) {
+                                    $set('capacity', floor($state / $reward));
+                                }
+                            }),
 
                         TextInput::make('reward')
                             ->required()
                             ->numeric()
-                            ->prefix('$')
+                            ->prefix('Ksh')
                             ->placeholder('0.00')
                             ->minValue(0)
                             ->step(0.01)
-                            ->helperText('Reward amount per engagement'),
+                            ->helperText('Reward amount per engagement')
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                $capital = $get('capital_invested');
+                                if ($state > 0) {
+                                    $set('capacity', floor($capital / $state));
+                                }
+                            }),
 
-                        DatePicker::make('valid_until')
+                        DatePicker::make('valid_until_date')
+                            ->label('Expiry Date')
                             ->required()
-                            ->native(false)
-                            ->displayFormat('Y-m-d')
-                            ->minDate(now())
-                            ->helperText('Campaign expiration date'),
+                            ->native(false),
+
+                        TimePicker::make('valid_until_time')
+                            ->label('Expiry Time')
+                            ->required()
+                            ->seconds(false),
+
 
                         TextInput::make('capacity')
-                            ->required()
                             ->numeric()
-                            ->minValue(1)
-                            ->placeholder('100')
-                            ->helperText('Maximum number of participants'),
+                            ->disabled()
+                            ->dehydrated(true) // ✅ This forces Filament to include this field in the submitted form data
+                            ->placeholder('Auto-calculated')
+                            ->helperText('Auto-calculated: capital ÷ reward'),
+
                     ])
                     ->columns(2),
             ]);
@@ -89,16 +111,16 @@ class CampaignResource extends Resource
                     ->sortable()
                     ->weight(FontWeight::Bold)
                     ->copyable()
-                    ->description(fn($record) => "Capital: $" . number_format($record->capital_invested, 2)),
+                    ->description(fn($record) => "Capital: Ksh " . number_format($record->capital_invested, 2)),
 
                 TextColumn::make('capital_invested')
-                    ->money('USD')
+                    ->money('Ksh')
                     ->sortable()
                     ->alignment('right')
                     ->color('success'),
 
                 TextColumn::make('reward')
-                    ->money('USD')
+                    ->money('Ksh')
                     ->sortable()
                     ->alignment('right')
                     ->color('primary'),
@@ -165,42 +187,42 @@ class CampaignResource extends Resource
                     ->icon('heroicon-o-pencil')
                     ->tooltip('Edit campaign'),
 
-                Action::make('extend')
-                    ->icon('heroicon-o-calendar-days')
-                    ->color('warning')
-                    ->tooltip('Extend campaign')
-                    ->visible(fn($record) => $record->valid_until < now()->addDays(7))
-                    ->form([
-                        DatePicker::make('new_valid_until')
-                            ->required()
-                            ->minDate(now())
-                            ->default(now()->addDays(30))
-                            ->label('New Expiration Date'),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->update(['valid_until' => $data['new_valid_until']]);
+                // Action::make('extend')
+                //     ->icon('heroicon-o-calendar-days')
+                //     ->color('warning')
+                //     ->tooltip('Extend campaign')
+                //     ->visible(fn($record) => $record->valid_until < now()->addDays(7))
+                //     ->form([
+                //         DatePicker::make('new_valid_until')
+                //             ->required()
+                //             ->minDate(now())
+                //             ->default(now()->addDays(30))
+                //             ->label('New Expiration Date'),
+                //     ])
+                //     ->action(function ($record, array $data) {
+                //         $record->update(['valid_until' => $data['new_valid_until']]);
 
-                        Notification::make()
-                            ->title('Campaign Extended')
-                            ->success()
-                            ->send();
-                    }),
+                //         Notification::make()
+                //             ->title('Campaign Extended')
+                //             ->success()
+                //             ->send();
+                //     }),
 
-                Action::make('duplicate')
-                    ->icon('heroicon-o-document-duplicate')
-                    ->color('info')
-                    ->tooltip('Duplicate campaign')
-                    ->action(function ($record) {
-                        $newCampaign = $record->replicate();
-                        $newCampaign->name = $record->name . ' (Copy)';
-                        $newCampaign->valid_until = now()->addDays(30);
-                        $newCampaign->save();
+                // Action::make('duplicate')
+                //     ->icon('heroicon-o-document-duplicate')
+                //     ->color('info')
+                //     ->tooltip('Duplicate campaign')
+                //     ->action(function ($record) {
+                //         $newCampaign = $record->replicate();
+                //         $newCampaign->name = $record->name . ' (Copy)';
+                //         $newCampaign->valid_until = now()->addDays(30);
+                //         $newCampaign->save();
 
-                        Notification::make()
-                            ->title('Campaign Duplicated')
-                            ->success()
-                            ->send();
-                    }),
+                //         Notification::make()
+                //             ->title('Campaign Duplicated')
+                //             ->success()
+                //             ->send();
+                //     }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
