@@ -95,23 +95,7 @@ class AdvertImagesResource extends Resource
                             ->searchable()
                             ->placeholder('Select category'),
 
-                        TextInput::make('selling_price')
-                            ->required()
-                            ->numeric()
-                            ->prefix('$')
-                            ->placeholder('0.00')
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->helperText('Product/service selling price'),
 
-                        TextInput::make('reward')
-                            ->required()
-                            ->numeric()
-                            ->prefix('$')
-                            ->placeholder('0.00')
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->helperText('Reward for engagement with this ad'),
                     ])
                     ->columns(2),
 
@@ -133,6 +117,16 @@ class AdvertImagesResource extends Resource
                             ])
                             ->helperText('Upload advertisement image (max 5MB)')
                             ->columnSpan(2),
+
+
+                        FileUpload::make('video_path')
+                            ->label('Advertisement Video (optional)')
+                            ->directory('advertisements')
+                            ->visibility('public')
+                            ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/ogg'])
+                            ->maxSize(20480) // 20MB
+                            ->helperText('Upload a promotional video (optional, max 20MB)')
+                            ->columnSpan(1),
 
                         Textarea::make('description')
                             ->required()
