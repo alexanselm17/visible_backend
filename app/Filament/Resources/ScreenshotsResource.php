@@ -1,0 +1,401 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\ScreenshotsResource\Pages;
+use App\Filament\Resources\ScreenshotsResource\RelationManagers;
+use App\Models\Screenshots;
+use App\Models\AdvertImages;
+use App\Models\User;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Support\Enums\FontWeight;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Actions\Action;
+use Filament\Notifications\Notification;
+use Filament\Support\Colors\Color;
+use Filament\Tables\Filters\Filter;
+
+class ScreenshotsResource extends Resource
+{
+    protected static ?string $model = Screenshots::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-camera';
+
+    protected static ?string $navigationGroup = 'Campaign Management';
+
+    protected static ?int $navigationSort = 3;
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\Section::make('Screenshot Details')
+                    ->schema([
+                        Select::make('advert_id')
+                            ->relationship('advert', 'name', function ($query) {
+                                return $query->with('campaign');
+                            })
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} ({$record->campaign->name})")
+                            ->helperText('Select the advertisement this screenshot belongs to')
+                            ->columnSpan(2),
+
+                        Select::make('processed_by')
+                            ->relationship('user', 'fullname')
+                            ->required()
+                            ->searchable()
+                            ->preload()
+                            ->default(auth()->id())
+                            ->helperText('User who processed this screenshot'),
+
+                        TextInput::make('views')
+                            ->required()
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
+                            ->helperText('Number of views for this screenshot'),
+                    ])
+                    ->columns(2),
+
+                Forms\Components\Section::make('Screenshot Image')
+                    ->schema([
+                        FileUpload::make('screenshot')
+                            ->label('Screenshot')
+                            ->image()
+                            ->required()
+                            ->directory('screenshots')
+                            ->visibility('public')
+                            ->maxSize(10240) // 10MB
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+                            ->imageEditor()
+                            ->imageEditorAspectRatios([
+                                '16:9',
+                                '4:3',
+                                '1:1',
+                                '9:16',
+                            ])
+                            ->helperText('Upload screenshot image (max 10MB)')
+                            ->columnSpan(2),
+                    ])
+                    ->columns(2),
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                ImageColumn::make('screenshot')
+                    ->size(80)
+                    ->square()
+                    ->defaultImageUrl(url('/images/placeholder.png')),
+
+                TextColumn::make('advert.name')
+                    ->label('Advertisement')
+                    ->searchable()
+                    ->sortable()
+                    ->weight(FontWeight::Bold)
+                    ->limit(25)
+                    ->tooltip(function (TextColumn $column): ?string {
+                        $state = $column->getState();
+                        return strlen($state) > 25 ? $state : null;
+                    }),
+
+                TextColumn::make('advert.campaign.name')
+                    ->label('Campaign')
+                    ->searchable()
+                    ->sortable()
+                    ->badge()
+                    ->color('primary')
+                    ->limit(20),
+
+                TextColumn::make('advert.category')
+                    ->label('Category')
+                    ->searchable()
+                    ->badge()
+                    ->color('info')
+                    ->formatStateUsing(fn($state) => ucfirst($state)),
+
+                TextColumn::make('user.fullname')
+                    ->label('Processed By')
+                    ->searchable()
+                    ->sortable()
+                    ->badge()
+                    ->color('gray'),
+
+                TextColumn::make('views')
+                    ->numeric()
+                    ->sortable()
+                    ->alignment('center')
+                    ->badge()
+                    ->color(fn($state) => match (true) {
+                        $state >= 1000 => 'success',
+                        $state >= 100 => 'warning',
+                        default => 'gray',
+                    }),
+
+                TextColumn::make('advert.reward')
+                    ->label('Reward')
+                    ->money('USD')
+                    ->sortable()
+                    ->alignment('right')
+                    ->color('success'),
+
+                TextColumn::make('created_at')
+                    ->label('Uploaded')
+                    ->dateTime()
+                    ->sortable()
+                    ->since()
+                    ->tooltip(fn($state) => $state->format('M d, Y H:i:s')),
+
+                TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                SelectFilter::make('advert_id')
+                    ->relationship('advert', 'name')
+                    ->label('Advertisement')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('processed_by')
+                    ->relationship('user', 'fullname')
+                    ->label('Processed By')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('campaign')
+                    ->relationship('advert.campaign', 'name')
+                    ->label('Campaign')
+                    ->searchable()
+                    ->preload(),
+
+                Filter::make('high_views')
+                    ->query(fn(Builder $query): Builder => $query->where('views', '>=', 100))
+                    ->label('High Views (≥100)'),
+
+                Filter::make('recent')
+                    ->query(fn(Builder $query): Builder => $query->where('created_at', '>=', now()->subDays(7)))
+                    ->label('Recent (7 days)')
+                    ->default(),
+
+                Filter::make('no_views')
+                    ->query(fn(Builder $query): Builder => $query->where('views', 0))
+                    ->label('No Views'),
+            ])
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+
+                Action::make('view_full_image')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->url(fn($record) => asset($record->screenshot))
+                    ->openUrlInNewTab(),
+
+                Action::make('increase_views')
+                    ->icon('heroicon-o-arrow-trending-up')
+                    ->color('success')
+                    ->form([
+                        TextInput::make('additional_views')
+                            ->required()
+                            ->numeric()
+                            ->minValue(1)
+                            ->default(10)
+                            ->label('Additional Views'),
+                    ])
+                    ->action(function ($record, array $data) {
+                        $record->update([
+                            'views' => $record->views + $data['additional_views']
+                        ]);
+
+                        Notification::make()
+                            ->title('Views Updated')
+                            ->body("Added {$data['additional_views']} views")
+                            ->success()
+                            ->send();
+                    }),
+
+                Action::make('approve')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        // Add your approval logic here
+                        // For example, you might have a status field
+
+                        Notification::make()
+                            ->title('Screenshot Approved')
+                            ->success()
+                            ->send();
+                    }),
+
+                Action::make('reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->form([
+                        Forms\Components\Textarea::make('rejection_reason')
+                            ->required()
+                            ->placeholder('Please provide a reason for rejection...'),
+                    ])
+                    ->action(function ($record, array $data) {
+                        // Add your rejection logic here
+
+                        Notification::make()
+                            ->title('Screenshot Rejected')
+                            ->body($data['rejection_reason'])
+                            ->danger()
+                            ->send();
+                    }),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+
+                    Tables\Actions\BulkAction::make('bulk_approve')
+                        ->label('Approve Selected')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->action(function ($records) { // Add your bulk approval logic here
+                            foreach ($records as $record) {
+                                // Update status or perform approval actions
+                                // $record->update(['status' => 'approved']);
+                            }
+
+                            Notification::make()
+                                ->title('Screenshots Approved')
+                                ->body(count($records) . ' screenshots have been approved')
+                                ->success()
+                                ->send();
+                        }),
+
+                    Tables\Actions\BulkAction::make('bulk_reject')
+                        ->label('Reject Selected')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->form([
+                            Forms\Components\Textarea::make('rejection_reason')
+                                ->required()
+                                ->placeholder('Please provide a reason for rejection...'),
+                        ])
+                        ->action(function ($records, array $data) {
+                            // Add your bulk rejection logic here
+                            foreach ($records as $record) {
+                                // Update status or perform rejection actions
+                                // $record->update([
+                                //     'status' => 'rejected',
+                                //     'rejection_reason' => $data['rejection_reason']
+                                // ]);
+                            }
+
+                            Notification::make()
+                                ->title('Screenshots Rejected')
+                                ->body(count($records) . ' screenshots have been rejected')
+                                ->danger()
+                                ->send();
+                        }),
+
+                    Tables\Actions\BulkAction::make('bulk_add_views')
+                        ->label('Add Views to Selected')
+                        ->icon('heroicon-o-arrow-trending-up')
+                        ->color('info')
+                        ->form([
+                            TextInput::make('additional_views')
+                                ->required()
+                                ->numeric()
+                                ->minValue(1)
+                                ->default(10)
+                                ->label('Additional Views'),
+                        ])
+                        ->action(function ($records, array $data) {
+                            foreach ($records as $record) {
+                                $record->update([
+                                    'views' => $record->views + $data['additional_views']
+                                ]);
+                            }
+
+                            Notification::make()
+                                ->title('Views Updated')
+                                ->body("Added {$data['additional_views']} views to " . count($records) . ' screenshots')
+                                ->success()
+                                ->send();
+                        }),
+                ]),
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->striped()
+            ->paginated([10, 25, 50, 100])
+            ->poll('60s'); // Auto-refresh every 60 seconds
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListScreenshots::route('/'),
+            'create' => Pages\CreateScreenshots::route('/create'),
+            // 'view' => Pages\ViewScreenshots::route('/{record}'),
+            'edit' => Pages\EditScreenshots::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::getModel()::count();
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        $count = static::getModel()::count();
+
+        return match (true) {
+            $count > 100 => 'success',
+            $count > 50 => 'warning',
+            default => 'primary',
+        };
+    }
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()->with(['advert', 'user']);
+    }
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['advert.name', 'advert.campaign.name', 'user.fullname'];
+    }
+
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        return [
+            'Advertisement' => $record->advert->name,
+            'Campaign' => $record->advert->campaign->name,
+            'Views' => number_format($record->views),
+            'Processed By' => $record->user->fullname,
+        ];
+    }
+}
