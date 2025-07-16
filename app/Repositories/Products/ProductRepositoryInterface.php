@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Repositories\Products;
 
 use App\Http\Requests\ProductAdvertRequest;
@@ -11,22 +12,22 @@ interface ProductRepositoryInterface
 {
     public function createProduct(ProductRequest $request);
 
-    public function createChildProduct(Request $request,$masterProductId);
+    public function createChildProduct(Request $request, $masterProductId);
     public function updateProduct(UpdateProductRequest $request, $productId);
     public function getProducts();
     public function searchProducts(Request $request);
 
 
     public function startCampaigns(StartCampaignRequest $request);
-    public function uploadAdvertProducts(ProductAdvertRequest $request,$campaignId);
+    public function uploadAdvertProducts(ProductAdvertRequest $request, $campaignId);
     public function getAdvertProducts(Request $request);
-    public function uploadScreenShotPlusCompare(Request $request,$advert_id);
+    public function uploadScreenShotPlusCompare(Request $request, $advert_id);
     public function getCampaigns(Request $request);
-    public function getAdvertCampaigns(Request $request,$campaignId);
+    public function getAdvertCampaigns(Request $request, $campaignId);
 
-    public function getAdvertCampaignsFraud(Request $request,$campaignId);
+    public function getAdvertCampaignsFraud(Request $request, $campaignId);
 
-    public function getDashboardData(Request $request,$userId);
+    public function getDashboardData(Request $request, $userId);
 
     public function getAdminDashboardData(Request $request);
 
@@ -38,9 +39,8 @@ interface ProductRepositoryInterface
     public function getCampaignTimelyPersional(Request $request);
 
     public function getExcellFileForPayment(Request $request);
-    
-    public function updateCampaign(Request $request, $id);
-    
-    public function updateAdvertProduct(ProductAdvertRequest $request, $advertId);
 
+    public function updateCampaign(Request $request, $id);
+
+    public function updateAdvertProduct(ProductAdvertRequest $request, $advertId);
 }
