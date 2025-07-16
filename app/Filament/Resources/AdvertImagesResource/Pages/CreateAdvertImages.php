@@ -5,7 +5,7 @@ namespace App\Filament\Resources\AdvertImagesResource\Pages;
 use App\Filament\Resources\AdvertImagesResource;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
-use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use App\Http\Requests\ProductAdvertRequest;
 use App\Http\Controllers\ProductController;
 use App\Repositories\Products\ProductRepositoryInterface;
@@ -20,38 +20,47 @@ class CreateAdvertImages extends CreateRecord
             $data = $this->form->getState();
             $request = new ProductAdvertRequest();
 
-            // Manually add file (image/video) and other fields if needed here
-            // Ensure files are in request()->files and available through form
-
+            // Merge non-file fields
             $request->merge([
                 'name' => $data['name'] ?? '',
                 'description' => $data['description'] ?? '',
                 'category' => $data['category'] ?? '',
                 'badge' => $data['badge'] ?? '',
-                'image' => $data['image'] ?? null,
-                'video' => $data['video'] ?? null,
             ]);
 
-            // Assume you are passing campaign_id via a hidden field
+            // Attach the file: either image or video (as fallback)
+            if (isset($data['image']) && $data['image'] instanceof UploadedFile) {
+                $request->files->set('image', $data['image']);
+            } elseif (isset($data['video']) && $data['video'] instanceof UploadedFile) {
+                $request->files->set('image', $data['video']); // fallback for image validation
+                $request->files->set('video', $data['video']); // still attach video separately
+            }
+
+            // Also attach the video if both are set
+            if (isset($data['video']) && $data['video'] instanceof UploadedFile) {
+                $request->files->set('video', $data['video']);
+            }
+
+            // Get campaign ID from hidden input
             $campaignId = $data['campaign_id'];
 
-            // Create controller + call method
+            // Use controller to handle logic
             $productRepository = app(ProductRepositoryInterface::class);
             $controller = new ProductController($productRepository);
             $response = $controller->uploadAdvertProducts($request, $campaignId);
 
             $responseData = $response->getData();
 
-            if ($responseData->ok === true) {
+            if (isset($responseData->ok) && $responseData->ok === true) {
                 Notification::make()
-                    ->title($responseData->message)
+                    ->title($responseData->message ?? 'Advert uploaded successfully!')
                     ->success()
                     ->send();
 
                 $this->redirect($this->getResource()::getUrl('index'));
             } else {
                 Notification::make()
-                    ->title($responseData->error ?? 'Failed to upload advert')
+                    ->title($responseData->error ?? $responseData->message ?? 'Failed to upload advert')
                     ->danger()
                     ->send();
             }
