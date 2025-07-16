@@ -20,35 +20,35 @@ class Dashboard extends BaseDashboard
   use HasFiltersForm;
 
 
-  public function filtersForm(Form $form): Form
-  {
-    $user = FacadesAuth::user();
+  // public function filtersForm(Form $form): Form
+  // {
+  //   $user = FacadesAuth::user();
 
-    // Retrieve petrol stations associated with the user's company
-    $petrolStations = PetrolStation::where('company_id', $user->company_id)
-      ->pluck('name', 'id');
+  //   // Retrieve petrol stations associated with the user's company
+  //   $petrolStations = PetrolStation::where('company_id', $user->company_id)
+  //     ->pluck('name', 'id');
 
-    return $form->schema([
-      Section::make()->schema([
-        // Petrol Station dropdown limited to the user's company
-        Select::make('petrol_station')
-          ->label('Petrol Station')
-          ->options($petrolStations)
-          ->placeholder('Select a Petrol Station'),
+  //   return $form->schema([
+  //     Section::make()->schema([
+  //       // Petrol Station dropdown limited to the user's company
+  //       Select::make('petrol_station')
+  //         ->label('Petrol Station')
+  //         ->options($petrolStations)
+  //         ->placeholder('Select a Petrol Station'),
 
-        // Date pickers for start and end date
-        DatePicker::make('startDate'),
-        DatePicker::make('endDate'),
-      ])->columns(3),
-    ]);
-  }
+  //       // Date pickers for start and end date
+  //       DatePicker::make('startDate'),
+  //       DatePicker::make('endDate'),
+  //     ])->columns(3),
+  //   ]);
+  // }
 
   public function getWidgets(): array
   {
     return [
-      StatsOverview::class,
-      SalesChart::class,
-      FuelChart::class,
+      // StatsOverview::class,
+      // SalesChart::class,
+      // FuelChart::class,
     ];
   }
 }

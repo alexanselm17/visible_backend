@@ -3,43 +3,52 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
+use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
+use App\Models\RolesModel;
+use App\Models\Permission;
 use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Support\Enums\FontWeight;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Form;
-use Filament\Notifications\Notification;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Actions\Action;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Grid;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Columns\BooleanColumn;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\RestoreAction;
+use Filament\Tables\Actions\ForceDeleteAction;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
-
-
 {
-
-
   protected static ?string $model = User::class;
 
   protected static ?string $navigationIcon = 'heroicon-o-users';
 
+  protected static ?string $navigationLabel = 'Users';
+
+  protected static ?string $modelLabel = 'User';
+
+  protected static ?string $pluralModelLabel = 'Users';
+
   protected static ?string $navigationGroup = 'User Management';
-
-  protected static ?string $navigationLabel = 'Employees';
-
-  protected static ?string $modelLabel = 'Employee';
-
-  protected static ?string $pluralModelLabel = 'Employees';
 
   protected static ?int $navigationSort = 1;
 
@@ -47,202 +56,445 @@ class UserResource extends Resource
   {
     return $form
       ->schema([
-        Forms\Components\Section::make('Employee Information')
+        Section::make('Personal Information')
           ->schema([
-            TextInput::make('fullname')
-              ->required()
-              ->maxLength(255)
-              ->helperText('Enter employee\'s full legal name'),
+            Grid::make(2)
+              ->schema([
+                TextInput::make('fullname')
+                  ->label('Full Name')
+                  ->required()
+                  ->maxLength(255)
+                  ->placeholder('Enter full name'),
 
-            TextInput::make('username')
-              ->required()
-              ->maxLength(255)
-              ->unique(ignorable: fn($record) => $record)
-              ->helperText('Choose a unique username for login'),
+                TextInput::make('username')
+                  ->label('Username')
+                  ->required()
+                  ->unique(ignoreRecord: true)
+                  ->maxLength(255)
+                  ->placeholder('Enter username'),
 
-            TextInput::make('email')
-              ->email()
-              ->required()
-              ->maxLength(255)
-              ->unique(ignorable: fn($record) => $record)
-              ->helperText('Enter a valid email address'),
+                TextInput::make('email')
+                  ->label('Email Address')
+                  ->email()
+                  ->required()
+                  ->unique(ignoreRecord: true)
+                  ->maxLength(255)
+                  ->placeholder('Enter email address'),
 
-            TextInput::make('phone')
-              ->tel()
-              ->prefix('+254')
-              ->required()
-              ->maxLength(9)
-              ->dehydrateStateUsing(function ($state) {
-                // Remove +254 if present
-                return str_replace('+254', '', $state);
-              })
-              ->formatStateUsing(function ($state) {
-                // Remove +254 if present when displaying
-                return str_replace('+254', '', $state);
-              })
-              ->helperText('Enter active contact number'),
+                TextInput::make('phone')
+                  ->label('Phone Number')
+                  ->tel()
+                  ->maxLength(255)
+                  ->placeholder('Enter phone number'),
 
-            TextInput::make('national_id')
-              ->required()
-              ->maxLength(255)
-              ->unique(ignorable: fn($record) => $record)
-              ->helperText('Enter valid national ID number'),
+                TextInput::make('national_id')
+                  ->label('National ID')
+                  ->maxLength(255)
+                  ->placeholder('Enter national ID'),
 
-            TextInput::make('card_number')
-              ->maxLength(255)
-              ->unique(ignorable: fn($record) => $record)
-              ->helperText('Optional: Enter employee card number if applicable'),
-          ])->columns(2),
+                TextInput::make('card_number')
+                  ->label('Card Number')
+                  ->maxLength(255)
+                  ->placeholder('Enter card number'),
+              ]),
 
-        Forms\Components\Section::make('Access & Roles')
+            Grid::make(3)
+              ->schema([
+                Select::make('gender')
+                  ->label('Gender')
+                  ->options([
+                    'male' => 'Male',
+                    'female' => 'Female',
+                    'other' => 'Other',
+                  ])
+                  ->placeholder('Select gender'),
+
+                TextInput::make('occupation')
+                  ->label('Occupation')
+                  ->maxLength(255)
+                  ->placeholder('Enter occupation'),
+
+                TextInput::make('location')
+                  ->label('Location')
+                  ->maxLength(255)
+                  ->placeholder('Enter location'),
+              ]),
+
+            Grid::make(3)
+              ->schema([
+                TextInput::make('town')
+                  ->label('Town')
+                  ->maxLength(255)
+                  ->placeholder('Enter town'),
+
+                TextInput::make('estate')
+                  ->label('Estate')
+                  ->maxLength(255)
+                  ->placeholder('Enter estate'),
+
+                TextInput::make('county')
+                  ->label('County')
+                  ->maxLength(255)
+                  ->placeholder('Enter county'),
+              ]),
+          ])
+          ->columns(2),
+
+        Section::make('Account Settings')
           ->schema([
-            Select::make('petrol_id')
-              ->label('Petrol Station')
-              ->relationship('petrolStation', 'name', function ($query) {
-                $query->where('company_id', auth()->user()->company_id);
-              })
-              ->required()
-              ->helperText('Assign employee to a specific petrol station'),
+            Grid::make(2)
+              ->schema([
+                TextInput::make('password')
+                  ->label('Password')
+                  ->password()
+                  ->required(fn(string $context): bool => $context === 'create')
+                  ->dehydrated(fn($state) => filled($state))
+                  ->dehydrateStateUsing(fn($state) => Hash::make($state))
+                  ->minLength(8)
+                  ->placeholder('Enter password'),
 
-            TextInput::make('password')
-              ->password()
-              ->dehydrateStateUsing(fn($state) => filled($state) ? $state : null)
-              ->required(fn(string $operation): bool => $operation === 'create')
-              ->helperText('Leave blank to keep existing password when editing'),
+                Select::make('role_id')
+                  ->label('Role')
+                  ->relationship('role', 'name')
+                  ->searchable()
+                  ->preload()
+                  ->required()
+                  ->placeholder('Select role'),
+              ]),
 
-            Toggle::make('is_active')
-              ->label('Active Status')
-              ->default(true)
-              ->helperText('Toggle to enable/disable employee account access'),
+            Grid::make(3)
+              ->schema([
+                Toggle::make('is_active')
+                  ->label('Active')
+                  ->default(true)
+                  ->helperText('Whether the user account is active'),
 
-            Toggle::make('is_verified')
-              ->label('Verified Status')
-              ->default(false)
-              ->helperText('Toggle to verify employee account credentials'),
-          ])->columns(2),
+                Toggle::make('is_verified')
+                  ->label('Verified')
+                  ->default(false)
+                  ->helperText('Whether the user email is verified'),
+
+                Toggle::make('is_logged_in')
+                  ->label('Currently Logged In')
+                  ->default(false)
+                  ->helperText('Whether the user is currently logged in'),
+              ]),
+          ])
+          ->columns(2),
+
+        Section::make('Permissions')
+          ->schema([
+            Select::make('permissions')
+              ->label('Additional Permissions')
+              ->multiple()
+              ->relationship('permissions', 'name')
+              ->searchable()
+              ->preload()
+              ->helperText('Select additional permissions for this user (beyond role permissions)'),
+          ])
+          ->collapsible(),
+
+        Section::make('Technical Information')
+          ->schema([
+            TextInput::make('fcm_token')
+              ->label('FCM Token')
+              ->maxLength(255)
+              ->placeholder('Firebase Cloud Messaging token'),
+          ])
+          ->collapsible()
+          ->collapsed(),
       ]);
   }
+
   public static function table(Table $table): Table
   {
     return $table
       ->columns([
         TextColumn::make('fullname')
+          ->label('Full Name')
           ->searchable()
-          ->sortable(),
+          ->sortable()
+          ->weight(FontWeight::Medium),
+
+        TextColumn::make('username')
+          ->label('Username')
+          ->searchable()
+          ->sortable()
+          ->copyable()
+          ->badge()
+          ->color('gray'),
+
         TextColumn::make('email')
+          ->label('Email')
           ->searchable()
-          ->sortable(),
+          ->sortable()
+          ->copyable()
+          ->icon('heroicon-m-envelope'),
+
         TextColumn::make('phone')
-          ->searchable(),
+          ->label('Phone')
+          ->searchable()
+          ->toggleable()
+          ->copyable()
+          ->icon('heroicon-m-phone'),
 
         TextColumn::make('role.name')
           ->label('Role')
-          ->sortable()
-          ->formatStateUsing(fn($state) => $state ? $state : 'Unassigned')
           ->badge()
-          ->color(fn($state) => $state === 'Unassigned' ? 'danger' : 'success'),
-
-
-        TextColumn::make('petrolStation.name')
-          ->label('Petrol Station')
+          ->color(fn(string $state): string => match ($state) {
+            'Admin' => 'danger',
+            'Developer' => 'purple',
+            'Manager' => 'warning',
+            'Cashier' => 'info',
+            'Customer Champion' => 'success',
+            default => 'gray',
+          })
           ->sortable(),
 
+        BooleanColumn::make('is_active')
+          ->label('Active')
+          ->sortable()
+          ->toggleable(),
+
+        BooleanColumn::make('is_verified')
+          ->label('Verified')
+          ->sortable()
+          ->toggleable(),
+
+        BooleanColumn::make('is_logged_in')
+          ->label('Online')
+          ->sortable()
+          ->toggleable(),
+
+        TextColumn::make('location')
+          ->label('Location')
+          ->searchable()
+          ->toggleable(isToggledHiddenByDefault: true),
+
         TextColumn::make('created_at')
+          ->label('Created')
           ->dateTime()
           ->sortable()
           ->toggleable(isToggledHiddenByDefault: true),
+
         TextColumn::make('updated_at')
+          ->label('Updated')
           ->dateTime()
           ->sortable()
           ->toggleable(isToggledHiddenByDefault: true),
       ])
       ->filters([
-        SelectFilter::make('role')
-          ->relationship('role', 'name'),
-        SelectFilter::make('petrol_station')
-          ->relationship('petrolStation', 'name', function ($query) {
-            $query->where('company_id', auth()->user()->company_id);
-          }),
         TrashedFilter::make(),
+
+        SelectFilter::make('role')
+          ->relationship('role', 'name')
+          ->multiple()
+          ->preload(),
+
+        SelectFilter::make('is_active')
+          ->label('Status')
+          ->options([
+            true => 'Active',
+            false => 'Inactive',
+          ]),
+
+        SelectFilter::make('is_verified')
+          ->label('Verification')
+          ->options([
+            true => 'Verified',
+            false => 'Unverified',
+          ]),
+
+        SelectFilter::make('is_logged_in')
+          ->label('Login Status')
+          ->options([
+            true => 'Online',
+            false => 'Offline',
+          ]),
+
+        SelectFilter::make('gender')
+          ->options([
+            'male' => 'Male',
+            'female' => 'Female',
+            'other' => 'Other',
+          ]),
       ])
       ->actions([
-        ViewAction::make(),
-        // ->visible(fn($record) => auth()->user()->can('view', $record)),
-        EditAction::make()
-        // ->visible(fn($record) => auth()->user()->can('update', $record)),
-
-        // Action::make('assignRole')
-        //   ->label(fn($record) => $record->role ? 'Change Role' : 'Assign Role')
-        //   ->icon('heroicon-o-user-group')
-        //   ->modalHeading(fn($record) => $record->role ? "Change {$record->fullname}'s Role" : "Assign Role to {$record->fullname}")
-        //   ->form([
-        //     Select::make('role_id')
-        //       ->label('Role')
-        //       ->options(function () {
-        //         return \App\Models\RolesModel::query()
-        //           ->when(!auth()->user()->role?->slug === 'dev', function ($query) {
-        //             $query->where('slug', '!=', 'dev');
-        //           })
-        //           ->pluck('name', 'id');
-        //       })
-        //       ->default(function ($record) {
-        //         return $record->role_id;
-        //       })
-        //       ->required()
-        //       ->searchable()
-        //       ->preload()
-        //       ->placeholder('Select a role')
-        //       ->helperText(function ($record) {
-        //         return $record->role
-        //           ? "Current Role: {$record->role->name}"
-        //           : 'No role currently assigned';
-        //       }),
-        //   ])
-        //   ->modalDescription(
-        //     fn($record) =>
-        //     $record->role
-        //       ? "You are about to change {$record->fullname}'s role from {$record->role->name}."
-        //       : "You are about to assign a role to {$record->fullname}."
-        //   )
-        //   ->action(function (array $data, $record) {
-        //     $request = new \App\Http\Requests\AssignRoleRequest();
-        //     $request->merge([
-        //       'user_id' => $record->id,
-        //       'role_id' => $data['role_id'],
-        //     ]);
-
-        //     $response = app(\App\Http\Controllers\AuthController::class)->assignRole($request);
-        //     $responseData = $response->getData();
-
-        //     if ($responseData->ok === true) {
-        //       Notification::make()
-        //         ->title($responseData->message ?? ($record->role
-        //           ? 'Role updated successfully'
-        //           : 'Role assigned successfully'))
-        //         ->success()
-        //         ->send();
-        //     } else {
-        //       Notification::make()
-        //         ->title($responseData->message ?? 'Failed to assign role')
-        //         ->danger()
-        //         ->send();
-        //     }
-        //   })
-        //   ->modalSubmitActionLabel(fn($record) => $record->role ? 'Change Role' : 'Assign Role')
-        //   ->color('success')
-        //   ->visible(
-        //     fn($record) =>
-        //     in_array(auth()->user()->role?->slug, ['dev', 'admin']) &&
-        //       $record->id !== auth()->id()
-        //   ),
+        ActionGroup::make([
+          ViewAction::make(),
+          EditAction::make(),
+          DeleteAction::make(),
+          RestoreAction::make(),
+          ForceDeleteAction::make(),
+        ])
       ])
-      ->bulkActions([]);
+      ->bulkActions([
+        Tables\Actions\BulkActionGroup::make([
+          Tables\Actions\DeleteBulkAction::make(),
+          Tables\Actions\ForceDeleteBulkAction::make(),
+          Tables\Actions\RestoreBulkAction::make(),
+
+          Tables\Actions\BulkAction::make('activate')
+            ->label('Activate Users')
+            ->icon('heroicon-m-check-circle')
+            ->color('success')
+            ->action(function ($records) {
+              $records->each->update(['is_active' => true]);
+              Notification::make()
+                ->title('Users activated successfully')
+                ->success()
+                ->send();
+            })
+            ->requiresConfirmation(),
+
+          Tables\Actions\BulkAction::make('deactivate')
+            ->label('Deactivate Users')
+            ->icon('heroicon-m-x-circle')
+            ->color('danger')
+            ->action(function ($records) {
+              $records->each->update(['is_active' => false]);
+              Notification::make()
+                ->title('Users deactivated successfully')
+                ->success()
+                ->send();
+            })
+            ->requiresConfirmation(),
+        ]),
+      ])
+      ->defaultSort('created_at', 'desc');
+  }
+
+  public static function infolist(Infolist $infolist): Infolist
+  {
+    return $infolist
+      ->schema([
+        Infolists\Components\Section::make('Personal Information')
+          ->schema([
+            Infolists\Components\Grid::make(2)
+              ->schema([
+                Infolists\Components\TextEntry::make('fullname')
+                  ->label('Full Name')
+                  ->weight(FontWeight::Bold),
+
+                Infolists\Components\TextEntry::make('username')
+                  ->label('Username')
+                  ->badge()
+                  ->color('gray'),
+
+                Infolists\Components\TextEntry::make('email')
+                  ->label('Email')
+                  ->copyable()
+                  ->icon('heroicon-m-envelope'),
+
+                Infolists\Components\TextEntry::make('phone')
+                  ->label('Phone')
+                  ->copyable()
+                  ->icon('heroicon-m-phone'),
+
+                Infolists\Components\TextEntry::make('national_id')
+                  ->label('National ID'),
+
+                Infolists\Components\TextEntry::make('card_number')
+                  ->label('Card Number'),
+
+                Infolists\Components\TextEntry::make('gender')
+                  ->label('Gender')
+                  ->badge(),
+
+                Infolists\Components\TextEntry::make('occupation')
+                  ->label('Occupation'),
+              ]),
+          ]),
+
+        Infolists\Components\Section::make('Location Information')
+          ->schema([
+            Infolists\Components\Grid::make(3)
+              ->schema([
+                Infolists\Components\TextEntry::make('location')
+                  ->label('Location'),
+
+                Infolists\Components\TextEntry::make('town')
+                  ->label('Town'),
+
+                Infolists\Components\TextEntry::make('estate')
+                  ->label('Estate'),
+
+                Infolists\Components\TextEntry::make('county')
+                  ->label('County'),
+              ]),
+          ]),
+
+        Infolists\Components\Section::make('Account Information')
+          ->schema([
+            Infolists\Components\Grid::make(2)
+              ->schema([
+                Infolists\Components\TextEntry::make('role.name')
+                  ->label('Role')
+                  ->badge()
+                  ->color(fn(string $state): string => match ($state) {
+                    'Admin' => 'danger',
+                    'Developer' => 'purple',
+                    'Manager' => 'warning',
+                    'Cashier' => 'info',
+                    'Customer Champion' => 'success',
+                    default => 'gray',
+                  }),
+
+                Infolists\Components\IconEntry::make('is_active')
+                  ->label('Active')
+                  ->boolean(),
+
+                Infolists\Components\IconEntry::make('is_verified')
+                  ->label('Verified')
+                  ->boolean(),
+
+                Infolists\Components\IconEntry::make('is_logged_in')
+                  ->label('Currently Logged In')
+                  ->boolean(),
+              ]),
+          ]),
+
+        Infolists\Components\Section::make('Permissions')
+          ->schema([
+            Infolists\Components\RepeatableEntry::make('permissions')
+              ->label('Additional Permissions')
+              ->schema([
+                Infolists\Components\TextEntry::make('name')
+                  ->badge()
+                  ->color('primary'),
+              ])
+              ->columns(3),
+          ])
+          ->collapsible(),
+
+        Infolists\Components\Section::make('System Information')
+          ->schema([
+            Infolists\Components\Grid::make(2)
+              ->schema([
+                Infolists\Components\TextEntry::make('created_at')
+                  ->label('Created')
+                  ->dateTime(),
+
+                Infolists\Components\TextEntry::make('updated_at')
+                  ->label('Last Updated')
+                  ->dateTime(),
+
+                Infolists\Components\TextEntry::make('deleted_at')
+                  ->label('Deleted')
+                  ->dateTime()
+                  ->placeholder('Not deleted'),
+              ]),
+          ])
+          ->collapsible()
+          ->collapsed(),
+      ]);
   }
 
   public static function getRelations(): array
   {
     return [
-      //
+      RelationManagers\PermissionsRelationManager::class,
+      RelationManagers\NotificationsRelationManager::class,
     ];
   }
 
@@ -251,18 +503,48 @@ class UserResource extends Resource
     return [
       'index' => Pages\ListUsers::route('/'),
       'create' => Pages\CreateUser::route('/create'),
-      'edit' => Pages\EditUser::route('/{record}/edit'),
       'view' => Pages\ViewUser::route('/{record}'),
+      'edit' => Pages\EditUser::route('/{record}/edit'),
     ];
   }
 
   public static function getEloquentQuery(): Builder
   {
     return parent::getEloquentQuery()
-      ->where('company_id', auth()->user()->company_id)
-      ->where('id', '!=', auth()->user()->id)
       ->withoutGlobalScopes([
         SoftDeletingScope::class,
       ]);
+  }
+
+  public static function getGlobalSearchEloquentQuery(): Builder
+  {
+    return parent::getGlobalSearchEloquentQuery()
+      ->with(['role']);
+  }
+
+  public static function getGloballySearchableAttributes(): array
+  {
+    return [
+      'fullname',
+      'username',
+      'email',
+      'phone',
+      'national_id',
+      'role.name',
+    ];
+  }
+
+  // public static function getGlobalSearchResultDetails(Model $record): array
+  // {
+  //   return [
+  //     'Role' => $record->role?->name,
+  //     'Email' => $record->email,
+  //     'Phone' => $record->phone,
+  //   ];
+  // }
+
+  public static function getNavigationBadge(): ?string
+  {
+    return static::getModel()::count();
   }
 }
