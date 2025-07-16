@@ -73,7 +73,7 @@ class ProductRepository implements ProductRepositoryInterface
         try {
             // Find the advert record to update
             $advert = AdvertImages::findOrFail($advertId);
-    
+
             // Handle image update (optional)
             if ($request->hasFile('image')) {
                 $imageFile = $request->file('image');
@@ -83,7 +83,7 @@ class ProductRepository implements ProductRepositoryInterface
                 $imageFile->move(public_path('storage/uploads'), $imageFilename);
                 $advert->image_path = 'uploads/' . $imageFilename;
             }
-    
+
             // Handle video update (optional)
             if ($request->hasFile('video')) {
                 $videoFile = $request->file('video');
@@ -93,16 +93,16 @@ class ProductRepository implements ProductRepositoryInterface
                 $videoFile->move(public_path('storage/uploads'), $videoFilename);
                 $advert->video_path = 'uploads/' . $videoFilename;
             }
-    
+
             // Update other fields
             $advert->category = $request->input('category', $advert->category);
             $advert->name = $request->input('name', $advert->name);
             $advert->description = $request->input('description', $advert->description);
             $advert->badge = $request->input('badge', $advert->badge);
-    
+
             // Save updated advert
             $advert->save();
-    
+
             return response()->json([
                 'ok' => true,
                 'status' => "Success",
@@ -123,38 +123,38 @@ class ProductRepository implements ProductRepositoryInterface
     }
 
     public function updateCampaign(Request $request, $id)
-{
-    try {
-        // Find the campaign by ID
-        $campaign = Campaign::findOrFail($id);
+    {
+        try {
+            // Find the campaign by ID
+            $campaign = Campaign::findOrFail($id);
 
-        // Update the campaign with validated input
-        $campaign->update([
-            'name' => $request->input('name', $campaign->name),
-            'capital_invested' => $request->input('capital_invested', $campaign->capital_invested),
-            'valid_until' => $request->input('valid_until', $campaign->valid_until),
-            'reward' => $request->input('reward', $campaign->reward),
-            'capacity' => $request->input('capacity', $campaign->capacity),
-        ]);
+            // Update the campaign with validated input
+            $campaign->update([
+                'name' => $request->input('name', $campaign->name),
+                'capital_invested' => $request->input('capital_invested', $campaign->capital_invested),
+                'valid_until' => $request->input('valid_until', $campaign->valid_until),
+                'reward' => $request->input('reward', $campaign->reward),
+                'capacity' => $request->input('capacity', $campaign->capacity),
+            ]);
 
-        return response()->json([
-            'ok' => true,
-            'message' => 'Campaign updated successfully.',
-            'data' => $campaign,
-        ], 200);
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-        return response()->json([
-            'ok' => false,
-            'message' => 'Campaign not found.',
-        ], 404);
-    } catch (\Throwable $th) {
-        return response()->json([
-            'ok' => false,
-            'message' => 'Failed to update campaign.',
-            'error' => $th->getMessage(),
-        ], 500);
+            return response()->json([
+                'ok' => true,
+                'message' => 'Campaign updated successfully.',
+                'data' => $campaign,
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Campaign not found.',
+            ], 404);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to update campaign.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
     }
-}
 
     public function createChildProduct(Request $request, $masterProductId)
     {
@@ -809,40 +809,40 @@ class ProductRepository implements ProductRepositoryInterface
 
 
 
-    
+
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
             $advertIds = DB::table('advert_images')
                 ->where('campaign_id', $campaignId)
                 ->pluck('id');
-    
+
             $userGroups = DB::table('screenshots')
                 ->select('advert_id', 'processed_by', DB::raw('COUNT(*) as total'))
                 ->whereIn('advert_id', $advertIds)
                 ->groupBy('advert_id', 'processed_by')
                 ->having('total', '=', 5)
                 ->get();
-    
+
             $fraudGroups = [];
-    
+
             foreach ($advertIds as $advertId) {
                 $users = $userGroups->where('advert_id', $advertId)->pluck('processed_by');
-    
+
                 $patterns = [];
-    
+
                 foreach ($users as $userId) {
                     $screens = DB::table('screenshots')
                         ->where('advert_id', $advertId)
                         ->where('processed_by', $userId)
                         ->orderBy('number')
                         ->get();
-    
+
                     $viewsArray = $screens->pluck('views')->toArray();
-    
+
                     // Create a pattern key (stringified view array)
                     $patternKey = implode('-', $viewsArray);
-    
+
                     // Add user to that view pattern group
                     $patterns[$patternKey][] = [
                         'user_id' => $userId,
@@ -857,7 +857,7 @@ class ProductRepository implements ProductRepositoryInterface
                         }),
                     ];
                 }
-    
+
                 // Only include patterns shared by 2+ users
                 foreach ($patterns as $pattern => $group) {
                     if (count($group) >= 2) {
@@ -869,11 +869,10 @@ class ProductRepository implements ProductRepositoryInterface
                     }
                 }
             }
-    
+
             return response()->json([
                 'fraud_groups' => $fraudGroups,
             ]);
-    
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
@@ -881,7 +880,7 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
-    
+
 
     public function getAdvertCampaigns(Request $request, $campaignId)
     {

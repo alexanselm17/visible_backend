@@ -208,61 +208,61 @@ class ScreenshotsResource extends Resource
                     ->url(fn($record) => asset($record->screenshot))
                     ->openUrlInNewTab(),
 
-                Action::make('increase_views')
-                    ->icon('heroicon-o-arrow-trending-up')
-                    ->color('success')
-                    ->form([
-                        TextInput::make('additional_views')
-                            ->required()
-                            ->numeric()
-                            ->minValue(1)
-                            ->default(10)
-                            ->label('Additional Views'),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->update([
-                            'views' => $record->views + $data['additional_views']
-                        ]);
+                // Action::make('increase_views')
+                //     ->icon('heroicon-o-arrow-trending-up')
+                //     ->color('success')
+                //     ->form([
+                //         TextInput::make('additional_views')
+                //             ->required()
+                //             ->numeric()
+                //             ->minValue(1)
+                //             ->default(10)
+                //             ->label('Additional Views'),
+                //     ])
+                //     ->action(function ($record, array $data) {
+                //         $record->update([
+                //             'views' => $record->views + $data['additional_views']
+                //         ]);
 
-                        Notification::make()
-                            ->title('Views Updated')
-                            ->body("Added {$data['additional_views']} views")
-                            ->success()
-                            ->send();
-                    }),
+                //         Notification::make()
+                //             ->title('Views Updated')
+                //             ->body("Added {$data['additional_views']} views")
+                //             ->success()
+                //             ->send();
+                //     }),
 
-                Action::make('approve')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->action(function ($record) {
-                        // Add your approval logic here
-                        // For example, you might have a status field
+                // Action::make('approve')
+                //     ->icon('heroicon-o-check-circle')
+                //     ->color('success')
+                //     ->requiresConfirmation()
+                //     ->action(function ($record) {
+                //         // Add your approval logic here
+                //         // For example, you might have a status field
 
-                        Notification::make()
-                            ->title('Screenshot Approved')
-                            ->success()
-                            ->send();
-                    }),
+                //         Notification::make()
+                //             ->title('Screenshot Approved')
+                //             ->success()
+                //             ->send();
+                //     }),
 
-                Action::make('reject')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->form([
-                        Forms\Components\Textarea::make('rejection_reason')
-                            ->required()
-                            ->placeholder('Please provide a reason for rejection...'),
-                    ])
-                    ->action(function ($record, array $data) {
-                        // Add your rejection logic here
+                // Action::make('reject')
+                //     ->icon('heroicon-o-x-circle')
+                //     ->color('danger')
+                //     ->requiresConfirmation()
+                //     ->form([
+                //         Forms\Components\Textarea::make('rejection_reason')
+                //             ->required()
+                //             ->placeholder('Please provide a reason for rejection...'),
+                //     ])
+                //     ->action(function ($record, array $data) {
+                //         // Add your rejection logic here
 
-                        Notification::make()
-                            ->title('Screenshot Rejected')
-                            ->body($data['rejection_reason'])
-                            ->danger()
-                            ->send();
-                    }),
+                //         Notification::make()
+                //             ->title('Screenshot Rejected')
+                //             ->body($data['rejection_reason'])
+                //             ->danger()
+                //             ->send();
+                //     }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
