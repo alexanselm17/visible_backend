@@ -20,35 +20,16 @@ class Dashboard extends BaseDashboard
   use HasFiltersForm;
 
 
-  // public function filtersForm(Form $form): Form
-  // {
-  //   $user = FacadesAuth::user();
-
-  //   // Retrieve petrol stations associated with the user's company
-  //   $petrolStations = PetrolStation::where('company_id', $user->company_id)
-  //     ->pluck('name', 'id');
-
-  //   return $form->schema([
-  //     Section::make()->schema([
-  //       // Petrol Station dropdown limited to the user's company
-  //       Select::make('petrol_station')
-  //         ->label('Petrol Station')
-  //         ->options($petrolStations)
-  //         ->placeholder('Select a Petrol Station'),
-
-  //       // Date pickers for start and end date
-  //       DatePicker::make('startDate'),
-  //       DatePicker::make('endDate'),
-  //     ])->columns(3),
-  //   ]);
-  // }
+ 
 
   public function getWidgets(): array
   {
     return [
-      // StatsOverview::class,
-      // SalesChart::class,
-      // FuelChart::class,
+      \App\Filament\Widgets\DashboardStatsWidget::class,
+        \App\Filament\Widgets\CampaignCardsWidget::class,
+        \App\Filament\Widgets\ViewsChart::class,
+        \App\Filament\Widgets\RewardsChart::class,
+        \App\Filament\Widgets\CompletedTasksChart::class,
     ];
   }
 }
