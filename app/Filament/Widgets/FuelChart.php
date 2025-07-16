@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Filament\Widgets;
 
 use App\Models\Drum;
@@ -44,16 +45,16 @@ class FuelChart extends PieChartWidget
         });
 
         $colors = [
-            '#FF6384', 
-            '#36A2EB', 
-            '#FFCE56', 
-            '#4BC0C0', 
-            '#9966FF', 
-            '#FF9F40', 
+            '#FF6384',
+            '#36A2EB',
+            '#FFCE56',
+            '#4BC0C0',
+            '#9966FF',
+            '#FF9F40',
         ];
 
         // Prepare data for the pie chart
-        $salesValues = $salesData->pluck('sales')->toArray(); 
+        $salesValues = $salesData->pluck('sales')->toArray();
         $salesLabels = $salesData->pluck('name')->toArray();
 
 
@@ -63,8 +64,8 @@ class FuelChart extends PieChartWidget
                     'label' => 'Sales',
                     'data' => $salesValues,
                     'backgroundColor' => collect($salesValues)->keys()->map(function ($index) use ($colors) {
-                        return $colors[$index % count($colors)]; 
-                    })->toArray(), 
+                        return $colors[$index % count($colors)];
+                    })->toArray(),
                 ],
             ],
             'labels' => $salesLabels,

@@ -583,44 +583,44 @@ class ProductRepository implements ProductRepositoryInterface
                 'screenshot' => 'required|image|mimes:jpeg,png,jpg|max:3072',
                 'user_id' => 'required|exists:users,id',
             ]);
-            
-          $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
-                    ->where('advert_images.id', $advert_id)
-                    ->select('campaigns.*')
-                    ->first();
 
-if (!$campaign) {
-    DB::rollBack();
-    return response()->json([
-        'ok' => false,
-        'status' => 'failed',
-        'message' => "Campaign not found for the given advert ID"
-    ], 404);
-}
+            $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
+                ->where('advert_images.id', $advert_id)
+                ->select('campaigns.*')
+                ->first();
 
-$previousScreenshot = Screenshots::where('advert_id', $advert_id)
-    ->where('processed_by', $request->user_id)
-    ->latest()
-    ->first();
+            if (!$campaign) {
+                DB::rollBack();
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => "Campaign not found for the given advert ID"
+                ], 404);
+            }
 
-$allStarted = Screenshots::where('advert_id', $advert_id)
-    ->where('number', 1)
-    ->count();
+            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $request->user_id)
+                ->latest()
+                ->first();
 
-if (is_null($previousScreenshot)) {
-    if ($allStarted >= $campaign->capacity) {
-        DB::rollBack();
-        return response()->json([
-            'ok' => false,
-            'status' => 'failed',
-            'message' => "Capacity already attained"
-        ], 400);
-    }
-}
+            $allStarted = Screenshots::where('advert_id', $advert_id)
+                ->where('number', 1)
+                ->count();
 
-                    
+            if (is_null($previousScreenshot)) {
+                if ($allStarted >= $campaign->capacity) {
+                    DB::rollBack();
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "Capacity already attained"
+                    ], 400);
+                }
+            }
 
-                               
+
+
+
 
             $advert = AdvertImages::find($advert_id);
             if (!$advert) {
@@ -804,6 +804,81 @@ if (is_null($previousScreenshot)) {
 
 
     //fraud
+
+    public function getAdvertCampaignsFraud(Request $request, $campaignId)
+    {
+        try {
+            $advertIds = DB::table('advert_images')
+                ->where('campaign_id', $campaignId)
+                ->pluck('id');
+
+            $userGroups = DB::table('screenshots')
+                ->select('advert_id', 'processed_by', DB::raw('COUNT(*) as total'))
+                ->whereIn('advert_id', $advertIds)
+                ->groupBy('advert_id', 'processed_by')
+                ->having('total', '=', 5)
+                ->get();
+
+            $fraudGroups = [];
+
+            foreach ($advertIds as $advertId) {
+                $users = $userGroups->where('advert_id', $advertId)->pluck('processed_by');
+
+                $patterns = [];
+
+                foreach ($users as $userId) {
+                    $screens = DB::table('screenshots')
+                        ->where('advert_id', $advertId)
+                        ->where('processed_by', $userId)
+                        ->orderBy('number')
+                        ->get();
+
+                    $viewsArray = $screens->pluck('views')->toArray();
+
+                    // Create a pattern key (stringified view array)
+                    $patternKey = implode('-', $viewsArray);
+
+                    // Add user to that view pattern group
+                    $patterns[$patternKey][] = [
+                        'user_id' => $userId,
+                        'name' => DB::table('users')->where('id', $userId)->value('fullname'),
+                        'views' => $viewsArray,
+                        'screenshots' => $screens->map(function ($s) {
+                            return [
+                                'number' => $s->number,
+                                'views' => $s->views,
+                                'url' => URL::to('storage/' . $s->screenshot),
+                            ];
+                        }),
+                    ];
+                }
+
+                // Only include patterns shared by 2+ users
+                foreach ($patterns as $pattern => $group) {
+                    if (count($group) >= 2) {
+                        $fraudGroups[] = [
+                            'advert_id' => $advertId,
+                            'views_pattern' => $pattern,
+                            'users' => $group,
+                        ];
+                    }
+                }
+            }
+
+            return response()->json([
+                'fraud_groups' => $fraudGroups,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred.',
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
+
+
+
+    
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
