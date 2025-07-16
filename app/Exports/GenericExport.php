@@ -22,16 +22,16 @@ class GenericExport implements FromCollection, WithHeadings, WithColumnFormattin
         return $this->data;
     }
 
+    // Remove headings
     public function headings(): array
     {
-        // Use keys from the first row as headings if data exists
-        return $this->data->first() ? array_keys($this->data->first()) : [];
+        return [];
     }
 
     public function columnFormats(): array
     {
         return [
-            'C' => NumberFormat::FORMAT_TEXT, // Column C = 'Account' as text
+            'C' => NumberFormat::FORMAT_TEXT, // Column C = Account, treated as plain text
         ];
     }
 }

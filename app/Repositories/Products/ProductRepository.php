@@ -34,7 +34,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
-
+use App\Exports\GenericExport;
 class ProductRepository implements ProductRepositoryInterface
 {
 
@@ -1848,17 +1848,16 @@ class ProductRepository implements ProductRepositoryInterface
 
 
 
-
     public function getExcellFileForPayment(Request $request)
     {
         try {
             // Get the latest invoice for each processed_by
             $latestInvoices = Invoice::select('invoices.*')
                 ->join(DB::raw('(SELECT MAX(created_at) AS latest_created, processed_by 
-                            FROM invoices 
-                            GROUP BY processed_by) AS latest'), function ($join) {
+                                FROM invoices 
+                                GROUP BY processed_by) AS latest'), function ($join) {
                     $join->on('invoices.processed_by', '=', 'latest.processed_by')
-                        ->on('invoices.created_at', '=', 'latest.latest_created');
+                         ->on('invoices.created_at', '=', 'latest.latest_created');
                 })
                 ->orderBy('invoices.created_at', 'desc')
                 ->leftJoin('users', 'invoices.processed_by', '=', 'users.id')
@@ -1873,23 +1872,28 @@ class ProductRepository implements ProductRepositoryInterface
                 )
                 ->where('invoices.customer_balance', '>', '0')
                 ->get();
-
+               
+    
+            // Transform data
             $data = $latestInvoices->map(function ($invoice) {
                 return [
-                    'Bank Code' => 99,
-                    'Code' => "002",
-                    'Account' => (string) $invoice->phone,
-                    'Name' => $invoice->fullname,
-                    'Amount' => $invoice->customer_balance,
-                    'Narrative' => 'SALARY',
-                    'Beneficiary Address 1' => $invoice->town,
-                    'Beneficiary Address 2' => $invoice->estate,
-                    'Beneficiary Address 3' => $invoice->county,
-                    'Purpose of Payment Code' => "SALA",
+                     99,
+                     "112",
+                     (string) $invoice->phone,
+                     $invoice->fullname,
+                     $invoice->customer_balance,
+                    'Payment',
+                    $invoice->town,
+                    $invoice->estate,
+                    $invoice->county,
+                    "SALA",
                 ];
             });
-
-            return Excel::download(new \App\Exports\GenericExport($data), 'latest_balances.xlsx');
+    
+            // Return Excel file for download
+            return Excel::download(
+                new GenericExport($data), 
+                'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
         } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
@@ -1898,4 +1902,5 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
+    
 }
