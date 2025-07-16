@@ -803,7 +803,7 @@ if (is_null($previousScreenshot)) {
     }
 
 
-    
+    //fraud
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
