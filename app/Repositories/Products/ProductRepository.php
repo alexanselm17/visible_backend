@@ -803,78 +803,9 @@ class ProductRepository implements ProductRepositoryInterface
     }
 
 
-    //fraud
 
-    public function getAdvertCampaignsFraud(Request $request, $campaignId)
-    {
-        try {
-            $advertIds = DB::table('advert_images')
-                ->where('campaign_id', $campaignId)
-                ->pluck('id');
 
-            $userGroups = DB::table('screenshots')
-                ->select('advert_id', 'processed_by', DB::raw('COUNT(*) as total'))
-                ->whereIn('advert_id', $advertIds)
-                ->groupBy('advert_id', 'processed_by')
-                ->having('total', '=', 5)
-                ->get();
 
-            $fraudGroups = [];
-
-            foreach ($advertIds as $advertId) {
-                $users = $userGroups->where('advert_id', $advertId)->pluck('processed_by');
-
-                $patterns = [];
-
-                foreach ($users as $userId) {
-                    $screens = DB::table('screenshots')
-                        ->where('advert_id', $advertId)
-                        ->where('processed_by', $userId)
-                        ->orderBy('number')
-                        ->get();
-
-                    $viewsArray = $screens->pluck('views')->toArray();
-
-                    // Create a pattern key (stringified view array)
-                    $patternKey = implode('-', $viewsArray);
-
-                    // Add user to that view pattern group
-                    $patterns[$patternKey][] = [
-                        'user_id' => $userId,
-                        'name' => DB::table('users')->where('id', $userId)->value('fullname'),
-                        'views' => $viewsArray,
-                        'screenshots' => $screens->map(function ($s) {
-                            return [
-                                'number' => $s->number,
-                                'views' => $s->views,
-                                'url' => URL::to('storage/' . $s->screenshot),
-                            ];
-                        }),
-                    ];
-                }
-
-                // Only include patterns shared by 2+ users
-                foreach ($patterns as $pattern => $group) {
-                    if (count($group) >= 2) {
-                        $fraudGroups[] = [
-                            'advert_id' => $advertId,
-                            'views_pattern' => $pattern,
-                            'users' => $group,
-                        ];
-                    }
-                }
-            }
-
-            return response()->json([
-                'fraud_groups' => $fraudGroups,
-            ]);
-        } catch (\Throwable $th) {
-            return response()->json([
-                'message' => 'An error occurred.',
-                'error' => $th->getMessage()
-            ], 500);
-        }
-    }
 
 
 
