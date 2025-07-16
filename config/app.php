@@ -69,7 +69,7 @@ return [
     |
     */
 
-   'timezone' => 'Africa/Nairobi',
+    'timezone' => 'Africa/Nairobi',
 
 
     /*
@@ -198,6 +198,8 @@ return [
         App\Providers\Filament\AdminPanelProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\RepositoryServiceProvider::class,
+        App\Providers\ObserverServiceProvider::class,
+
 
     ],
 
@@ -215,7 +217,7 @@ return [
     'aliases' => Facade::defaultAliases()->merge([
         // 'ExampleClass' => App\Example\ExampleClass::class,
 
-    'PDF' => Barryvdh\DomPDF\Facade::class,
+        'PDF' => Barryvdh\DomPDF\Facade::class,
     ])->toArray(),
 
 ];
