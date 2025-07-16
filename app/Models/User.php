@@ -221,19 +221,15 @@ class User extends Authenticatable implements FilamentUser
   }
 
 
-  public function notifications(): HasMany
+  public function notifications()
   {
     return $this->hasMany(Notification::class)->orderBy('created_at', 'desc');
   }
 
-  /**
-   * Get unread notifications for the user.
-   */
-  public function unreadNotifications(): HasMany
+  public function unreadNotifications()
   {
     return $this->hasMany(Notification::class)->where('is_read', false)->orderBy('created_at', 'desc');
   }
-
   /**
    * Get the count of unread notifications.
    */
