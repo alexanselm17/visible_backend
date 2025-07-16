@@ -520,26 +520,48 @@ class AuthRepository implements AuthRepositoryInterface
     public function accountActivationCard(Request $request)
     {
         try {
-            $user = User::where('id', $request['user_id'])->first();
-            // Toggle the is_active status
+            $user = User::find($request->input('user_id'));
+    
+            if (!$user) {
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'error',
+                    'message' => 'User not found.',
+                ], 404);
+            }
+    
+            if ($request->has('login_status')) {
+                $user->is_logged_in = !$user->is_logged_in;
+                $user->save();
+    
+                return response()->json([
+                    'ok' => true,
+                    'status' => 'success',
+                    'message' => 'Account Logged Out Successfully',
+                ]);
+            }
+    
             $user->is_active = !$user->is_active;
             $user->save();
-            $message = $user->is_active ? "Account Activated Successfully" : "Account Deactivated Successfully";
-
+    
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => $message,
+                'message' => $user->is_active ? 'Account Activated Successfully' : 'Account Deactivated Successfully',
             ]);
+    
         } catch (\Throwable $th) {
-            Log::debug('Deactivating Account Error: ' . $th->getMessage());
+            Log::debug('Account Activation Error: ' . $th->getMessage());
+    
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
-                'message' => $th->getMessage(),
-            ]);
+                'message' => 'An unexpected error occurred.',
+                'error' => $th->getMessage(), 
+            ], 500);
         }
     }
+    
 
 
     public function updateProfile(UpdateProfileRequest $request)

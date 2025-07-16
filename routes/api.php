@@ -84,6 +84,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::put('/{id}', [ProductController::class, 'updateCampaign']);
             Route::get('/', [ProductController::class, 'getCampaigns']);
             Route::get('/advert/{campaignId}', [ProductController::class, 'getAdvertCampaigns']);
+            Route::get('/advert/{campaignId}', [ProductController::class, 'getAdvertCampaignsFraud']);
             Route::put('/advert/{advertId}', [ProductController::class, 'updateAdvertProduct']);
             Route::post('/upload_product_advert/{campaignId}', [ProductController::class, 'uploadAdvertProducts']);
             Route::get('/get_product_advert', [ProductController::class, 'getAdvertProducts']);
