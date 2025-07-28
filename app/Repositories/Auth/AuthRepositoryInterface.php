@@ -25,4 +25,9 @@ interface AuthRepositoryInterface
 
     public function getUserPermissions($userId);
     public function transferUser(Request $request);
+
+    public function getCountiesWithSubCounties(Request $request);
+
+ 
+    public function activateAllInactiveAcounts(Request $request);
 }

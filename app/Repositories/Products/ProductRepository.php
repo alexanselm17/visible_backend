@@ -657,7 +657,8 @@ class ProductRepository implements ProductRepositoryInterface
             $screenshotBase64 = base64_encode(file_get_contents($screenshotPath));
 
             // Prepare OpenAI request
-            $apiKey = "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"; // Get from .env file for security
+            $apiKey = "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"; 
+            // Get from .env file for security
             $prompt = "
         You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
         
@@ -699,6 +700,7 @@ class ProductRepository implements ProductRepositoryInterface
 
 
             $output = $response->json('choices.0.message.content') ?? '❌ Not Verified';
+            
 
             // Remove markdown formatting like ```json ... ``` if present
             $output = trim($output);
@@ -713,7 +715,8 @@ class ProductRepository implements ProductRepositoryInterface
                 @unlink($screenshotPath);
                 return response()->json([
                     'message' => '❌ Not Verified',
-                    'reason' => 'Invalid format from the verification model.'
+                    'reason' => 'Invalid format from the verification model...',
+                    'raw' => $output 
                 ], 400);
             }
 

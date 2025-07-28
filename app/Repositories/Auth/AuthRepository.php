@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\RolesModel;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\User;
+use App\Models\Counties;
 use App\Repositories\Auth\AuthRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,8 @@ class AuthRepository implements AuthRepositoryInterface
                 "email" => $request['email'],
                 "password" => $request["password"],
                 "phone" => $request['phone'],
-                "national_id" => $request['national_id'],
+                "county_id" => $request['county'],
+                "subcounty_id" => $request['sub_county'],
                 "role_id" => $role->id,
                 "occupation" => $request['occupation'],
                 "location" => $request['location'],
@@ -67,7 +69,8 @@ class AuthRepository implements AuthRepositoryInterface
                 $query->where('username', $request->username)
                     ->orWhere('email', $request->username)
                     ->orWhere('phone', $request->username);
-            })->first();
+            })->with(['county', 'subCounty'])
+            ->first();
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'ok' => false,
@@ -130,14 +133,29 @@ class AuthRepository implements AuthRepositoryInterface
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'deleted_at' => $user->deleted_at,
-
-                // Include role data in structured format
+            
+            
                 'role' => [
                     'id' => $user->role?->id,
                     'name' => $user->role?->name,
                     'slug' => $user->role?->slug
                 ],
+            
+               
+                'county' => $user->county ? [
+                    'id' => $user->county->id,
+                    'name' => $user->county->name,
+                    'capital' => $user->county->capital,
+                    'code' => $user->county->code ?? null,
+                ] : null,
+            
+                'sub_county' => $user->subCounty ? [
+                    'id' => $user->subCounty->id,
+                    'name' => $user->subCounty->name,
+                    'county_id' => $user->subCounty->county_id,
+                ] : null,
             ];
+            
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
@@ -640,4 +658,82 @@ class AuthRepository implements AuthRepositoryInterface
             ], 500);
         }
     }
+
+
+    public function getCountiesWithSubCounties(Request $request)
+    {
+        try {
+            $name = $request->query('name');
+    
+            $counties = Counties::with('subCounties')
+                ->where('name', 'like', '%' . $name . '%')
+                ->limit(5)
+                ->get();
+    
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'data' => $counties
+            ]);
+        } catch (\Throwable $th) {
+            Log::error('Location Search error:', [
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ]);
+    
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => $th->getMessage(), // 👈 Return exact error here
+                'trace' => $th->getTraceAsString(), // (optional) for full stack trace
+            ], 500);
+        }
+    }
+
+
+    public function activateAllInactiveAcounts(Request $request)
+    {
+        try {
+            $processed_by=$request->input('user_id');
+            $user=User::where('id',$processed_by)->with('role')->first();
+        
+            if($user->role->name !="Admin"){
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => "Not Permitted"
+                ],403);
+            }
+            
+            $allInactiveAccounts = User::where('is_active', false)->get();
+    
+            foreach ($allInactiveAccounts as $inactiveAccount) {
+                $inactiveAccount->is_active = true;
+                $inactiveAccount->save();
+            }
+    
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'message' => count($allInactiveAccounts) . ' account(s) activated.'
+            ]);
+    
+        } catch (\Throwable $th) {
+            Log::error('Activate Accounts Error:', [
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ]);
+    
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ], 500);
+        }
+    }
+    
+    
+
 }

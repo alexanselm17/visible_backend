@@ -108,4 +108,14 @@ class AuthController extends Controller
   {
     return $this->authRepository->transferUser($request);
   }
+
+  public function getCountiesWithSubCounties(Request $request)
+  {
+    return $this->authRepository->getCountiesWithSubCounties($request);
+  }
+
+  public function activateAllInactiveAcounts(Request $request)
+  {
+    return $this->authRepository->activateAllInactiveAcounts($request);
+  }
 }

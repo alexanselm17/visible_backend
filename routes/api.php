@@ -4,7 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomersController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\SalesController;
+
 use App\Http\Controllers\SetupController;
 use App\Http\Middleware\CheckActiveUser;
 use Illuminate\Support\Facades\Route;
@@ -19,14 +19,13 @@ Route::group(['prefix' => 'v1'], function () {
 
         //Admin and manager only
         Route::post('/signup', [AuthController::class, 'signup']);
+        Route::get('/location', [AuthController::class, 'getCountiesWithSubCounties']);
+        Route::post('/all_account_activation', [AuthController::class, 'activateAllInactiveAcounts']);
 
         Route::post('/signin', [AuthController::class, 'signin']);
         Route::put('/logout', [AuthController::class, 'signOut']);
     });
-    Route::group(['prefix' => 'stock'], function () {
-        Route::put('/reconcile_stock', [SalesController::class, 'reconcileStock']);
-        Route::get('/', [SalesController::class, 'getAllProductStock']);
-    });
+
 
     Route::get('/download/advert/{path}', function ($path) {
         $fullPath = public_path("storage/" . $path);
@@ -60,12 +59,7 @@ Route::group(['prefix' => 'v1'], function () {
         Route::put('/reset_password', [AuthController::class, 'restorePassword']);
     });
 
-    Route::group(['prefix' => 'sale_status'], function () {
-        Route::post('/iot/check_sales_status', [SalesController::class, 'isValidToSell']);
-    });
-    Route::group(['prefix' => 'sales'], function () {
-        Route::post('/iot', [SalesController::class, 'recordSalesIOT']);
-    });
+   
 
     Route::group(['prefix' => 'setup'], function () {
 
@@ -143,28 +137,10 @@ Route::group(['prefix' => 'v1'], function () {
 
 
 
-        Route::group(['prefix' => 'dashboard'], function () {
-            Route::get('/{userId}/{roleId}/{companyId}', [SalesController::class, 'dashboardData']);
-            Route::get('/statistic', [SalesController::class, 'statisticData'])->name('dashboard.statistic');
-        });
-
-        Route::group(['prefix' => 'sale'], function () {
-
-            Route::post('/invoice/{shiftId}', [SalesController::class, 'recordCreditSales']);
-            Route::post('/', [SalesController::class, 'recordSales']);
-            Route::get('/', [SalesController::class, 'getLast10SalesReceipts']);
-            Route::put('/return_sales/{transactionId}', [SalesController::class, 'salesReturn']);
-            Route::get('/{shiftId}/{userId}', [SalesController::class, 'getLastFewTransactions']);
-        });
+       
 
         Route::group(['prefix' => 'customers'], function () {
 
-
-            Route::post('/{petrolStationId}', [CustomersController::class, 'createCustomer']);
-            Route::post('reconcile/{customerId}', [SalesController::class, 'reconcileCustomer']);
-            Route::post('repayment/{shiftId}/{customerId}', [SalesController::class, 'customerRepayment']);
-            Route::put('/{id}', [CustomersController::class, 'updateCustomer']);
-            Route::post('customer_discount/{customerId}', [SalesController::class, 'discountCustomer']);
 
 
 
@@ -172,83 +148,8 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/{petrolStationId}', [CustomersController::class, 'fetchCustomers']);
             Route::get('/{petrolStationId}/search', [CustomersController::class, 'searchCustomers']);
         });
-        Route::group(['prefix' => 'activity'], function () {
-            Route::post('/purchases', [SalesController::class, 'recordPurchases']);
-
-            Route::post('/expenses', [SalesController::class, 'recordExpenses']);
-            Route::get('/get_unapproved_expenses', [SalesController::class, 'getUnapprovedExpenses']);
-            //this is admin routes only
-
-
-
-
-            Route::post('/{petrolStationId}', [SalesController::class, 'startShift']);
-            Route::get('/drum/{petrolStationId}/{shiftId}', [SalesController::class, 'getDrums']);
-            Route::get('pump/{shiftId}/{userId}/{petrolStation}', [SalesController::class, 'getPumpAssignment']);
-
-            Route::get('/drums/session/{shiftId}/{petrolId}', [SalesController::class, 'fetchDrumsShiftSession']);
-            Route::post('/drums/record_dips/{shiftId}/{petrolId}/{drumId}', [SalesController::class, 'recordDips']);
-
-            Route::put('/pumps/reverse', [SalesController::class, 'reversePump']);
-
-            //Discounts
-            Route::post('/discounts/{shiftId}', [SalesController::class, 'recordShiftDiscount']);
-            Route::get('/get_unapproved_discounts/{petrolStationId}/{shiftId}', [SalesController::class, 'getUnapprovedShiftDiscount']);
-            Route::put('/approve_discounts', [SalesController::class, 'approveDiscounts']);
-            //Discounts
-
-            Route::get('/{petrolStationId}', [SalesController::class, 'getShifts']);
-            Route::get('/unapprovedInvoices/{petrolStationId}/{shiftId}', [SalesController::class, 'getUnapprovedCustomerInvoices']);
-            Route::post('/assignStation/{petrolStationId}/{shiftId}', [SalesController::class, 'assignStation']);
-            Route::put('/transfer', [SalesController::class, 'approveTransfer']);
-            Route::post('/transfer/{shiftId}', [SalesController::class, 'stationTransfers']);
-            Route::get('/transfer/{station}/{shiftId}', [SalesController::class, 'getAllUnApprovedTransfer']);
-
-            Route::put('/endshift/{shiftId}', [SalesController::class, 'endShift']);
-
-            Route::put('/approve_expenses', [SalesController::class, 'approveExpenses']);
-            Route::put('/cashierApprovals/{userId}', [SalesController::class, 'cashierApprovals']);
-            Route::post('/session/{petrolStationId}/{shiftId}', [SalesController::class, 'drumSession']);
-
-            //let's add a middle ware to ensure no  salesman does the approvals
-            Route::put('/invoices_approval', [SalesController::class, 'approveInvoices']);
-
-
-            Route::get('/session/single_stations', [SalesController::class, 'getStationSessionDetails']);
-            //NIOT
-
-
-            //IOT
-            // Route::post('/session/iot/{petrolStationId}/{shiftId}', [SalesController::class, 'drumSessionIOT']);
-            Route::post('/station/start_session/{petrolStationId}/{shiftId}', [SalesController::class, 'startStationSession']);
-
-            Route::get('station/search_products', [SalesController::class, 'searchProductStation']);
-
-            Route::get('/unapprovedCashierTransaction/{petrolStationId}/{shiftId}', [SalesController::class, 'getUnApprovedCashierTransactions']);
-            Route::get('/unapprovedBankedTransaction/{petrolStationId}', [SalesController::class, 'getUnApprovedBankedTransactions']);
-            // get all bankings for that shift
-            Route::get('bankings', [SalesController::class, 'fetchShiftBanking']);
-
-            Route::post('/banking/{petrolStationId}', [SalesController::class, 'recordBankings']);
-            Route::post('/banking/reset_transactions', [SalesController::class, 'resetBankings']);
-            Route::post('/autobanking', [SalesController::class, 'recordBankingsAutomatic']);
-            Route::get('/constants/{category}', [SalesController::class, 'fetchPaymentMethods']);
-            Route::get('/station/product_not_sesstion/{shiftId}/{station}', [SalesController::class, 'getStationsProductsNotInSession']);
-            Route::get('/station/product_opening_stock/{shiftId}/{station}', [SalesController::class, 'getStationsProductsInSession']);
-            Route::get('/station_assignment/{petrolStationId}/{userId}/{shiftId}', [SalesController::class, 'getStationAssignment']);
-        });
-    });
-    Route::group(['prefix' => 'report'], function () {
-        Route::get('/sale_summary/{petrolStationId}/{shiftId}', [SalesController::class, 'generateSalesReport']);
-        Route::get('/personal_sale_summary', [SalesController::class, 'generatePersonalSalesReport']);
-        Route::get('/customer', [SalesController::class, 'generateCustomerReport']);
-        Route::get('/stock/{petrolStationId}', [SalesController::class, 'generateStockReport']);
-        Route::get('/sales-report/download/{shiftId}/{petrolStationId}', [SalesController::class, 'downloadSalesReport'])->name('download.sales_report');
-        Route::get('/customer_report/download', [SalesController::class, 'downloadCustomerReport'])->name('download.customer_report');
-        Route::get('/personal_periodic_sales_report', [SalesController::class, 'periodicSalesmanReport']);
-        Route::get('/general_periodic_sales_report', [SalesController::class, 'periodicGeneralReport']);
-        Route::get('/daily_report', [SalesController::class, 'dailyReport']);
-    });
+      
+  
 
     Route::prefix('notifications')->group(function () {
         Route::get('/user', [NotificationController::class, 'getUserNotifications']);
@@ -259,4 +160,5 @@ Route::group(['prefix' => 'v1'], function () {
         // Statistics
         Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
     });
+});
 });

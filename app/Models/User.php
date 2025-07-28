@@ -51,16 +51,13 @@ class User extends Authenticatable implements FilamentUser
     'email',
     'is_verified',
     'password',
-    'national_id',
     'is_logged_in',
     'card_number',
     'occupation',
-    'location',
     'gender',
     'fcm_token',
-    'town',
-    'estate',
-    'county'
+    'county_id',
+    'subcounty_id'
 
 
   ];
@@ -134,6 +131,7 @@ class User extends Authenticatable implements FilamentUser
    *
    * @return bool
    */
+
 
   public function isAdmin(): bool
   {
@@ -230,6 +228,17 @@ class User extends Authenticatable implements FilamentUser
   {
     return $this->hasMany(Notification::class)->where('is_read', false)->orderBy('created_at', 'desc');
   }
+
+  public function county()
+{
+    return $this->belongsTo(Counties::class);
+}
+
+public function subCounty()
+{
+    return $this->belongsTo(SubCounty::class, 'subcounty_id');
+}
+
   /**
    * Get the count of unread notifications.
    */
