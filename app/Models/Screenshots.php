@@ -11,7 +11,8 @@ class Screenshots extends Model
         'screenshot',
         'advert_id',
         'processed_by',
-        'views'
+        'views',
+        'timestamp'
     ];
 
     protected $keyType = 'string';

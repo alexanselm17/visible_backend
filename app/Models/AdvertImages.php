@@ -17,7 +17,11 @@ class AdvertImages extends Model
         'campaign_id',
         'reward',
         'description',
-        'badge'
+        'badge',
+        'capital_invested',
+        'valid_until',
+        'capacity',
+        'target_audience'
     ];
 
     protected $keyType = 'string';
@@ -27,6 +31,7 @@ class AdvertImages extends Model
         'badge' => 'array',
         'selling_price' => 'decimal:2',
         'reward' => 'decimal:2',
+        'target_audience' => 'array',
     ];
 
     protected static function boot()
@@ -49,7 +54,8 @@ class AdvertImages extends Model
     {
         return $this->hasMany(Screenshots::class, 'advert_id');
     }
-
+  
+    
     public function invoices()
     {
         return $this->hasMany(Invoice::class, 'advert_id');

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->dateTime('valid_until');
             $table->decimal('reward', 10, 2);
             $table->integer('capacity');
+            $table->json('target_audience')->nullable();
 
             $table->string('image_path');
             $table->string('category');
