@@ -7,6 +7,7 @@ use App\Models\AppVersion;
 use App\Models\Permission;
 use App\Models\RolesModel;
 use Symfony\Component\HttpFoundation\Response;
+use App\Models\Invoice;
 use App\Models\User;
 use App\Models\Counties;
 use App\Repositories\Auth\AuthRepositoryInterface;
@@ -14,15 +15,41 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+
 
 class AuthRepository implements AuthRepositoryInterface
 {
 
+
     public function signUpUser(Request $request)
     {
         try {
+            // Define helper function inside this method
+            $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
+                do {
+                    $code = Str::random($length);
+                    $code = preg_replace('/[^0-9]/', '', $code);
+                    while (strlen($code) < $length) {
+                        $code .= rand(0, 9);
+                    }
+                    $exists = DB::table($table)->where($column, $code)->exists();
+                } while ($exists);
+    
+                return $code;
+            };
+    
             $role = RolesModel::where('name', '=', 'Customer Champion')->first();
-            User::create([
+            $usersCount = User::count();
+    
+            $myCode = $generateUniqueCode('users', 'my_code');
+    
+            $referalCode = $usersCount == 0
+                ? $generateUniqueCode('users', 'referal_code')
+                : $request['code'];
+    
+            $user = User::create([
                 "fullname" => $request['fullname'],
                 "username" => $request['username'],
                 "email" => $request['email'],
@@ -37,12 +64,29 @@ class AuthRepository implements AuthRepositoryInterface
                 "town" => $request['town'],
                 "estate" => $request['estate'],
                 "county" => $request['county'],
-                "is_active" => false
+                "is_active" => false,
+                "referal_code" => $referalCode,
+                "my_code" => $myCode,
             ]);
+    
+            // Handle referral reward
+            $whoReferedMe = User::where("my_code", $request['code'])->first();
+    
+            $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
+            $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
+    
+            Invoice::create([
+                "type" => "Referal",
+                "amount" => 30,
+                "processed_by" => $user->id,
+                "customer_balance" => $customerBalance + 30,
+                "posted_by" => $user->id,
+            ]);
+    
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => "Account created successfully "
+                'message' => "Account created successfully"
             ]);
         } catch (\Throwable $th) {
             Log::debug('Sign Up Error: ' . $th->getMessage());
@@ -53,6 +97,7 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
+    
 
 
     public function signInUser(Request $request)

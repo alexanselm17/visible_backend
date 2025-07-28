@@ -691,73 +691,62 @@ class ProductRepository implements ProductRepositoryInterface
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
+            // Get all advert IDs for the given campaign
             $advertIds = DB::table('advert_images')
                 ->where('campaign_id', $campaignId)
                 ->pluck('id');
-
-            $userGroups = DB::table('screenshots')
-                ->select('advert_id', 'processed_by', DB::raw('COUNT(*) as total'))
-                ->whereIn('advert_id', $advertIds)
-                ->groupBy('advert_id', 'processed_by')
-                ->having('total', '=', 5)
-                ->get();
-
+    
             $fraudGroups = [];
-
+    
             foreach ($advertIds as $advertId) {
-                $users = $userGroups->where('advert_id', $advertId)->pluck('processed_by');
-
+                // Get all screenshots for this advert, ordered by user and number
+                $screenshots = DB::table('screenshots')
+                    ->where('advert_id', $advertId)
+                    ->get();
+    
+                // Group screenshots by a combined key of views + timestamp
                 $patterns = [];
-
-                foreach ($users as $userId) {
-                    $screens = DB::table('screenshots')
-                        ->where('advert_id', $advertId)
-                        ->where('processed_by', $userId)
-                        ->orderBy('number')
-                        ->get();
-
-                    $viewsArray = $screens->pluck('views')->toArray();
-
-                    // Create a pattern key (stringified view array)
-                    $patternKey = implode('-', $viewsArray);
-
-                    // Add user to that view pattern group
+    
+                foreach ($screenshots as $screenshot) {
+                    $patternKey = "{$screenshot->views}_{$screenshot->timestamp}";
+    
                     $patterns[$patternKey][] = [
-                        'user_id' => $userId,
-                        'name' => DB::table('users')->where('id', $userId)->value('fullname'),
-                        'views' => $viewsArray,
-                        'screenshots' => $screens->map(function ($s) {
-                            return [
-                                'number' => $s->number,
-                                'views' => $s->views,
-                                'url' => URL::to('storage/' . $s->screenshot),
-                            ];
-                        }),
+                        'user_id' => $screenshot->processed_by,
+                        'name' => DB::table('users')->where('id', $screenshot->processed_by)->value('fullname'),
+                        'views' => $screenshot->views,
+                        'timestamp' => $screenshot->timestamp,
+                        'number' => $screenshot->number,
+                        'url' => URL::to('storage/' . $screenshot->screenshot),
                     ];
                 }
-
-                // Only include patterns shared by 2+ users
-                foreach ($patterns as $pattern => $group) {
-                    if (count($group) >= 2) {
+    
+                // Only include suspicious patterns shared by 2 or more users
+                foreach ($patterns as $pattern => $grouped) {
+                    // Extract unique user IDs to avoid repetition
+                    $uniqueUsers = collect($grouped)->pluck('user_id')->unique();
+    
+                    if ($uniqueUsers->count() >= 2) {
                         $fraudGroups[] = [
                             'advert_id' => $advertId,
-                            'views_pattern' => $pattern,
-                            'users' => $group,
+                            'matching_views_timestamp' => $pattern,
+                            'users' => $uniqueUsers->values(),
+                            'details' => $grouped,
                         ];
                     }
                 }
             }
-
+    
             return response()->json([
                 'fraud_groups' => $fraudGroups,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
+    
 
 
     public function getAdvertCampaigns(Request $request, $campaignId)

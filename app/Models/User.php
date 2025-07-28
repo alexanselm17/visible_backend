@@ -57,7 +57,9 @@ class User extends Authenticatable implements FilamentUser
     'gender',
     'fcm_token',
     'county_id',
-    'subcounty_id'
+    'subcounty_id',
+    'referal_code',
+    'my_code'
 
 
   ];
