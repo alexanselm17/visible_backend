@@ -72,6 +72,11 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->description = $request->input('description', $advert->description);
             $advert->badge = $request->input('badge', $advert->badge);
 
+            $advert->capital_invested = $request->input('capital_invested', $advert->capital_invested);
+            $advert->valid_until = $request->input('valid_until', $advert->valid_until);
+            $advert->reward = $request->input('reward', $advert->reward);
+            $advert->capacity = $request->input('capacity', $advert->capacity);
+
             // Save updated advert
             $advert->save();
 
@@ -102,12 +107,8 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Update the campaign with validated input
             $campaign->update([
-                'name' => $request->input('name', $campaign->name),
-                'capital_invested' => $request->input('capital_invested', $campaign->capital_invested),
-                'valid_until' => $request->input('valid_until', $campaign->valid_until),
-                'reward' => $request->input('reward', $campaign->reward),
-                'capacity' => $request->input('capacity', $campaign->capacity),
-            ]);
+                'name' => $request->input('name', $campaign->name)]);
+
 
             return response()->json([
                 'ok' => true,
@@ -406,7 +407,7 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->name = $request->name;
             $advert->description = $request->description;
             $advert->badge = $request->badge;
-            $advert->selling_price = "0.00";
+            $advert->selling_price = 0;
             $advert->campaign_id = $campaignId;
             $advert->reward = $campaign->reward;
             //
