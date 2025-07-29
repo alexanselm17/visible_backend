@@ -504,8 +504,31 @@ class ProductRepository implements ProductRepositoryInterface
                 ->where('processed_by', $request->user_id)
                 ->latest()
                 ->first();
+
+                //let's ensure that the first screenshot and second have a differences of 18 hours 
+                $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $request->user_id)
+                ->latest()
+                ->first();
+            
+            if ($previousScreenshot !== null) {
+                // Convert the previous time to Nairobi timezone
+                $previousTime = Carbon::parse($previousScreenshot->created_at)->timezone('Africa/Nairobi');
+            
+                // Get current time minus 18 hours
+                $eighteenHoursAgo = Carbon::now('Africa/Nairobi')->subHours(18);
+            
+                if ($previousTime > $eighteenHoursAgo) {
+                    DB::rollBack();
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "You can only process this after 18 hours since your last submission."
+                    ], 400);
+                }
+            }
             if ($previousScreenshot != null) {
-                if ($previousScreenshot->number == 5) {
+                if ($previousScreenshot->number == 2) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
