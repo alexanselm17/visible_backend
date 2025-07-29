@@ -22,15 +22,10 @@ class StartCampaignRequest extends FormRequest
      */
     public function rules()
     {
-        // Calculate minimum datetime (24 hours from now in Africa/Nairobi timezone)
-        $minDateTime = Carbon::now('Africa/Nairobi')->addDay()->format('Y-m-d H:i:s');
-
+       
         return [
             'name' => 'required|string|max:255',
-            'capital_invested' => 'required|numeric|min:0',
-            'valid_until' => ['required', 'date', "before_or_equal:$minDateTime"],
-            'reward' => 'required|numeric|min:0',
-            'capacity' => 'required|integer|min:1',
+         
         ];
     }
 }

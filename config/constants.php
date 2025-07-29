@@ -6,5 +6,5 @@ return [
     'currency_symbol' => 'Ksh',
     'admin_email' => 'admin@example.com',
     'pagination_limit' => 10,
-    'report_footer_text' => 'New Malaba Border Service Station',
+    'report_footer_text' => 'Visbledb',
 ];

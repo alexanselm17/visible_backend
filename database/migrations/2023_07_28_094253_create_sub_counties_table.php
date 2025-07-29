@@ -11,12 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('campaigns', function (Blueprint $table) {
+        Schema::create('sub_counties', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name');
-          
+            $table->uuid('county_id'); // This line must be here
+            $table->foreign('county_id')->references('id')->on('counties')->onDelete('cascade');
             $table->timestamps();
         });
+        
     }
 
     /**
@@ -24,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('campaigns');
+        Schema::dropIfExists('sub_counties');
     }
 };

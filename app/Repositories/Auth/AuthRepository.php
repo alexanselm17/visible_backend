@@ -7,27 +7,56 @@ use App\Models\AppVersion;
 use App\Models\Permission;
 use App\Models\RolesModel;
 use Symfony\Component\HttpFoundation\Response;
+use App\Models\Invoice;
 use App\Models\User;
+use App\Models\Counties;
 use App\Repositories\Auth\AuthRepositoryInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+
 
 class AuthRepository implements AuthRepositoryInterface
 {
 
+
     public function signUpUser(Request $request)
     {
         try {
+            // Define helper function inside this method
+            $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
+                do {
+                    $code = Str::random($length);
+                    $code = preg_replace('/[^0-9]/', '', $code);
+                    while (strlen($code) < $length) {
+                        $code .= rand(0, 9);
+                    }
+                    $exists = DB::table($table)->where($column, $code)->exists();
+                } while ($exists);
+    
+                return $code;
+            };
+    
             $role = RolesModel::where('name', '=', 'Customer Champion')->first();
-            User::create([
+            $usersCount = User::count();
+    
+            $myCode = $generateUniqueCode('users', 'my_code');
+    
+            $referalCode = $usersCount == 0
+                ? $generateUniqueCode('users', 'referal_code')
+                : $request['code'];
+    
+            $user = User::create([
                 "fullname" => $request['fullname'],
                 "username" => $request['username'],
                 "email" => $request['email'],
                 "password" => $request["password"],
                 "phone" => $request['phone'],
-                "national_id" => $request['national_id'],
+                "county_id" => $request['county'],
+                "subcounty_id" => $request['sub_county'],
                 "role_id" => $role->id,
                 "occupation" => $request['occupation'],
                 "location" => $request['location'],
@@ -35,12 +64,29 @@ class AuthRepository implements AuthRepositoryInterface
                 "town" => $request['town'],
                 "estate" => $request['estate'],
                 "county" => $request['county'],
-                "is_active" => false
+                "is_active" => false,
+                "referal_code" => $referalCode,
+                "my_code" => $myCode,
             ]);
+    
+            // Handle referral reward
+            $whoReferedMe = User::where("my_code", $request['code'])->first();
+    
+            $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
+            $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
+    
+            Invoice::create([
+                "type" => "Referal",
+                "amount" => 30,
+                "processed_by" => $user->id,
+                "customer_balance" => $customerBalance + 30,
+                "posted_by" => $user->id,
+            ]);
+    
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => "Account created successfully "
+                'message' => "Account created successfully"
             ]);
         } catch (\Throwable $th) {
             Log::debug('Sign Up Error: ' . $th->getMessage());
@@ -51,6 +97,7 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
+    
 
 
     public function signInUser(Request $request)
@@ -67,7 +114,8 @@ class AuthRepository implements AuthRepositoryInterface
                 $query->where('username', $request->username)
                     ->orWhere('email', $request->username)
                     ->orWhere('phone', $request->username);
-            })->first();
+            })->with(['county', 'subCounty'])
+            ->first();
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'ok' => false,
@@ -131,13 +179,31 @@ class AuthRepository implements AuthRepositoryInterface
                 'updated_at' => $user->updated_at,
                 'deleted_at' => $user->deleted_at,
 
-                // Include role data in structured format
+                'my_code' => $user->my_code,
+            
+            
+            
                 'role' => [
                     'id' => $user->role?->id,
                     'name' => $user->role?->name,
                     'slug' => $user->role?->slug
                 ],
+            
+               
+                'county' => $user->county ? [
+                    'id' => $user->county->id,
+                    'name' => $user->county->name,
+                    'capital' => $user->county->capital,
+                    'code' => $user->county->code ?? null,
+                ] : null,
+            
+                'sub_county' => $user->subCounty ? [
+                    'id' => $user->subCounty->id,
+                    'name' => $user->subCounty->name,
+                    'county_id' => $user->subCounty->county_id,
+                ] : null,
             ];
+            
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
@@ -640,4 +706,82 @@ class AuthRepository implements AuthRepositoryInterface
             ], 500);
         }
     }
+
+
+    public function getCountiesWithSubCounties(Request $request)
+    {
+        try {
+            $name = $request->query('name');
+    
+            $counties = Counties::with('subCounties')
+                ->where('name', 'like', '%' . $name . '%')
+                ->limit(5)
+                ->get();
+    
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'data' => $counties
+            ]);
+        } catch (\Throwable $th) {
+            Log::error('Location Search error:', [
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ]);
+    
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => $th->getMessage(), // 👈 Return exact error here
+                'trace' => $th->getTraceAsString(), // (optional) for full stack trace
+            ], 500);
+        }
+    }
+
+
+    public function activateAllInactiveAcounts(Request $request)
+    {
+        try {
+            $processed_by=$request->input('user_id');
+            $user=User::where('id',$processed_by)->with('role')->first();
+        
+            if($user->role->name !="Admin"){
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => "Not Permitted"
+                ],403);
+            }
+            
+            $allInactiveAccounts = User::where('is_active', false)->get();
+    
+            foreach ($allInactiveAccounts as $inactiveAccount) {
+                $inactiveAccount->is_active = true;
+                $inactiveAccount->save();
+            }
+    
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'message' => count($allInactiveAccounts) . ' account(s) activated.'
+            ]);
+    
+        } catch (\Throwable $th) {
+            Log::error('Activate Accounts Error:', [
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ]);
+    
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
+            ], 500);
+        }
+    }
+    
+    
+
 }

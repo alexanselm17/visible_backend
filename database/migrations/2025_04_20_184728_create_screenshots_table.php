@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('screenshots', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('screenshot');
+            $table->string('timestamp');
             $table->integer('views');
             $table->uuid('advert_id')->nullable(); // Foreign key for users (processed_by)
             $table->foreign('advert_id')->references('id')->on('advert_images')->onDelete('set null'); // Foreign key constraint for users

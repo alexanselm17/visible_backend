@@ -13,10 +13,7 @@ class Campaign extends Model
 
     protected $fillable = [
         'name',
-        'capital_invested',
-        'valid_until',
-        'reward',
-        'capacity',
+       
     ];
 
     protected $casts = [

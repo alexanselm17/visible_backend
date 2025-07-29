@@ -33,13 +33,9 @@ class SignUp extends FormRequest
                 Rule::unique('users', 'phone'),
             ],
             'email' => 'required|email|unique:users,email',
-            'national_id' => 'required|unique:users,national_id',
             'password' => 'required|confirmed|min:8',
             'occupation'=>'required|string',
-            'location'=>'required|string',
             'gender' => 'required|in:Male,Female',
-            'town'=>"required|string",
-            'estate'=>"required|string",
             'county'=>'required|string'
         ];
     }

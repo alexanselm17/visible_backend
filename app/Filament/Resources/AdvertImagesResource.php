@@ -286,7 +286,8 @@ class AdvertImagesResource extends Resource
 
                         Notification::make()
                             ->title('Reward Boosted')
-                            ->body("Reward increased by ${$data['boost_amount']}")
+                            ->body("Reward increased by " . $data['boost_amount'])
+
                             ->success()
                             ->send();
                     }),

@@ -38,35 +38,7 @@ use App\Exports\GenericExport;
 class ProductRepository implements ProductRepositoryInterface
 {
 
-    public function createProduct(ProductRequest $request)
-    {
-        try {
-            // Create the product using mass assignment
-            $product = ProductsModel::create([
-                'name' => strtoupper($request->input('name')),
-                'min_stock' => $request->input('min_stock'),
-                'selling_price' => $request->input('selling_price'),
-                'unit_name' => $request->input('unit_name')
-            ]);
-
-            // Return a success response with the created product
-            return response()->json([
-                'ok' => true,
-                'status' => 'success',
-                'message' => 'Product created successfully.',
-                'product' => $product
-            ]);
-        } catch (\Throwable $th) {
-            // Log the error and return an error response
-            Log::debug('Create Product Error: ' . $th->getMessage());
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => 'Failed to create product. Please try again.',
-                'error' => $th->getMessage()
-            ]);
-        }
-    }
+   
 
     public function updateAdvertProduct(ProductAdvertRequest $request, $advertId)
     {
@@ -100,6 +72,11 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->description = $request->input('description', $advert->description);
             $advert->badge = $request->input('badge', $advert->badge);
 
+            $advert->capital_invested = $request->input('capital_invested', $advert->capital_invested);
+            $advert->valid_until = $request->input('valid_until', $advert->valid_until);
+            $advert->reward = $request->input('reward', $advert->reward);
+            $advert->capacity = $request->input('capacity', $advert->capacity);
+
             // Save updated advert
             $advert->save();
 
@@ -130,12 +107,8 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Update the campaign with validated input
             $campaign->update([
-                'name' => $request->input('name', $campaign->name),
-                'capital_invested' => $request->input('capital_invested', $campaign->capital_invested),
-                'valid_until' => $request->input('valid_until', $campaign->valid_until),
-                'reward' => $request->input('reward', $campaign->reward),
-                'capacity' => $request->input('capacity', $campaign->capacity),
-            ]);
+                'name' => $request->input('name', $campaign->name)]);
+
 
             return response()->json([
                 'ok' => true,
@@ -156,135 +129,7 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-    public function createChildProduct(Request $request, $masterProductId)
-    {
-        try {
-            $masterProduct = ProductsModel::where('id', $masterProductId)->first();
-            if ($masterProduct ==  null) {
-                return response()->json([
-                    'ok' => false,
-                    'status' => 'failed',
-                    'message' => 'Product not found',
-                ]);
-            }
-            // Create the product using mass assignment
-            $product = ProductsModel::create([
-                'name' => strtoupper($request->input('name')),
-                'min_stock' => 0,
-                'selling_price' => $request->input('selling_price'),
-                'unit_name' => $masterProduct->unit_name,
-                'parent_id' => $masterProduct->id,
-                'unit' => $request->input('unit')
-            ]);
-
-            // Return a success response with the created product
-            return response()->json([
-                'ok' => true,
-                'status' => 'success',
-                'message' => 'Product created successfully.',
-                'product' => $product
-            ]);
-        } catch (\Throwable $th) {
-            Log::debug('Create Child Product Error: ' . $th->getMessage());
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => 'Failed to create product. Please try again.',
-                'error' => $th->getMessage()
-            ]);
-        }
-    }
-
-    public function updateProduct(UpdateProductRequest $request, $productId)
-    {
-        try {
-            // Find the product by ID
-            $product = ProductsModel::findOrFail($productId);
-
-            // Update the product with the validated data
-            $product->update([
-                'name' => strtoupper($request->input('name')),
-                'selling_price' => $request->input('selling_price'),
-                'unit_name' => $request->input('unit_name')
-            ]);
-
-            // Return a success response with the updated product
-            return response()->json([
-                'ok' => true,
-                'status' => 'success',
-                'message' => 'Product updated successfully.',
-                'product' => $product
-            ]);
-        } catch (\Throwable $th) {
-            // Log the error and return an error response
-            Log::debug('Update Product Error: ' . $th->getMessage());
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => 'Failed to update product. Please try again.',
-                'error' => $th->getMessage()
-            ]);
-        }
-    }
-
-    public function getProducts()
-    {
-        try {
-            // Define the number of products per page
-            $perPage = 10;
-
-            // Fetch paginated products
-            $products = ProductsModel::where('id', '!=', null)->paginate($perPage);
-
-            // Return a success response with the paginated products
-            return response()->json([
-                'ok' => true,
-                'status' => 'success',
-                'message' => 'Products retrieved successfully.',
-                'products' => $products
-            ]);
-        } catch (\Throwable $th) {
-            // Log the error and return an error response
-            Log::debug('Get Products Error: ' . $th->getMessage());
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => 'Failed to retrieve products. Please try again.',
-                'error' => $th->getMessage()
-            ]);
-        }
-    }
-    public function searchProducts(Request $request)
-    {
-        try {
-            $searchQuery = $request->query('query');
-
-
-            // Define the number of products per page
-            $perPage = 10;
-
-
-            // Fetch paginated products with name like the search query
-            $products = ProductsModel::where('name', 'like', '%' . $searchQuery . '%')
-                ->paginate($perPage);
-
-            // Return a success response with the paginated products
-            return response()->json([
-                'ok' => true,
-                'status' => 'success',
-                'message' => 'Products retrieved successfully.',
-                'products' => $products
-            ]);
-        } catch (\Throwable $th) {
-            Log::debug('Get Products Error: ' . $th->getMessage());
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => 'Failed to retrieve products. Please try again.',
-                'error' => $th->getMessage()
-            ]);
-        }
-    }
+   
 
 
 
@@ -294,10 +139,7 @@ class ProductRepository implements ProductRepositoryInterface
             // Create and save the campaign
             $campaign = Campaign::create([
                 'name' => $request->input('name'),
-                'capital_invested' => $request->input('capital_invested'),
-                'valid_until' => $request->input('valid_until'),
-                'reward' => $request->input('reward'),
-                'capacity' => $request->input('capacity'),
+               
             ]);
 
             return response()->json([
@@ -351,10 +193,6 @@ class ProductRepository implements ProductRepositoryInterface
                 return [
                     'id' => $campaign->id,
                     'name' => $campaign->name,
-                    'capital_invested' => $campaign->capital_invested,
-                    'valid_until' => $campaign->valid_until,
-                    'reward' => $campaign->reward,
-                    'capacity' => $campaign->capacity,
                     'completed' => $completed,
                     'ongoing' => $ongoing,
                     'available' => $available,
@@ -394,13 +232,38 @@ class ProductRepository implements ProductRepositoryInterface
                 ], 400);
             }
 
+    $user = User::with(['county', 'subCounty'])->find($userId);
+    if (!$user) {
+        return response()->json([
+            'message' => 'User not found.',
+        ], 404);
+    }
+
             $adverts = AdvertImages::query();
 
             if ($status === 'available') {
+                $adverts->where('advert_images.valid_until', '>', Carbon::now('Africa/Nairobi'));
+        
                 $adverts->whereDoesntHave('screenshots', function ($query) use ($userId) {
                     $query->where('processed_by', $userId);
-                })->whereHas('campaign', function ($query) {
-                    $query->where('valid_until', '>', Carbon::now('Africa/Nairobi'));
+                });
+        
+                $adverts->where(function ($query) use ($user) {
+                    $query
+                        // Matches where no target_audience (open to all)
+                        ->whereNull('target_audience')
+                      
+        
+                        // Or check if user matches target_audience
+                        ->orWhere(function ($subQuery) use ($user) {
+                            $subQuery->whereJsonContains('target_audience->gender', $user->gender)
+                                ->whereJsonContains('target_audience->county_id', $user->county_id)
+                                ->where(function ($subSubQuery) use ($user) {
+                                    $subSubQuery
+                                        ->whereNull('target_audience->subcounty_id') // Optional match
+                                        ->orWhereJsonContains('target_audience->subcounty_id', $user->subcounty_id);
+                                });
+                        });
                 });
             }
 
@@ -441,7 +304,7 @@ class ProductRepository implements ProductRepositoryInterface
                         $query->where('processed_by', $userId)
                             ->orderBy('created_at', 'asc');
                     },
-                    'campaign:id,valid_until'
+                    'campaign:id'
                 ])
                 ->paginate(10);
 
@@ -454,7 +317,7 @@ class ProductRepository implements ProductRepositoryInterface
 
                     $screenshotCount = match ($status) {
                         'available' => 0,
-                        'completed' => 5,
+                        'completed' => 2,
                         default => $advert->user_screenshot_count ?? 0,
                     };
 
@@ -466,6 +329,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'badge' => $advert->badge,
                         'description' => $advert->description,
                         'reward' => $advert->reward,
+                        'capacity' => $advert->capacity,
                         'updated_at' => $advert->updated_at,
                         'valid_until' => $advert->campaign?->valid_until,
                         'image_path' => $advert->image_path,
@@ -543,9 +407,15 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->name = $request->name;
             $advert->description = $request->description;
             $advert->badge = $request->badge;
-            $advert->selling_price = "0.00";
+            $advert->selling_price = 0;
             $advert->campaign_id = $campaignId;
             $advert->reward = $campaign->reward;
+            //
+            $advert->capital_invested = $request->capital_invested;
+            $advert->valid_until = $request->valid_until;
+            $advert->capacity = $request->capacity;
+            $advert->reward = $request->reward;
+            $advert->target_audience = json_decode($request->target_audience, true);
             $advert->save();
 
             // Notify users
@@ -589,6 +459,8 @@ class ProductRepository implements ProductRepositoryInterface
                 ->select('campaigns.*')
                 ->first();
 
+             $advert=AdvertImages::where('id',$advert_id)->first();   
+
             if (!$campaign) {
                 DB::rollBack();
                 return response()->json([
@@ -608,7 +480,7 @@ class ProductRepository implements ProductRepositoryInterface
                 ->count();
 
             if (is_null($previousScreenshot)) {
-                if ($allStarted >= $campaign->capacity) {
+                if ($allStarted >=  $advert->capacity) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
@@ -632,8 +504,31 @@ class ProductRepository implements ProductRepositoryInterface
                 ->where('processed_by', $request->user_id)
                 ->latest()
                 ->first();
+
+                //let's ensure that the first screenshot and second have a differences of 18 hours 
+                $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $request->user_id)
+                ->latest()
+                ->first();
+            
+            if ($previousScreenshot !== null) {
+                // Convert the previous time to Nairobi timezone
+                $previousTime = Carbon::parse($previousScreenshot->created_at)->timezone('Africa/Nairobi');
+            
+                // Get current time minus 18 hours
+                $eighteenHoursAgo = Carbon::now('Africa/Nairobi')->subHours(18);
+            
+                if ($previousTime > $eighteenHoursAgo) {
+                    DB::rollBack();
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "You can only process this after 18 hours since your last submission."
+                    ], 400);
+                }
+            }
             if ($previousScreenshot != null) {
-                if ($previousScreenshot->number == 5) {
+                if ($previousScreenshot->number == 2) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
@@ -657,27 +552,31 @@ class ProductRepository implements ProductRepositoryInterface
             $screenshotBase64 = base64_encode(file_get_contents($screenshotPath));
 
             // Prepare OpenAI request
-            $apiKey = "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"; // Get from .env file for security
+            $apiKey = "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"; 
+            // Get from .env file for security
             $prompt = "
-        You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
-        
-        Instructions:
-        1. Confirm the screenshot is from WhatsApp and clearly displays 'My status' and a visible timestamp (e.g., 'Just now', 'Yesterday', '10:24pm', or '9 minutes ago').
-        2. Confirm that the media shown in the screenshot (either a static image or a thumbnail/frame from a video) matches the original media provided.
-           - If the original is a video, compare the screenshot to the provided video thumbnail or a representative frame.
-           - Ensure layout, colors, and content alignment are consistent.
-        3. Extract the number of views from the screenshot if it is clearly visible.
-        
-        Respond only in this valid JSON format:
-        
-        {
-          \"status\": \"✅ Verified: The media was successfully posted.\" OR \"❌ Not Verified\",
-          \"reason\": \"[If not verified, explain why. If verified, return null]\",
-          \"views\": \"[Exact number of views like '91', or 'Not visible']\"
-        }
-        
-        Do not include any other text before or after the JSON.
-        ";
+            You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
+            
+            Instructions:
+            1. Confirm the screenshot is from WhatsApp and clearly displays 'My status' and a visible timestamp (e.g., 'Just now', 'Yesterday', '10:24pm', or '9 minutes ago').
+            2. Confirm that the media shown in the screenshot (either a static image or a thumbnail/frame from a video) matches the original media provided.
+               - If the original is a video, compare the screenshot to the provided video thumbnail or a representative frame.
+               - Ensure layout, colors, and content alignment are consistent.
+            3. Extract the number of views from the screenshot if it is clearly visible.
+            4. Extract the timestamp shown below 'My status'.
+            
+            Respond only in this valid JSON format:
+            
+            {
+              \"status\": \"✅ Verified: The media was successfully posted.\" OR \"❌ Not Verified\",
+              \"reason\": \"[If not verified, explain why. If verified, return null]\",
+              \"views\": \"[Exact number of views like '91', or 'Not visible']\",
+              \"timestamp\": \"[e.g., 'Just now', 'Today, 1:06 PM', or '43 minutes ago']\"
+            }
+            
+            Do not include any other text before or after the JSON.
+            ";
+            
 
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
@@ -699,6 +598,7 @@ class ProductRepository implements ProductRepositoryInterface
 
 
             $output = $response->json('choices.0.message.content') ?? '❌ Not Verified';
+            
 
             // Remove markdown formatting like ```json ... ``` if present
             $output = trim($output);
@@ -713,7 +613,8 @@ class ProductRepository implements ProductRepositoryInterface
                 @unlink($screenshotPath);
                 return response()->json([
                     'message' => '❌ Not Verified',
-                    'reason' => 'Invalid format from the verification model.'
+                    'reason' => 'Invalid format from the verification model...',
+                    'raw' => $output 
                 ], 400);
             }
 
@@ -750,11 +651,12 @@ class ProductRepository implements ProductRepositoryInterface
             $screenshot->screenshot = 'screenshots/' . $filename;
             $screenshot->advert_id = $advert_id;
             $screenshot->views = $json['views'] ?? 0;
+            $screenshot->timestamp = $json['timestamp'] ?? null;
             $screenshot->processed_by = $request->user_id;
             $screenshot->number = $number;
             $screenshot->save();
             $message = $json['status'] . ' | Views: ' . ($json['views'] ?? 'Not visible');
-            if ($number == 5) {
+            if ($number == 2) {
                 //let's also ensure that only more than 50 views for last screenshot
                 if ($json['views'] < 50) {
                     DB::rollBack();
@@ -766,8 +668,8 @@ class ProductRepository implements ProductRepositoryInterface
                 }
                 //we now proceed to reward the users
                 $advert = AdvertImages::where('id', $advert_id)->first();
-                $campaign = Campaign::where('id', $advert->campaign_id)->first();
-                $reward = $campaign->reward;
+               // $campaign = Campaign::where('id', $advert->campaign_id)->first();
+                $reward = $advert->reward;
 
 
                 $customerLastInvoice = Invoice::where('processed_by', $request->user_id)->latest()->first();
@@ -813,73 +715,62 @@ class ProductRepository implements ProductRepositoryInterface
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
+            // Get all advert IDs for the given campaign
             $advertIds = DB::table('advert_images')
                 ->where('campaign_id', $campaignId)
                 ->pluck('id');
-
-            $userGroups = DB::table('screenshots')
-                ->select('advert_id', 'processed_by', DB::raw('COUNT(*) as total'))
-                ->whereIn('advert_id', $advertIds)
-                ->groupBy('advert_id', 'processed_by')
-                ->having('total', '=', 5)
-                ->get();
-
+    
             $fraudGroups = [];
-
+    
             foreach ($advertIds as $advertId) {
-                $users = $userGroups->where('advert_id', $advertId)->pluck('processed_by');
-
+                // Get all screenshots for this advert, ordered by user and number
+                $screenshots = DB::table('screenshots')
+                    ->where('advert_id', $advertId)
+                    ->get();
+    
+                // Group screenshots by a combined key of views + timestamp
                 $patterns = [];
-
-                foreach ($users as $userId) {
-                    $screens = DB::table('screenshots')
-                        ->where('advert_id', $advertId)
-                        ->where('processed_by', $userId)
-                        ->orderBy('number')
-                        ->get();
-
-                    $viewsArray = $screens->pluck('views')->toArray();
-
-                    // Create a pattern key (stringified view array)
-                    $patternKey = implode('-', $viewsArray);
-
-                    // Add user to that view pattern group
+    
+                foreach ($screenshots as $screenshot) {
+                    $patternKey = "{$screenshot->views}_{$screenshot->timestamp}";
+    
                     $patterns[$patternKey][] = [
-                        'user_id' => $userId,
-                        'name' => DB::table('users')->where('id', $userId)->value('fullname'),
-                        'views' => $viewsArray,
-                        'screenshots' => $screens->map(function ($s) {
-                            return [
-                                'number' => $s->number,
-                                'views' => $s->views,
-                                'url' => URL::to('storage/' . $s->screenshot),
-                            ];
-                        }),
+                        'user_id' => $screenshot->processed_by,
+                        'name' => DB::table('users')->where('id', $screenshot->processed_by)->value('fullname'),
+                        'views' => $screenshot->views,
+                        'timestamp' => $screenshot->timestamp,
+                        'number' => $screenshot->number,
+                        'url' => URL::to('storage/' . $screenshot->screenshot),
                     ];
                 }
-
-                // Only include patterns shared by 2+ users
-                foreach ($patterns as $pattern => $group) {
-                    if (count($group) >= 2) {
+    
+                // Only include suspicious patterns shared by 2 or more users
+                foreach ($patterns as $pattern => $grouped) {
+                    // Extract unique user IDs to avoid repetition
+                    $uniqueUsers = collect($grouped)->pluck('user_id')->unique();
+    
+                    if ($uniqueUsers->count() >= 2) {
                         $fraudGroups[] = [
                             'advert_id' => $advertId,
-                            'views_pattern' => $pattern,
-                            'users' => $group,
+                            'matching_views_timestamp' => $pattern,
+                            'users' => $uniqueUsers->values(),
+                            'details' => $grouped,
                         ];
                     }
                 }
             }
-
+    
             return response()->json([
                 'fraud_groups' => $fraudGroups,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
+    
 
 
     public function getAdvertCampaigns(Request $request, $campaignId)
@@ -899,6 +790,11 @@ class ProductRepository implements ProductRepositoryInterface
                         'id' => $advert->id,
                         'category' => $advert->category,
                         'description' => $advert->description,
+                        'capital_invested' => $advert->capital_invested,
+                        'valid_until' => $advert->valid_until,
+                        'reward' => $advert->reward,
+                        'capacity' => $advert->capacity,
+                        'target_audience' => $advert->target_audience,
                         'badge' => $advert->badge,
                         'name' => $advert->name,
                         'selling_price' => $advert->selling_price,

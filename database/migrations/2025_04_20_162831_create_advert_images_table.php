@@ -13,10 +13,18 @@ return new class extends Migration
     {
         Schema::create('advert_images', function (Blueprint $table) {
             $table->uuid('id')->primary();
+
+
+            $table->decimal('capital_invested', 15, 2); // up to 999 trillion
+            $table->dateTime('valid_until');
+            $table->decimal('reward', 10, 2);
+            $table->integer('capacity');
+            $table->json('target_audience')->nullable();
+
             $table->string('image_path');
             $table->string('category');
             $table->string('description');
-            $table->decimal('reward', 10, 2);
+           
             $table->double('selling_price');
             $table->string('name');
             $table->json('badge')->nullable();

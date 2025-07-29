@@ -11,10 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('campaigns', function (Blueprint $table) {
+        Schema::create('counties', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name');
-          
+            $table->string('capital')->nullable();
+            $table->integer('code')->unique();
             $table->timestamps();
         });
     }
@@ -24,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('campaigns');
+        Schema::dropIfExists('counties');
     }
 };
