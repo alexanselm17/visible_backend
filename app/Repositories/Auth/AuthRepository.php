@@ -46,7 +46,7 @@ class AuthRepository implements AuthRepositoryInterface
             $myCode = $generateUniqueCode('users', 'my_code');
     
             $referalCode = $usersCount == 0
-                ? $generateUniqueCode('users', 'referal_code')
+                ?  $myCode
                 : $request['code'];
     
             $user = User::create([
@@ -78,7 +78,7 @@ class AuthRepository implements AuthRepositoryInterface
             Invoice::create([
                 "type" => "Referal",
                 "amount" => 30,
-                "processed_by" => $user->id,
+                "processed_by" => $whoReferedMe->id,
                 "customer_balance" => $customerBalance + 30,
                 "posted_by" => $user->id,
             ]);

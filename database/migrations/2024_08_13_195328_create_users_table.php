@@ -27,7 +27,7 @@ return new class extends Migration
             $table->uuid('role_id')->nullable();
             $table->foreign('role_id')->references('id')->on('roles')->onDelete('set null'); // Foreign key constraint
          
-            $table->string('referal_code')->unique();
+            $table->string('referal_code');
             $table->string('my_code')->unique();
             $table->string('password');
             $table->rememberToken();
