@@ -35,34 +35,33 @@ class NotificationController extends Controller
     /**
      * Get user notifications with pagination
      */
-  public function getUserNotifications(Request $request): JsonResponse
-{
-    $request->validate([
-        'user_id' => 'required|exists:users,id',
-        'per_page' => 'nullable|integer|min:1|max:100',
-    ]);
+    public function getUserNotifications(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
 
-    $perPage = $request->per_page ?? 10;
+        $perPage = $request->per_page ?? 10;
 
-    $notifications = Notification::where('user_id', $request->user_id)
-        ->orderBy('created_at', 'desc')
-        ->paginate($perPage);
+        $notifications = Notification::where('user_id', $request->user_id)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
 
-    return response()->json([
-        'notifications' => $notifications->items(),
-        'pagination' => [
-            'current_page' => $notifications->currentPage(),
-            'last_page' => $notifications->lastPage(),
-            'per_page' => $notifications->perPage(),
-            'total' => $notifications->total(),
-            'has_more' => $notifications->hasMorePages(),
-        ],
-        'unread_count' => Notification::where('user_id', $request->user_id)
-            ->where('is_read', false)
-            ->count(),
-    ]);
-}
-
+        return response()->json([
+            'notifications' => $notifications->items(),
+            'pagination' => [
+                'current_page' => $notifications->currentPage(),
+                'last_page' => $notifications->lastPage(),
+                'per_page' => $notifications->perPage(),
+                'total' => $notifications->total(),
+                'has_more' => $notifications->hasMorePages(),
+            ],
+            'unread_count' => Notification::where('user_id', $request->user_id)
+                ->where('is_read', false)
+                ->count(),
+        ]);
+    }
 
     /**
      * Mark notification as read
@@ -220,6 +219,134 @@ class NotificationController extends Controller
             'message' => 'Notifications sent to all users',
             'total_sent' => count($notifications),
             'notifications_created' => count($notifications),
+        ]);
+    }
+
+    /**
+     * Send notification to admins when a new account is created
+     */
+    public function notifyAdminsNewAccount(Request $request): JsonResponse
+    {
+        $request->validate([
+            'new_user_id' => 'required|exists:users,id',
+            'send_push' => 'nullable|boolean',
+        ]);
+
+        $newUser = User::with(['role', 'county', 'subCounty'])->find($request->new_user_id);
+
+        // Get all admin users
+        $admins = User::whereHas('role', function ($query) {
+            $query->where('slug', 'admin');
+        })->get();
+
+        if ($admins->isEmpty()) {
+            return response()->json([
+                'message' => 'No admin users found',
+                'notifications_sent' => 0,
+            ]);
+        }
+
+        $firebase = new FirebaseService();
+        $notifications = [];
+
+        $title = 'New Account Registration';
+        $message = "A new user account has been created: {$newUser->fullname} ({$newUser->username})";
+
+        // Additional data for admins
+        $notificationData = [
+            'user_id' => $newUser->id,
+            'user_fullname' => $newUser->fullname,
+            'user_username' => $newUser->username,
+            'user_email' => $newUser->email,
+            'user_phone' => $newUser->phone,
+            'user_role' => $newUser->role?->name,
+            'user_county' => $newUser->county?->name,
+            'user_subcounty' => $newUser->subCounty?->name,
+            'created_at' => $newUser->created_at->toDateTimeString(),
+            'action_type' => 'new_account_created',
+        ];
+
+        foreach ($admins as $admin) {
+            $notification = Notification::create([
+                'user_id' => $admin->id,
+                'title' => $title,
+                'message' => $message,
+                'type' => 'system',
+                'data' => $notificationData,
+            ]);
+
+            $notifications[] = $notification;
+
+            if (($request->send_push ?? true) && $admin->fcm_token) {
+                try {
+                    $firebase->sendToDevice($admin->fcm_token, $title, $message);
+                } catch (\Exception $e) {
+                    \Log::error("FCM error for admin [{$admin->id}]: " . $e->getMessage());
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'New account notifications sent to admins',
+            'notifications_sent' => count($notifications),
+            'admins_notified' => $admins->count(),
+            'new_user' => [
+                'id' => $newUser->id,
+                'fullname' => $newUser->fullname,
+                'username' => $newUser->username,
+            ],
+        ]);
+    }
+
+    /**
+     * Send notification to user when their account has been activated
+     */
+    public function notifyUserAccountActivated(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'send_push' => 'nullable|boolean',
+        ]);
+
+        $user = User::find($request->user_id);
+
+        $title = 'Account Activated';
+        $message = 'Congratulations! Your account has been successfully activated. You can now access all features of our platform.';
+
+        $notificationData = [
+            'action_type' => 'account_activated',
+            'activated_at' => now()->toDateTimeString(),
+            'account_status' => 'active',
+        ];
+
+        // Store notification in database
+        $notification = Notification::create([
+            'user_id' => $user->id,
+            'title' => $title,
+            'message' => $message,
+            'type' => 'system',
+            'data' => $notificationData,
+        ]);
+
+        // Send push notification if requested and user has FCM token
+        if (($request->send_push ?? true) && $user->fcm_token) {
+            try {
+                $firebase = new FirebaseService();
+                $firebase->sendToDevice($user->fcm_token, $title, $message);
+            } catch (\Exception $e) {
+                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'message' => 'Account activation notification sent successfully',
+            'notification' => $notification,
+            'user' => [
+                'id' => $user->id,
+                'fullname' => $user->fullname,
+                'username' => $user->username,
+            ],
+
         ]);
     }
 

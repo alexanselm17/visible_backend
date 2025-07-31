@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Auth;
 
+use App\Http\Controllers\NotificationController;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Models\AppVersion;
 use App\Models\Permission;
@@ -23,6 +24,8 @@ class AuthRepository implements AuthRepositoryInterface
 {
 
 
+
+
     public function signUpUser(Request $request)
     {
         try {
@@ -36,19 +39,19 @@ class AuthRepository implements AuthRepositoryInterface
                     }
                     $exists = DB::table($table)->where($column, $code)->exists();
                 } while ($exists);
-    
+
                 return $code;
             };
-    
+
             $role = RolesModel::where('name', '=', 'Customer Champion')->first();
             $usersCount = User::count();
-    
+
             $myCode = $generateUniqueCode('users', 'my_code');
-    
+
             $referalCode = $usersCount == 0
                 ? $generateUniqueCode('users', 'referal_code')
                 : $request['code'];
-    
+
             $user = User::create([
                 "fullname" => $request['fullname'],
                 "username" => $request['username'],
@@ -68,13 +71,13 @@ class AuthRepository implements AuthRepositoryInterface
                 "referal_code" => $referalCode,
                 "my_code" => $myCode,
             ]);
-    
+
             // Handle referral reward
             $whoReferedMe = User::where("my_code", $request['code'])->first();
-    
+
             $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
             $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
-    
+
             Invoice::create([
                 "type" => "Referal",
                 "amount" => 30,
@@ -82,7 +85,12 @@ class AuthRepository implements AuthRepositoryInterface
                 "customer_balance" => $customerBalance + 30,
                 "posted_by" => $user->id,
             ]);
-    
+
+            $notificationController = new NotificationController();
+            $notificationRequest = new Request(['new_user_id' => $user->id]);
+            $notificationController->notifyAdminsNewAccount($notificationRequest);
+
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
@@ -97,7 +105,7 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
-    
+
 
 
     public function signInUser(Request $request)
@@ -115,7 +123,7 @@ class AuthRepository implements AuthRepositoryInterface
                     ->orWhere('email', $request->username)
                     ->orWhere('phone', $request->username);
             })->with(['county', 'subCounty'])
-            ->first();
+                ->first();
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'ok' => false,
@@ -168,7 +176,6 @@ class AuthRepository implements AuthRepositoryInterface
                 'is_active' => $user->is_active,
                 'role_id' => $user->role_id,
                 'is_verified' => $user->is_verified,
-                'national_id' => $user->national_id,
                 'is_logged_in' => $user->is_logged_in,
                 'card_number' => $user->card_number,
                 'occupation' => $user->occupation,
@@ -180,30 +187,30 @@ class AuthRepository implements AuthRepositoryInterface
                 'deleted_at' => $user->deleted_at,
 
                 'my_code' => $user->my_code,
-            
-            
-            
+
+
+
                 'role' => [
                     'id' => $user->role?->id,
                     'name' => $user->role?->name,
                     'slug' => $user->role?->slug
                 ],
-            
-               
+
+
                 'county' => $user->county ? [
                     'id' => $user->county->id,
                     'name' => $user->county->name,
                     'capital' => $user->county->capital,
                     'code' => $user->county->code ?? null,
                 ] : null,
-            
+
                 'sub_county' => $user->subCounty ? [
                     'id' => $user->subCounty->id,
                     'name' => $user->subCounty->name,
                     'county_id' => $user->subCounty->county_id,
                 ] : null,
             ];
-            
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
@@ -467,7 +474,6 @@ class AuthRepository implements AuthRepositoryInterface
                     'users.username',
                     'users.email',
                     'users.phone',
-                    'users.national_id',
                     'users.is_active',
                     'users.created_at',
                     'users.updated_at',
@@ -516,7 +522,7 @@ class AuthRepository implements AuthRepositoryInterface
             // Retrieve users with pagination
             $users = User::where('users.id', '!=', null)
                 ->leftJoin('roles', 'users.role_id', '=', 'roles.id')
-                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone', 'users.national_id', 'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
+                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone',  'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
                 ->orderBy('users.id')
                 ->paginate($perPage);
 
@@ -587,7 +593,7 @@ class AuthRepository implements AuthRepositoryInterface
     {
         try {
             $user = User::find($request->input('user_id'));
-    
+
             if (!$user) {
                 return response()->json([
                     'ok' => false,
@@ -595,39 +601,48 @@ class AuthRepository implements AuthRepositoryInterface
                     'message' => 'User not found.',
                 ], 404);
             }
-    
+
             if ($request->has('login_status')) {
                 $user->is_logged_in = !$user->is_logged_in;
                 $user->save();
-    
+
                 return response()->json([
                     'ok' => true,
                     'status' => 'success',
                     'message' => 'Account Logged Out Successfully',
                 ]);
             }
-    
+
+            $previousStatus = $user->is_active;
             $user->is_active = !$user->is_active;
             $user->save();
-    
+
+            if (!$previousStatus && $user->is_active) {
+                $notificationController = new NotificationController();
+                $notificationRequest = new Request([
+                    'user_id' => $user->id,
+                    'send_push' => true,
+                ]);
+                $notificationController->notifyUserAccountActivated($notificationRequest);
+            }
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
                 'message' => $user->is_active ? 'Account Activated Successfully' : 'Account Deactivated Successfully',
             ]);
-    
         } catch (\Throwable $th) {
             Log::debug('Account Activation Error: ' . $th->getMessage());
-    
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
                 'message' => 'An unexpected error occurred.',
-                'error' => $th->getMessage(), 
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
-    
+
 
 
     public function updateProfile(UpdateProfileRequest $request)
@@ -712,12 +727,12 @@ class AuthRepository implements AuthRepositoryInterface
     {
         try {
             $name = $request->query('name');
-    
+
             $counties = Counties::with('subCounties')
                 ->where('name', 'like', '%' . $name . '%')
                 ->limit(5)
                 ->get();
-    
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
@@ -728,7 +743,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'message' => $th->getMessage(),
                 'trace' => $th->getTraceAsString(),
             ]);
-    
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -742,37 +757,36 @@ class AuthRepository implements AuthRepositoryInterface
     public function activateAllInactiveAcounts(Request $request)
     {
         try {
-            $processed_by=$request->input('user_id');
-            $user=User::where('id',$processed_by)->with('role')->first();
-        
-            if($user->role->name !="Admin"){
+            $processed_by = $request->input('user_id');
+            $user = User::where('id', $processed_by)->with('role')->first();
+
+            if ($user->role->name != "Admin") {
 
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
                     'message' => "Not Permitted"
-                ],403);
+                ], 403);
             }
-            
+
             $allInactiveAccounts = User::where('is_active', false)->get();
-    
+
             foreach ($allInactiveAccounts as $inactiveAccount) {
                 $inactiveAccount->is_active = true;
                 $inactiveAccount->save();
             }
-    
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
                 'message' => count($allInactiveAccounts) . ' account(s) activated.'
             ]);
-    
         } catch (\Throwable $th) {
             Log::error('Activate Accounts Error:', [
                 'message' => $th->getMessage(),
                 'trace' => $th->getTraceAsString(),
             ]);
-    
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -781,7 +795,4 @@ class AuthRepository implements AuthRepositoryInterface
             ], 500);
         }
     }
-    
-    
-
 }
