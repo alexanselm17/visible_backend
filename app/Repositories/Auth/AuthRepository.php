@@ -53,6 +53,7 @@ class AuthRepository implements AuthRepositoryInterface
                 ?  $myCode
                 : $request['code'];
                 $userCode=User::where('my_code', $referalCode )->first();
+                //dd($userCode == null ? $referalCode :  $myCode);
 
             $user = User::create([
                 "fullname" => $request['fullname'],
@@ -72,7 +73,7 @@ class AuthRepository implements AuthRepositoryInterface
                 "fcm_token"=>$request['fcm_token'],
                 "is_active" => false,
                 "referal_code" => $referalCode,
-                "my_code" =>  $userCode == null ? $myCode : $referalCode,
+                "my_code" =>  $userCode == null ? $referalCode :  $myCode,
             ]);
 
             // Handle referral reward
