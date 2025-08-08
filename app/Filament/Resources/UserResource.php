@@ -7,6 +7,7 @@ use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use App\Models\RolesModel;
 use App\Models\Permission;
+use App\Repositories\Products\ProductRepositoryInterface;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -34,6 +35,7 @@ use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Actions\RestoreAction;
 use Filament\Tables\Actions\ForceDeleteAction;
 use Filament\Notifications\Notification;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
@@ -51,6 +53,8 @@ class UserResource extends Resource
   protected static ?string $navigationGroup = 'User Management';
 
   protected static ?int $navigationSort = 1;
+
+
 
   public static function form(Form $form): Form
   {
@@ -251,20 +255,8 @@ class UserResource extends Resource
           })
           ->sortable(),
 
-        BooleanColumn::make('is_active')
-          ->label('Active')
-          ->sortable()
-          ->toggleable(),
 
-        BooleanColumn::make('is_verified')
-          ->label('Verified')
-          ->sortable()
-          ->toggleable(),
 
-        BooleanColumn::make('is_logged_in')
-          ->label('Online')
-          ->sortable()
-          ->toggleable(),
 
         TextColumn::make('location')
           ->label('Location')
@@ -284,26 +276,6 @@ class UserResource extends Resource
           ->toggleable(isToggledHiddenByDefault: true),
       ])
       ->filters([
-        TrashedFilter::make(),
-
-        SelectFilter::make('role')
-          ->relationship('role', 'name')
-          ->multiple()
-          ->preload(),
-
-        SelectFilter::make('is_active')
-          ->label('Status')
-          ->options([
-            true => 'Active',
-            false => 'Inactive',
-          ]),
-
-        SelectFilter::make('is_verified')
-          ->label('Verification')
-          ->options([
-            true => 'Verified',
-            false => 'Unverified',
-          ]),
 
         SelectFilter::make('is_logged_in')
           ->label('Login Status')
@@ -320,6 +292,31 @@ class UserResource extends Resource
           ]),
       ])
       ->actions([
+        Tables\Actions\Action::make('viewReport')
+          ->label('View Report')
+          ->icon('heroicon-m-chart-bar')
+          ->color('info')
+          ->form([
+            Forms\Components\DatePicker::make('from_date')
+              ->label('From Date')
+              ->required()
+              ->default(now()->subMonth()),
+
+            Forms\Components\DatePicker::make('to_date')
+              ->label('To Date')
+              ->required()
+              ->default(now()),
+          ])
+          ->action(function (array $data, $record) {
+            return redirect()->route('user.report', [
+              'processed_by' => $record->id,
+              'from_date' => $data['from_date'],
+              'to_date' => $data['to_date'],
+            ]);
+          })
+          ->modalHeading('Generate User Report')
+          ->modalSubmitActionLabel('Generate Report'),
+
         ActionGroup::make([
           ViewAction::make(),
           EditAction::make(),
@@ -327,7 +324,14 @@ class UserResource extends Resource
           RestoreAction::make(),
           ForceDeleteAction::make(),
         ])
+          ->label('More')
+          ->icon('heroicon-m-ellipsis-vertical')
+          ->color('secondary')
+          ->button()
+          ->outlined()
+          ->size('sm'),
       ])
+
       ->bulkActions([
         Tables\Actions\BulkActionGroup::make([
           Tables\Actions\DeleteBulkAction::make(),
@@ -360,6 +364,8 @@ class UserResource extends Resource
             })
             ->requiresConfirmation(),
         ]),
+
+
       ])
       ->defaultSort('created_at', 'desc');
   }
@@ -495,6 +501,8 @@ class UserResource extends Resource
     return [
       RelationManagers\PermissionsRelationManager::class,
       RelationManagers\NotificationsRelationManager::class,
+      RelationManagers\ScreenshotsRelationManager::class,
+
     ];
   }
 
@@ -534,14 +542,7 @@ class UserResource extends Resource
     ];
   }
 
-  // public static function getGlobalSearchResultDetails(Model $record): array
-  // {
-  //   return [
-  //     'Role' => $record->role?->name,
-  //     'Email' => $record->email,
-  //     'Phone' => $record->phone,
-  //   ];
-  // }
+
 
   public static function getNavigationBadge(): ?string
   {

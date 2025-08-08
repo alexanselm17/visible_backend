@@ -232,20 +232,43 @@ class User extends Authenticatable implements FilamentUser
   }
 
   public function county()
-{
+  {
     return $this->belongsTo(Counties::class);
-}
+  }
 
-public function subCounty()
-{
+  public function subCounty()
+  {
     return $this->belongsTo(SubCounty::class, 'subcounty_id');
-}
+  }
 
-  /**
-   * Get the count of unread notifications.
-   */
   public function getUnreadNotificationsCountAttribute(): int
   {
     return $this->unreadNotifications()->count();
+  }
+
+  public function screenshots()
+  {
+    return $this->hasMany(Screenshots::class, 'processed_by')
+      ->orderBy('timestamp', 'desc')
+      ->orderBy('created_at', 'desc');
+  }
+
+  /**
+   * Get recent screenshots (last 30 days)
+   */
+  public function recentScreenshots()
+  {
+    return $this->screenshots()
+      ->where('created_at', '>=', now()->subDays(30));
+  }
+
+  /**
+   * Get popular screenshots (with views > 0)
+   */
+  public function popularScreenshots()
+  {
+    return $this->screenshots()
+      ->where('views', '>', 0)
+      ->orderBy('views', 'desc');
   }
 }

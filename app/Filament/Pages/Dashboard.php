@@ -20,16 +20,16 @@ class Dashboard extends BaseDashboard
   use HasFiltersForm;
 
 
- 
+
 
   public function getWidgets(): array
   {
     return [
-      \App\Filament\Widgets\DashboardStatsWidget::class,
-        \App\Filament\Widgets\CampaignCardsWidget::class,
-        \App\Filament\Widgets\ViewsChart::class,
-        \App\Filament\Widgets\RewardsChart::class,
-        \App\Filament\Widgets\CompletedTasksChart::class,
+      \App\Filament\Widgets\CampaignCardsWidget::class,
+      \App\Filament\Widgets\RecentActivityWidget::class,
+      \App\Filament\Widgets\ViewsChart::class,
+      \App\Filament\Widgets\RewardsChart::class,
+      \App\Filament\Widgets\CompletedTasksChart::class,
     ];
   }
 }

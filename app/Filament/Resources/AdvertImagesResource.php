@@ -6,6 +6,8 @@ use App\Filament\Resources\AdvertImagesResource\Pages;
 use App\Filament\Resources\AdvertImagesResource\RelationManagers;
 use App\Models\AdvertImages;
 use App\Models\Campaign;
+use App\Models\Counties;
+use App\Models\SubCounty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -21,10 +23,17 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\TimePicker;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Colors\Color;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Carbon\Carbon;
+
 
 class AdvertImagesResource extends Resource
 {
@@ -67,7 +76,7 @@ class AdvertImagesResource extends Resource
                                     ->required()
                                     ->numeric()
                                     ->prefix('$'),
-                                Forms\Components\DatePicker::make('valid_until')
+                                DatePicker::make('valid_until')
                                     ->required()
                                     ->minDate(now()),
                                 TextInput::make('capacity')
@@ -95,10 +104,118 @@ class AdvertImagesResource extends Resource
                             ->searchable()
                             ->placeholder('Select category'),
 
+                        Forms\Components\Fieldset::make('Investment & Rewards')
+                            ->schema([
+                                TextInput::make('capital_invested')
+                                    ->required()
+                                    ->numeric()
+                                    ->prefix('KSH')
+                                    ->minValue(0)
+                                    ->placeholder('0.00')
+                                    ->helperText('Amount invested in this advertisement'),
 
+                                TextInput::make('capacity')
+                                    ->required()
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->placeholder('100')
+                                    ->helperText('Maximum number of participants'),
+
+                                TextInput::make('reward')
+                                    ->required()
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->placeholder('100')
+                                    ->helperText('Reward per participant (KSH)'),
+                            ])
+                            ->columns(3),
+
+                        // Combined Date + Time fields
+                        Forms\Components\Fieldset::make('Valid Until')
+                            ->schema([
+                                DatePicker::make('valid_until_date')
+                                    ->label('Valid Until Date')
+                                    ->required()
+                                    ->minDate(now())
+                                    ->reactive()
+                                    ->afterStateHydrated(function (Get $get, Set $set) {
+                                        self::combineValidUntil($get, $set);
+                                    })
+                                    ->afterStateUpdated(function (Get $get, Set $set) {
+                                        self::combineValidUntil($get, $set);
+                                    }),
+
+                                TimePicker::make('valid_until_time')
+                                    ->label('Valid Until Time')
+                                    ->withoutSeconds()
+                                    ->required()
+                                    ->reactive()
+                                    ->afterStateHydrated(function (Get $get, Set $set) {
+                                        self::combineValidUntil($get, $set);
+                                    })
+                                    ->afterStateUpdated(function (Get $get, Set $set) {
+                                        self::combineValidUntil($get, $set);
+                                    }),
+
+                            ])
+                            ->columns(2),
+
+                        // Hidden field that stores the final datetime
+                        TextInput::make('valid_until')
+                            ->hidden()
+                            ->required(),
                     ])
                     ->columns(2),
 
+                // Target Audience
+                Forms\Components\Section::make('Target Audience')
+                    ->schema([
+                        Repeater::make('target_audience')
+                            ->label('Target Locations')
+                            ->schema([
+                                Select::make('county_id')
+                                    ->label('County')
+                                    ->options(Counties::all()->pluck('name', 'id'))
+                                    ->required()
+                                    ->searchable()
+                                    ->preload()
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set) {
+                                        $set('sub_county_id', null);
+                                    })
+                                    ->placeholder('Select County'),
+
+                                Select::make('sub_county_id')
+                                    ->label('Sub County')
+                                    ->options(
+                                        fn(Get $get): array =>
+                                        $get('county_id')
+                                            ? SubCounty::where('county_id', $get('county_id'))->pluck('name', 'id')->toArray()
+                                            : []
+                                    )
+                                    ->required()
+                                    ->searchable()
+                                    ->placeholder('Select Sub County')
+                                    ->disabled(fn(Get $get): bool => !$get('county_id')),
+
+                                Select::make('gender')
+                                    ->label('Gender')
+                                    ->options([
+                                        'male' => 'Male',
+                                        'female' => 'Female',
+                                    ])
+                                    ->required()
+                                    ->placeholder('Select Gender'),
+                            ])
+                            ->columns(3)
+                            ->defaultItems(1)
+                            ->addActionLabel('Add Location')
+                            ->helperText('Add target locations for this advertisement')
+                            ->columnSpan(2),
+                    ])
+                    ->columns(1),
+
+                // Content & Media
                 Forms\Components\Section::make('Content & Media')
                     ->schema([
                         FileUpload::make('image_path')
@@ -107,7 +224,7 @@ class AdvertImagesResource extends Resource
                             ->required()
                             ->directory('advertisements')
                             ->visibility('public')
-                            ->maxSize(5120) // 5MB
+                            ->maxSize(5120)
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
                             ->imageEditor()
                             ->imageEditorAspectRatios([
@@ -118,13 +235,12 @@ class AdvertImagesResource extends Resource
                             ->helperText('Upload advertisement image (max 5MB)')
                             ->columnSpan(2),
 
-
                         FileUpload::make('video_path')
                             ->label('Advertisement Video (optional)')
                             ->directory('advertisements')
                             ->visibility('public')
                             ->acceptedFileTypes(['video/mp4', 'video/webm', 'video/ogg'])
-                            ->maxSize(20480) // 20MB
+                            ->maxSize(20480)
                             ->helperText('Upload a promotional video (optional, max 20MB)')
                             ->columnSpan(1),
 
@@ -153,7 +269,6 @@ class AdvertImagesResource extends Resource
                     ->columns(2),
             ]);
     }
-
     public static function table(Table $table): Table
     {
         return $table
@@ -186,17 +301,51 @@ class AdvertImagesResource extends Resource
                     ->color('info')
                     ->formatStateUsing(fn($state) => ucfirst($state)),
 
-                TextColumn::make('selling_price')
-                    ->money('USD')
+                TextColumn::make('capital_invested')
+                    ->money('KSH')
                     ->sortable()
                     ->alignment('right')
                     ->color('success'),
 
-                TextColumn::make('reward')
-                    ->money('USD')
+                TextColumn::make('capacity')
                     ->sortable()
-                    ->alignment('right')
+                    ->alignment('center')
+                    ->badge()
                     ->color('warning'),
+
+                TextColumn::make('valid_until')
+                    ->date()
+                    ->sortable()
+                    ->color(fn($state) => now()->gt($state) ? 'danger' : 'success')
+                    ->badge(),
+
+                TextColumn::make('target_audience')
+                    ->label('Locations')
+                    ->formatStateUsing(function ($state) {
+                        if (!$state) return 'N/A';
+
+                        $locations = is_string($state) ? json_decode($state, true) : $state;
+                        if (!is_array($locations)) return 'N/A';
+
+                        return collect($locations)->map(function ($location) {
+                            $county = Counties::find($location['county_id'])?->name ?? 'Unknown';
+                            $subCounty = SubCounty::find($location['sub_county_id'])?->name ?? 'Unknown';
+                            return "{$county} - {$subCounty}";
+                        })->join(', ');
+                    })
+                    ->limit(50),
+                // ->tooltip(function ($state) {
+                //     if (!$state) return null;
+
+                //     $locations = is_string($state) ? json_decode($state, true) : $state;
+                //     if (!is_array($locations)) return null;
+
+                //     return collect($locations)->map(function ($location) {
+                //         $county = Counties::find($location['county_id'])?->name ?? 'Unknown';
+                //         $subCounty = SubCounty::find($location['sub_county_id'])?->name ?? 'Unknown';
+                //         return "{$county} - {$subCounty}";
+                //     })->join("\n");
+                // }),
 
                 TextColumn::make('screenshots_count')
                     ->counts('screenshots')
@@ -211,17 +360,6 @@ class AdvertImagesResource extends Resource
                     ->alignment('center')
                     ->badge()
                     ->color('success'),
-
-                TextColumn::make('badge')
-                    ->badge()
-                    ->separator(',')
-                    ->color('indigo')
-                    ->limit(3),
-
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('campaign_id')
@@ -246,13 +384,29 @@ class AdvertImagesResource extends Resource
                     ])
                     ->searchable(),
 
-                Tables\Filters\Filter::make('high_reward')
-                    ->query(fn(Builder $query): Builder => $query->where('reward', '>=', 5))
-                    ->label('High Reward (≥$5)'),
+                SelectFilter::make('county')
+                    ->options(Counties::all()->pluck('name', 'id'))
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            $data['value'],
+                            fn(Builder $query, $countyId): Builder => $query->whereJsonContains('target_audience', [
+                                ['county_id' => $countyId]
+                            ])
+                        );
+                    })
+                    ->searchable(),
 
-                Tables\Filters\Filter::make('premium_price')
-                    ->query(fn(Builder $query): Builder => $query->where('selling_price', '>=', 100))
-                    ->label('Premium Price (≥$100)'),
+                Tables\Filters\Filter::make('expired')
+                    ->query(fn(Builder $query): Builder => $query->where('valid_until', '<', now()))
+                    ->label('Expired Ads'),
+
+                Tables\Filters\Filter::make('high_capacity')
+                    ->query(fn(Builder $query): Builder => $query->where('capacity', '>=', 100))
+                    ->label('High Capacity (≥100)'),
+
+                Tables\Filters\Filter::make('high_investment')
+                    ->query(fn(Builder $query): Builder => $query->where('capital_invested', '>=', 10000))
+                    ->label('High Investment (≥10K)'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -267,30 +421,6 @@ class AdvertImagesResource extends Resource
                         ],
                     ]))
                     ->visible(fn($record) => $record->screenshots_count > 0),
-
-                Action::make('boost_reward')
-                    ->icon('heroicon-o-arrow-trending-up')
-                    ->color('success')
-                    ->form([
-                        TextInput::make('boost_amount')
-                            ->required()
-                            ->numeric()
-                            ->prefix('$')
-                            ->minValue(0.01)
-                            ->label('Boost Amount'),
-                    ])
-                    ->action(function ($record, array $data) {
-                        $record->update([
-                            'reward' => $record->reward + $data['boost_amount']
-                        ]);
-
-                        Notification::make()
-                            ->title('Reward Boosted')
-                            ->body("Reward increased by " . $data['boost_amount'])
-
-                            ->success()
-                            ->send();
-                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -327,6 +457,27 @@ class AdvertImagesResource extends Resource
                                 ->success()
                                 ->send();
                         }),
+
+                    Tables\Actions\BulkAction::make('extend_validity')
+                        ->label('Extend Validity')
+                        ->icon('heroicon-o-calendar')
+                        ->color('warning')
+                        ->form([
+                            DatePicker::make('valid_until')
+                                ->required()
+                                ->minDate(now())
+                                ->label('New Expiry Date'),
+                        ])
+                        ->action(function ($records, array $data) {
+                            $records->each(function ($record) use ($data) {
+                                $record->update(['valid_until' => $data['valid_until']]);
+                            });
+
+                            Notification::make()
+                                ->title('Validity Extended')
+                                ->success()
+                                ->send();
+                        }),
                 ]),
             ])
             ->defaultSort('created_at', 'desc')
@@ -360,5 +511,23 @@ class AdvertImagesResource extends Resource
     public static function getNavigationBadgeColor(): ?string
     {
         return 'info';
+    }
+
+    protected static function combineValidUntil(Get $get, Set $set): void
+    {
+        $date = $get('valid_until_date');
+        $time = $get('valid_until_time');
+        $existing = $get('valid_until');
+
+        if ($date && $time) {
+            if (strlen($time) === 5) {
+                $time .= ':00'; // Add seconds if missing
+            }
+            $set('valid_until', Carbon::parse("$date $time")->format('Y-m-d H:i:s'));
+        } elseif ($existing) {
+            $set('valid_until', Carbon::parse($existing)->format('Y-m-d H:i:s'));
+        } else {
+            $set('valid_until', null); // Prevent ''
+        }
     }
 }
