@@ -44,14 +44,16 @@ class AuthRepository implements AuthRepositoryInterface
             return $code;
         };
 
+         // Generate a unique my_code
+         $myCode = $generateUniqueCode('users', 'my_code');
         $role = RolesModel::where('name', '=', 'Customer Champion')->first();
         $usersCount = User::count();
 
-        $referalCode = $usersCount == 0 ? null : $request['code'];
+        $referalCode = $usersCount == 0 ?  $myCode : $request['code'];
+       // dd(  $referalCode);
         $userCode = User::where('my_code', $referalCode)->first();
 
-        // Generate a unique my_code
-        $myCode = $generateUniqueCode('users', 'my_code');
+       
 
         if ($usersCount > 0 && !$userCode) {
             DB::rollBack();
@@ -59,7 +61,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'ok' => false,
                 'status' => 'error',
                 'message' => "Invalid referral code"
-            ]);
+            ],400);
         }
 
         $user = User::create([
@@ -79,8 +81,8 @@ class AuthRepository implements AuthRepositoryInterface
             "county" => $request['county'],
             "fcm_token" => $request['fcm_token'],
             "is_active" => false,
-            "referal_code" => $referalCode,
-            "my_code" => $usersCount == 0 ? $myCode : $referalCode,
+            "referal_code" => $usersCount == 0 ? $myCode : $referalCode,
+            "my_code" => $usersCount == 0 ? $referalCode :  $myCode,
         ]);
 
         // Handle referral reward
