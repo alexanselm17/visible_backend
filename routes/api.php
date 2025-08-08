@@ -95,6 +95,11 @@ Route::group(['prefix' => 'v1'], function () {
         Route::get('/timely_response', [ProductController::class, 'getCampaignTimelyPersional']);
     });
 
+    Route::group(['prefix' => 'campaign'], function () {
+        Route::post('/payment', [ProductController::class, 'uploadPaymentExcell']);
+   
+    });
+
 
 
 

@@ -128,5 +128,9 @@ class ProductController extends Controller
         return $this->productRepository->getAdvertCampaignsFraud($request,$campaignId);
     }
 
+    public function uploadPaymentExcell(Request $request){
+        return $this->productRepository->uploadPaymentExcell($request);
+   
+    }
 
 }

@@ -37,4 +37,7 @@ interface ProductRepositoryInterface
     public function updateCampaign(Request $request, $id);
 
     public function updateAdvertProduct(ProductAdvertRequest $request, $advertId);
+
+    public function uploadPaymentExcell(Request $request);
+
 }

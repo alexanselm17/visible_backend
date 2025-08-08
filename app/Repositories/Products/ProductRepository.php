@@ -7,6 +7,8 @@ use App\Repositories\Products\ProductRepositoryInterface;
 use App\Models\ProductsModel;
 use App\Models\Drum;
 use App\Models\Pump;
+use App\Models\Banking;
+use App\Models\SysMeta;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use App\Http\Controllers\NotificationController;
@@ -35,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use App\Exports\GenericExport;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 class ProductRepository implements ProductRepositoryInterface
 {
 
@@ -181,7 +184,7 @@ class ProductRepository implements ProductRepositoryInterface
                             ->where('processed_by', '!=', null)
                             ->count();
 
-                        if ($firstScreenshotTime && $firstScreenshotTime >= $threshold && $userScreenshotCount < 5) {
+                        if ($firstScreenshotTime && $firstScreenshotTime >= $threshold && $userScreenshotCount < 2) {
                             $ongoing++;
                         }
                     }
@@ -297,7 +300,7 @@ class ProductRepository implements ProductRepositoryInterface
                     ->withCount(['screenshots as user_screenshot_count' => function ($query) use ($userId) {
                         $query->where('processed_by', $userId);
                     }])
-                    ->having('user_screenshot_count', '<', 5);
+                    ->having('user_screenshot_count', '<', 2);
             }
 
             if ($status === 'completed') {
@@ -917,7 +920,7 @@ class ProductRepository implements ProductRepositoryInterface
                 ->withCount(['screenshots as user_screenshot_count' => function ($query) use ($userId) {
                     $query->where('processed_by', $userId);
                 }])
-                ->having('user_screenshot_count', '<', 5);
+                ->having('user_screenshot_count', '<', 2);
 
          
             $adverts = $adverts
@@ -1032,6 +1035,14 @@ class ProductRepository implements ProductRepositoryInterface
                 ->whereBetween('created_at', [$start, $end])
                 ->get();
 
+               
+
+                // Collect campaign IDs
+$campaignIds = $campaigns->pluck('id');
+
+$advertCampaigns = AdvertImages::whereIn('campaign_id', $campaignIds)->get();
+$capacitySum=$advertCampaigns->sum('capacity');
+
             $campaignCount = $campaigns->count();
             $completed = 0;
             $ongoing = 0;
@@ -1040,8 +1051,14 @@ class ProductRepository implements ProductRepositoryInterface
             $paymentDone = 0;
             $pendingPayment = 0;
 
-            $campaignStats = $campaigns->map(function ($campaign) use (&$completed, &$ongoing, &$rewardAssigned, &$pending, &$paymentDone, &$pendingPayment) {
+            
+
+            $campaignStats = $campaigns->map(function ($campaign) use (&$completed, &$ongoing, &$rewardAssigned, &$pending, &$paymentDone, $capacitySum,&$pendingPayment) {
                 $comp = $campaign->adverts->filter(fn($ad) => $ad->invoices->isNotEmpty())->count();
+                $adverts=AdvertImages::where('campaign_id',$campaign->id)->get();
+                $advertIds = $adverts->pluck('id');
+                $totalRewards=Invoice::whereIn('advert_id',$advertIds)->get()->sum('amount');
+
 
                 $ong = $campaign->adverts->filter(function ($ad) {
                     if ($ad->invoices->isNotEmpty()) return false;
@@ -1049,7 +1066,7 @@ class ProductRepository implements ProductRepositoryInterface
                     $minDate = $ad->screenshots->min('created_at');
                     if (!$minDate || Carbon::parse($minDate)->lt(Carbon::now('Africa/Nairobi')->subDay())) return false;
 
-                    return $ad->screenshots->count() < 5;
+                    return $ad->screenshots->count() < 2;
                 })->count();
 
                 $compReward = $comp * ($campaign->reward ?? 0);
@@ -1057,14 +1074,18 @@ class ProductRepository implements ProductRepositoryInterface
                 $completed += $comp;
                 $ongoing += $ong;
                 $rewardAssigned += $compReward;
-                $pending += $campaign->capacity - ($comp + $ong);
+                $pending += $capacitySum - ($comp + $ong);
+
 
                 $campaign->adverts->each(function ($ad) use (&$paymentDone, &$pendingPayment) {
                     foreach ($ad->invoices as $invoice) {
-                        if ($invoice->type === 'Payment') {
-                            $paymentDone += $invoice->amount;
+                        if ($invoice->type == 'Payment') {
+                            $paymentDone += $invoice->amount ?? 0;
                         }
-                        $pendingPayment += $invoice->customer_balance ?? 0;
+                
+                        if (!is_null($invoice->customer_balance)) {
+                            $pendingPayment += $invoice->customer_balance;
+                        }
                     }
                 });
 
@@ -1073,7 +1094,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'name' => $campaign->name,
                     'completed' => $comp,
                     'capacity' => $campaign->capacity,
-                    'reward_total' => $compReward,
+                    'reward_total' =>   $totalRewards,
                 ];
             });
             $totalUsers = User::leftJoin('roles', 'roles.id', '=', 'users.role_id')
@@ -1083,6 +1104,16 @@ class ProductRepository implements ProductRepositoryInterface
 
             $topCampaigns = $campaignStats->sortByDesc('completed')->take(5)->values();
 
+            $latestInvoiceIds = Invoice::select(DB::raw('MAX(id) as id'))
+            ->groupBy('processed_by');
+        
+        // Fetch those latest invoices and sum their customer_balance
+        $totalBalance = Invoice::whereIn('id', $latestInvoiceIds)
+            ->get()
+            ->sum('customer_balance');
+        $paymentDone = Invoice::whereBetween('created_at', [$start, $end])
+            ->where('type','Payment')
+            ->get()->sum('amount');    
             return response()->json([
                 'success' => true,
                 'message' => 'Admin dashboard data fetched successfully',
@@ -1093,7 +1124,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'ongoing' => $ongoing,
                     'unused_slots' => $pending,
                     'payment_done' => $paymentDone,
-                    'pending_payment' => $pendingPayment,
+                    'pending_payment' =>  $totalBalance,
                     'total_users' => $totalUsers,
                     'top_campaigns' => $topCampaigns,
 
@@ -1132,7 +1163,7 @@ class ProductRepository implements ProductRepositoryInterface
 
                 foreach ($userScreenshots as $screenshots) {
                     $firstScreenshot = $screenshots->where('number', 1)->first();
-                    $lastScreenshot = $screenshots->where('number', 5)->first();
+                    $lastScreenshot = $screenshots->where('number', 2)->first();
                     if (!$firstScreenshot) continue;
 
                     $user = $firstScreenshot->user;
@@ -1145,7 +1176,7 @@ class ProductRepository implements ProductRepositoryInterface
                     $firstScreenshotTime = Carbon::parse($firstScreenshot->created_at, 'Africa/Nairobi');
                     $ongoingEnd = $firstScreenshotTime->copy()->addDay();
                     $isNowBetween = $now->between($firstScreenshotTime, $ongoingEnd, true);
-                    $isOngoing = $screenshotCount < 5 && !$hasInvoice && $isNowBetween;
+                    $isOngoing = $screenshotCount < 2 && !$hasInvoice && $isNowBetween;
 
 
 
@@ -1159,7 +1190,7 @@ class ProductRepository implements ProductRepositoryInterface
                             'phone' => $user->phone ?? null,
                             'completed_screenshots' => $screenshotCount,
                             'reward' => $advert->reward ?? $campaign->reward,
-                            'views' => $views,
+                            'views' => $views ?? null,
                         ];
                         $totalCompleted++;
                         $totalRewardAwarded += $advert->reward ?? $campaign->reward;
@@ -1172,7 +1203,7 @@ class ProductRepository implements ProductRepositoryInterface
                         ];
                         $totalOngoing++;
                     } elseif ($validUntil->lt($now)) {
-                        if ($screenshotCount < 5 && $firstScreenshotTime->lt($now->copy()->subDay())) {
+                        if ($screenshotCount < 2 && $firstScreenshotTime->lt($now->copy()->subDay())) {
                             $incompleteUsers[] = [
                                 'full_name' => $user->fullname,
                                 'phone' => $user->phone ?? null,
@@ -1197,7 +1228,7 @@ class ProductRepository implements ProductRepositoryInterface
                 'completed_users' => $completedUsers,
                 'incomplete_users' => $incompleteUsers,
                 'ongoing_users' => $ongoingUsers,
-                'total_views_all_users' => $totalViewsAllUsers, // ✅ passed to Blade
+                'total_views_all_users' => $totalViewsAllUsers, 
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1251,6 +1282,8 @@ class ProductRepository implements ProductRepositoryInterface
                 $totalOngoing = 0;
                 $totalViewsAllUsers = 0;
 
+               // dd($campaign);
+
                 foreach ($campaign->adverts as $advert) {
                     $userScreenshots = $advert->screenshots->groupBy('processed_by');
 
@@ -1274,7 +1307,7 @@ class ProductRepository implements ProductRepositoryInterface
 
                     foreach ($userScreenshots as $screenshots) {
                         $firstScreenshot = $screenshots->where('number', 1)->first();
-                        $lastScreenshot = $screenshots->where('number', 5)->first();
+                        $lastScreenshot = $screenshots->where('number', 2)->first();
                         if (!$firstScreenshot) continue;
 
                         $user = $firstScreenshot->user;
@@ -1287,24 +1320,24 @@ class ProductRepository implements ProductRepositoryInterface
                         $firstScreenshotTime = Carbon::parse($firstScreenshot->created_at, 'Africa/Nairobi');
                         $ongoingEnd = $firstScreenshotTime->copy()->addDay();
                         $isNowBetween = $now->between($firstScreenshotTime, $ongoingEnd, true);
-                        $isOngoing = $screenshotCount < 5 && !$hasInvoice && $isNowBetween;
+                        $isOngoing = $screenshotCount < 2 && !$hasInvoice && $isNowBetween;
 
                         if ($hasInvoice) {
                             $views = $lastScreenshot->views ?? 0;
                             $totalViewsAllUsers += $views;
-
+                        
                             $entry = [
                                 'full_name' => $user->fullname,
                                 'phone' => $user->phone ?? null,
                                 'completed_screenshots' => $screenshotCount,
-                                'reward' => $advert->reward ?? $campaign->reward,
+                                'reward' => $advert->reward,
                                 'views' => $views,
                                 'campaign_name' => $campaign->name,
                             ];
                             $completedUsers[] = $entry;
                             $summary['all_completed_users'][] = $entry;
                             $totalCompleted++;
-                            $totalRewardAwarded += $advert->reward ?? $campaign->reward;
+                            $totalRewardAwarded += $advert->reward;
                         } elseif ($isOngoing) {
                             $entry = [
                                 'full_name' => $user->fullname,
@@ -1317,7 +1350,7 @@ class ProductRepository implements ProductRepositoryInterface
                             $summary['all_ongoing_users'][] = $entry;
                             $totalOngoing++;
                         } elseif ($validUntil->lt($now)) {
-                            if ($screenshotCount < 5 && $firstScreenshotTime->lt($now->copy()->subDay())) {
+                            if ($screenshotCount < 2 && $firstScreenshotTime->lt($now->copy()->subDay())) {
                                 $entry = [
                                     'full_name' => $user->fullname,
                                     'phone' => $user->phone ?? null,
@@ -1362,7 +1395,7 @@ class ProductRepository implements ProductRepositoryInterface
                 'summary' => $summary,
                 'startDate' => $from,
                 'upto' => $to,
-                'campaigns' => $campaigns // Pass paginator to blade for pagination links
+                'campaigns' => $campaigns 
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1446,7 +1479,6 @@ class ProductRepository implements ProductRepositoryInterface
                     ->where('type', 'Reward')
                     ->sum('amount');
                 $latestRecord = Invoice::where('processed_by', $processedBy)
-                    ->where('type', 'Reward')
                     ->latest()
                     ->first();
 
@@ -1482,7 +1514,7 @@ class ProductRepository implements ProductRepositoryInterface
                     if ($screenshots->isEmpty()) continue;
 
                     $firstScreenshot = $screenshots->where('number', 1)->first();
-                    $lastScreenshot = $screenshots->where('number', 5)->first();
+                    $lastScreenshot = $screenshots->where('number', 2)->first();
                     if (!$firstScreenshot) continue;
 
                     $user = $firstScreenshot->user;
@@ -1494,7 +1526,7 @@ class ProductRepository implements ProductRepositoryInterface
                     $firstScreenshotTime = Carbon::parse($firstScreenshot->created_at, 'Africa/Nairobi');
                     $ongoingEnd = $firstScreenshotTime->copy()->addDay();
                     $isNowBetween = $now->between($firstScreenshotTime, $ongoingEnd, true);
-                    $isOngoing = $screenshotCount < 5 && !$hasInvoice && $isNowBetween;
+                    $isOngoing = $screenshotCount < 2 && !$hasInvoice && $isNowBetween;
 
                     if ($hasInvoice) {
                         $views = $lastScreenshot->views ?? 0;
@@ -1524,7 +1556,7 @@ class ProductRepository implements ProductRepositoryInterface
                         $summary['user_ongoing'][] = $entry;
                         $totalOngoing++;
                     } elseif ($validUntil->lt($now)) {
-                        if ($screenshotCount < 5 && $firstScreenshotTime->lt($now->copy()->subDay())) {
+                        if ($screenshotCount < 2 && $firstScreenshotTime->lt($now->copy()->subDay())) {
                             $entry = [
                                 'full_name' => $user->fullname,
                                 'phone' => $user->phone ?? null,
@@ -1626,7 +1658,7 @@ class ProductRepository implements ProductRepositoryInterface
                     ->withCount(['screenshots as user_screenshot_count' => function ($query) use ($userId) {
                         $query->where('processed_by', $userId);
                     }])
-                    ->having('user_screenshot_count', '<', 5);
+                    ->having('user_screenshot_count', '<', 2);
             }
 
             // incomplete
@@ -1645,7 +1677,7 @@ class ProductRepository implements ProductRepositoryInterface
                             $query->where('processed_by', $userId);
                         }
                     ])
-                    ->having('user_screenshot_count', '<', 5)
+                    ->having('user_screenshot_count', '<', 2)
                     ->with([
                         'screenshots' => function ($query) use ($userId) {
                             $query->where('processed_by', $userId)->orderBy('created_at', 'asc');
@@ -1709,7 +1741,7 @@ class ProductRepository implements ProductRepositoryInterface
 
                     $screenshotCount = match ($status) {
                         'available' => 0,
-                        'completed' => 5,
+                        'completed' => 2,
                         default => $advert->user_screenshot_count ?? 0,
                     };
 
@@ -1813,5 +1845,86 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
+
+ 
+    
+  
+    
+    public function uploadPaymentExcell(Request $request)
+    {
+        try {
+            $request->validate([
+                'file' => 'required|file|mimes:xlsx,xls'
+            ]);
+    
+            $spreadsheet = IOFactory::load($request->file('file'));
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray();
+    
+            $data = [];
+            foreach ($rows as $index => $row) {
+                if (strtolower($row[2]) == 'payee name' || empty($row[11])) continue;
+    
+                $data[] = [
+                    'payee_name' => $row[2],
+                    'phone' => $row[4],
+                    'amount' => (float)$row[8],
+                    'transaction_receipt' => $row[11],
+                    'transaction_status' => $row[12],
+                ];
+            }
+    
+            DB::beginTransaction();
+    
+            foreach ($data as $payment) {
+                $user = User::where('phone', $payment['phone'])->first();
+                if (!$user) continue; // Skip if user not found
+    
+                $method = SysMeta::where('meta_shortcode', 'mpesa')->first();
+                $latestInvoice = Invoice::where('processed_by', $user->id)->latest()->first();
+                $lastBalance = $latestInvoice ? $latestInvoice->customer_balance : 0;
+                $newBalance = $lastBalance - $payment['amount'];
+    
+                $newBanking = Banking::create([
+                    'reference' => $payment['transaction_receipt'],
+                    'amount' => $payment['amount'],
+                    'name' => $payment['payee_name'],
+                    'processed_by' => $user->id,
+                    'approval_status' => true,
+                    'approved_by' => $user->id,
+                    'phone' => $payment['phone'],
+                    'deposit_method' => $method?->id,
+                ]);
+    
+                Invoice::create([
+                    "type" => "Payment",
+                    "amount" => $payment['amount'],
+                    "processed_by" => $user->id,
+                    "customer_balance" => $newBalance,
+                    "posted_by" => $user->id,
+                    "banking" => $newBanking->id
+                ]);
+            }
+    
+            DB::commit();
+    
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'message' => 'Payment processed successfully.',
+            ]);
+    
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Failed to process the Excel file.',
+                'error' => $th->getMessage()
+            ],400);
+        }
+    }
+    
+    
     
 }
