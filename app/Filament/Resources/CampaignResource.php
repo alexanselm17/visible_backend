@@ -79,15 +79,15 @@ class CampaignResource extends Resource
                                 }
                             }),
 
-                        DatePicker::make('valid_until_date')
-                            ->label('Expiry Date')
-                            ->required()
-                            ->native(false),
+                        // DatePicker::make('valid_until_date')
+                        //     ->label('Expiry Date')
+                        //     ->required()
+                        //     ->native(false),
 
-                        TimePicker::make('valid_until_time')
-                            ->label('Expiry Time')
-                            ->required()
-                            ->seconds(false),
+                        // TimePicker::make('valid_until_time')
+                        //     ->label('Expiry Time')
+                        //     ->required()
+                        //     ->seconds(false),
 
 
                         TextInput::make('capacity')
@@ -148,12 +148,12 @@ class CampaignResource extends Resource
                     ->badge()
                     ->color('primary'),
 
-                TextColumn::make('valid_until')
-                    ->date()
-                    ->sortable()
-                    ->badge()
-                    ->color(fn($record) => $record->valid_until < now() ? 'danger' : 'success')
-                    ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y')),
+                // TextColumn::make('valid_until')
+                //     ->date()
+                //     ->sortable()
+                //     ->badge()
+                //     ->color(fn($record) => $record->valid_until < now() ? 'danger' : 'success')
+                //     ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y')),
 
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -166,14 +166,14 @@ class CampaignResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Filter::make('active')
-                    ->query(fn(Builder $query): Builder => $query->where('valid_until', '>=', now()))
-                    ->label('Active Campaigns')
-                    ->default(),
+                // Filter::make('active')
+                //     ->query(fn(Builder $query): Builder => $query->where('valid_until', '>=', now()))
+                //     ->label('Active Campaigns')
+                //     ->default(),
 
-                Filter::make('expired')
-                    ->query(fn(Builder $query): Builder => $query->where('valid_until', '<', now()))
-                    ->label('Expired Campaigns'),
+                // Filter::make('expired')
+                //     ->query(fn(Builder $query): Builder => $query->where('valid_until', '<', now()))
+                //     ->label('Expired Campaigns'),
 
                 Filter::make('high_reward')
                     ->query(fn(Builder $query): Builder => $query->where('reward', '>=', 10))
@@ -254,7 +254,7 @@ class CampaignResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return static::getModel()::where('valid_until', '>=', now())->count();
+        return static::getModel()::count();
     }
 
     public static function getNavigationBadgeColor(): ?string
