@@ -168,7 +168,6 @@ class AuthRepository implements AuthRepositoryInterface
                 'is_active' => $user->is_active,
                 'role_id' => $user->role_id,
                 'is_verified' => $user->is_verified,
-                'national_id' => $user->national_id,
                 'is_logged_in' => $user->is_logged_in,
                 'card_number' => $user->card_number,
                 'occupation' => $user->occupation,
@@ -467,7 +466,7 @@ class AuthRepository implements AuthRepositoryInterface
                     'users.username',
                     'users.email',
                     'users.phone',
-                    'users.national_id',
+            
                     'users.is_active',
                     'users.created_at',
                     'users.updated_at',
@@ -516,7 +515,7 @@ class AuthRepository implements AuthRepositoryInterface
             // Retrieve users with pagination
             $users = User::where('users.id', '!=', null)
                 ->leftJoin('roles', 'users.role_id', '=', 'roles.id')
-                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone', 'users.national_id', 'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
+                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone', 'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
                 ->orderBy('users.id')
                 ->paginate($perPage);
 
