@@ -67,6 +67,7 @@ class AuthRepository implements AuthRepositoryInterface
                 "town" => $request['town'],
                 "estate" => $request['estate'],
                 "county" => $request['county'],
+                "fcm_token"=>$request['fcm_token'],
                 "is_active" => false,
                 "referal_code" => $referalCode,
                 "my_code" => $myCode,
@@ -77,12 +78,12 @@ class AuthRepository implements AuthRepositoryInterface
 
             $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
             $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
-
+            $rewardCoin=30;
             Invoice::create([
                 "type" => "Referal",
-                "amount" => 30,
+                "amount" => $rewardCoin,
                 "processed_by" => $whoReferedMe->id,
-                "customer_balance" => $customerBalance + 30,
+                "customer_balance" => $customerBalance + $rewardCoin,
                 "posted_by" => $user->id,
             ]);
 
