@@ -36,7 +36,7 @@ class ScreenshotsRelationManager extends RelationManager
                     ->columnSpan(2),
 
                 Select::make('processed_by')
-                    ->relationship('user', 'name')
+                    ->relationship('user', 'username')
                     ->label('Processed By')
                     ->searchable()
                     ->preload()
@@ -61,7 +61,7 @@ class ScreenshotsRelationManager extends RelationManager
                     ->circular()
                     ->defaultImageUrl(url('/images/placeholder.png')),
 
-                TextColumn::make('user.name')
+                TextColumn::make('user.username')
                     ->label('Processed By')
                     ->searchable()
                     ->sortable()
@@ -83,7 +83,7 @@ class ScreenshotsRelationManager extends RelationManager
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('processed_by')
-                    ->relationship('user', 'name')
+                    ->relationship('user', 'username')
                     ->label('Processed By')
                     ->searchable()
                     ->preload(),
@@ -92,9 +92,7 @@ class ScreenshotsRelationManager extends RelationManager
                     ->query(fn(Builder $query): Builder => $query->where('views', '>=', 100))
                     ->label('High Views (≥100)'),
             ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-            ])
+            ->headerActions([])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
