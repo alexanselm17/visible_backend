@@ -74,7 +74,7 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
 
             // Handle referral reward
-            $whoReferedMe = User::where("my_code", $request['code'])->first();
+            $whoReferedMe = User::where("my_code", $referalCode)->first();
 
             $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
             $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
