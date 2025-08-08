@@ -61,10 +61,7 @@ class ScreenshotObserver
     {
         // Schedule notifications at different intervals
         $reminderIntervals = [
-            6 => '6 hours', // 6 hours after first upload
-            12 => '12 hours', // 12 hours after first upload
-            20 => '20 hours', // 20 hours after first upload (4 hours before expiry)
-            23 => '23 hours', // 23 hours after first upload (1 hour before expiry)
+            18 => '18 hours', 
         ];
 
         foreach ($reminderIntervals as $hours => $description) {
