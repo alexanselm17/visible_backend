@@ -139,9 +139,7 @@ class InvoicesRelationManager extends RelationManager
                     ->query(fn(Builder $query): Builder => $query->where('amount', '>=', 1000))
                     ->label('High Amount (≥$1000)'),
             ])
-            ->headerActions([
-                Tables\Actions\CreateAction::make(),
-            ])
+            ->headerActions([])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),

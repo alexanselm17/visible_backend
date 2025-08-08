@@ -1,6 +1,6 @@
 <?php
 
-
+use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -18,3 +18,6 @@ Route::get('/', function () {
   return view('welcome');
 });
 
+Route::get('/timely_individual_campaign_report', [ProductController::class, 'getCampaignTimelyPersionalReports'])->name('user.report');
+Route::get('/campaign_report', [ProductController::class, 'getCampaignReports'])->name('campaign_report');
+Route::get('/timely_campaign_report', [ProductController::class, 'getCampaignTimelyReports'])->name('timely_campaign_report');
