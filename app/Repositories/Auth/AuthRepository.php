@@ -70,7 +70,7 @@ class AuthRepository implements AuthRepositoryInterface
                 "fcm_token"=>$request['fcm_token'],
                 "is_active" => false,
                 "referal_code" => $referalCode,
-                "my_code" => $myCode,
+                "my_code" => $referalCode,
             ]);
 
             // Handle referral reward
