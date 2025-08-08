@@ -522,6 +522,7 @@ class AuthRepository implements AuthRepositoryInterface
             // Retrieve users with pagination
             $users = User::where('users.id', '!=', null)
                 ->leftJoin('roles', 'users.role_id', '=', 'roles.id')
+                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone', 'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
                 ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone',  'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
                 ->orderBy('users.id')
                 ->paginate($perPage);
@@ -536,7 +537,7 @@ class AuthRepository implements AuthRepositoryInterface
             Log::debug('Get User Error: ' . $th->getMessage());
             return response()->json([
                 'ok' => false,
-                'status' => 'error',
+               'error',
                 'message' => $th->getMessage(),
             ]);
         }
