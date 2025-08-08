@@ -4,9 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers;
+use App\Http\Controllers\AuthController;
 use App\Models\User;
 use App\Models\RolesModel;
 use App\Models\Permission;
+use App\Repositories\Auth\AuthRepositoryInterface;
 use App\Repositories\Products\ProductRepositoryInterface;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -317,6 +319,53 @@ class UserResource extends Resource
           ->modalHeading('Generate User Report')
           ->modalSubmitActionLabel('Generate Report'),
 
+        Tables\Actions\Action::make('toggleAccountStatus')
+          ->label(fn($record) => $record->is_active ? 'Deactivate Account' : 'Activate Account')
+          ->icon(fn($record) => $record->is_active ? 'heroicon-m-x-circle' : 'heroicon-m-check-circle')
+          ->color(fn($record) => $record->is_active ? 'danger' : 'success')
+          ->action(function ($record) {
+            try {
+              $request = new Request();
+              $request->merge([
+                'user_id' => $record->id,
+              ]);
+
+              // Call the AuthController method
+              $authRepository = app(AuthRepositoryInterface::class);
+              $response = $authRepository->AccountActivationCard($request);
+
+              $responseData = $response->getData();
+
+              if (isset($responseData->ok) && $responseData->ok === true) {
+                Notification::make()
+                  ->title('Account status updated successfully')
+                  ->body($record->is_active ? 'Account has been activated' : 'Account has been deactivated')
+                  ->success()
+                  ->send();
+              } else {
+                Notification::make()
+                  ->title('Failed to update account status')
+                  ->body('Please try again later')
+                  ->danger()
+                  ->send();
+              }
+            } catch (\Exception $e) {
+              Notification::make()
+                ->title('Error updating account status')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+            }
+          })
+          ->requiresConfirmation()
+          ->modalHeading(fn($record) => $record->is_active ? 'Deactivate User Account' : 'Activate User Account')
+          ->modalDescription(
+            fn($record) => $record->is_active
+              ? 'Are you sure you want to deactivate this user account? The user will not be able to login until reactivated.'
+              : 'Are you sure you want to activate this user account? The user will be able to login immediately.'
+          )
+          ->modalSubmitActionLabel(fn($record) => $record->is_active ? 'Deactivate' : 'Activate'),
+
         ActionGroup::make([
           ViewAction::make(),
           EditAction::make(),
@@ -334,35 +383,87 @@ class UserResource extends Resource
 
       ->bulkActions([
         Tables\Actions\BulkActionGroup::make([
-          Tables\Actions\DeleteBulkAction::make(),
-          Tables\Actions\ForceDeleteBulkAction::make(),
-          Tables\Actions\RestoreBulkAction::make(),
 
           Tables\Actions\BulkAction::make('activate')
             ->label('Activate Users')
             ->icon('heroicon-m-check-circle')
             ->color('success')
             ->action(function ($records) {
-              $records->each->update(['is_active' => true]);
-              Notification::make()
-                ->title('Users activated successfully')
-                ->success()
-                ->send();
+              try {
+                foreach ($records as $record) {
+                  $request = new \Illuminate\Http\Request();
+                  $request->merge([
+                    'user_id' => $record->id,
+                  ]);
+
+                  $authRepository = app(\App\Repositories\Auth\AuthRepositoryInterface::class);
+                  $response = $authRepository->AccountActivationCard($request);
+
+                  $responseData = $response->getData();
+
+                  if (!isset($responseData->ok) || $responseData->ok !== true) {
+                    throw new \Exception('Failed to update one or more accounts.');
+                  }
+                }
+
+                Notification::make()
+                  ->title('Accounts Activated')
+                  ->body(count($records) . ' user accounts have been activated successfully.')
+                  ->success()
+                  ->send();
+              } catch (\Exception $e) {
+                Notification::make()
+                  ->title('Error Activating Accounts')
+                  ->body($e->getMessage())
+                  ->danger()
+                  ->send();
+              }
             })
-            ->requiresConfirmation(),
+            ->requiresConfirmation()
+            ->modalHeading('Activate Selected User Accounts')
+            ->modalDescription('Are you sure you want to activate the selected user accounts? They will be able to login immediately.')
+            ->modalSubmitActionLabel('Activate'),
 
           Tables\Actions\BulkAction::make('deactivate')
             ->label('Deactivate Users')
             ->icon('heroicon-m-x-circle')
             ->color('danger')
             ->action(function ($records) {
-              $records->each->update(['is_active' => false]);
-              Notification::make()
-                ->title('Users deactivated successfully')
-                ->success()
-                ->send();
+              try {
+                foreach ($records as $record) {
+                  $request = new \Illuminate\Http\Request();
+                  $request->merge([
+                    'user_id' => $record->id,
+                  ]);
+
+                  $authRepository = app(\App\Repositories\Auth\AuthRepositoryInterface::class);
+                  $response = $authRepository->AccountActivationCard($request);
+
+                  $responseData = $response->getData();
+
+                  if (!isset($responseData->ok) || $responseData->ok !== true) {
+                    throw new \Exception('Failed to update one or more accounts.');
+                  }
+                }
+
+                Notification::make()
+                  ->title('Accounts Deactivated')
+                  ->body(count($records) . ' user accounts have been deactivated successfully.')
+                  ->success()
+                  ->send();
+              } catch (\Exception $e) {
+                Notification::make()
+                  ->title('Error Deactivating Accounts')
+                  ->body($e->getMessage())
+                  ->danger()
+                  ->send();
+              }
             })
-            ->requiresConfirmation(),
+            ->requiresConfirmation()
+            ->modalHeading('Deactivate Selected User Accounts')
+            ->modalDescription('Are you sure you want to deactivate the selected user accounts? They will not be able to login until reactivated.')
+            ->modalSubmitActionLabel('Deactivate'),
+
         ]),
 
 
