@@ -248,23 +248,36 @@ class ProductRepository implements ProductRepositoryInterface
                     $query->where('processed_by', $userId);
                 });
         
-                $adverts->where(function ($query) use ($user) {
-                    $query
-                        // Matches where no target_audience (open to all)
-                        ->whereNull('target_audience')
-                      
+           $adverts->where(function ($query) use ($user) {
+    // 1. If target_audience is null, allow all records (target everyone)
+    $query->whereNull('target_audience')
+    
+        // 2. If gender is set, filter by gender
+        ->orWhere(function ($subQuery) use ($user) {
+            if ($user->gender) {
+                $subQuery->whereJsonContains('target_audience->gender', $user->gender);
+            }
+        })
         
-                        // Or check if user matches target_audience
-                        ->orWhere(function ($subQuery) use ($user) {
-                            $subQuery->whereJsonContains('target_audience->gender', $user->gender)
-                                ->whereJsonContains('target_audience->county_id', $user->county_id)
-                                ->where(function ($subSubQuery) use ($user) {
-                                    $subSubQuery
-                                        ->whereNull('target_audience->subcounty_id') // Optional match
-                                        ->orWhereJsonContains('target_audience->subcounty_id', $user->subcounty_id);
-                                });
-                        });
-                });
+        // 3. If county_id is set, filter by county
+        ->orWhere(function ($subQuery) use ($user) {
+            if ($user->county_id) {
+                $subQuery->whereJsonContains('target_audience->county_id', $user->county_id);
+            }
+        })
+
+        // 4. If subcounty_id is set, filter by subcounty
+        ->orWhere(function ($subQuery) use ($user) {
+            if ($user->subcounty_id) {
+                $subQuery->whereJsonContains('target_audience->subcounty_id', $user->subcounty_id);
+            } else {
+                // If subcounty is not provided, allow entries where subcounty is null
+                $subQuery->orWhereNull('target_audience->subcounty_id');
+            }
+        });
+});
+
+
             }
 
             if ($status === 'ongoing') {
@@ -906,15 +919,17 @@ class ProductRepository implements ProductRepositoryInterface
                 }])
                 ->having('user_screenshot_count', '<', 5);
 
+         
             $adverts = $adverts
                 ->with([
                     'screenshots' => function ($query) use ($userId) {
                         $query->where('processed_by', $userId)
                             ->orderBy('created_at', 'asc');
                     },
-                    'campaign:id,valid_until,reward'
+                   
                 ])
                 ->paginate(10);
+               
 
             $ongoingData = [
                 'message' => 'Adverts retrieved successfully.',
@@ -933,8 +948,8 @@ class ProductRepository implements ProductRepositoryInterface
                         'created_at' => $advert->created_at,
                         'name' => $advert->name,
                         'updated_at' => $advert->updated_at,
-                        'valid_until' => $advert->campaign?->valid_until,
-                        'reward' => $advert->campaign?->reward,
+                        'valid_until' => $advert->valid_until,
+                        'reward' => $advert->reward,
                         'image_path' => $advert->image_path,
                         'image_url' => asset($imagePath),
                         'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
