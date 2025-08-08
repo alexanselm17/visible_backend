@@ -115,14 +115,6 @@
                 <tr>
                     <th>#</th>
                     <th>Name</th>
-                    <th>Capital Invested</th>
-                    <th>Valid Until</th>
-                    <th>Reward/Task</th>
-                    <th>Slots</th>
-                    <th>Completed Tasks</th>
-                    <th>Incompletes</th>
-                    <th>Ongoing</th>
-                    <th>Unused Slots</th>
                     <th>Total Rewards</th>
                     <th>Total Views </th>
                 </tr>
@@ -132,14 +124,6 @@
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $campaignReport['campaign']['name'] }}</td>
-                    <td>{{ $campaignReport['campaign']['capital_invested'] }}</td>
-                    <td>{{ $campaignReport['campaign']['valid_until'] }}</td>
-                    <td>{{ $campaignReport['campaign']['reward'] }}</td>
-                    <td>{{ $campaignReport['campaign']['capacity'] }}</td>
-                    <td>{{ $campaignReport['completed_count'] }}</td>
-                    <td>{{ $campaignReport['incomplete_count'] }}</td>
-                    <td>{{ $campaignReport['ongoing_count'] }}</td>
-                    <td>{{ $campaignReport['unused_slots'] }}</td>
                     <td>{{ $campaignReport['total_reward_awarded'] }}</td>
                     <td>{{ $campaignReport['total_views_all_users'] }}</td>
                 </tr>
@@ -265,7 +249,6 @@
         <h2>Completed: {{ number_format($summary['total_completed'] ?? 0) }}</h2>
         <h2>Incompletes: {{ number_format($summary['total_incomplete'] ?? 0) }}</h2>
         <h2>Still Ongoing: {{ number_format($summary['total_ongoing'] ?? 0) }}</h2>
-        <h2>Unused Slots: {{ number_format($summary['total_unused_slots'] ?? 0) }}</h2>
         <h2>Total Views (All Users): {{ number_format($summary['total_views_all_users']?? 0) }}</h2>
         <h2>Total Reward Awarded: Ksh. {{ number_format($summary['total_invoices'] ?? 0, 2) }}</h2>
     </div>

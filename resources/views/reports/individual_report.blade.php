@@ -6,67 +6,97 @@
   <title>Personal Timely Report</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #fff;
+        font-family: Arial, sans-serif;
     }
-
-    .container {
-      max-width: 950px;
-      margin: 0 auto;
-      padding: 30px;
-    }
-
     .header {
-      text-align: center;
-      margin-bottom: 30px;
+        text-align: center;
+        margin-bottom: 20px;
+        position: relative;
+        padding: 20px;
     }
-
-    h1, h2 {
-      margin: 10px 0;
+    .download-button {
+        position: absolute;
+        top: 0.5;
+        right: 0;
+        background-color: #007bff;
+        color: white;
+        padding: 8px 15px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 14px;
     }
-
+    @media (max-width: 768px) {
+        .header {
+            padding-top: 50px;
+        }
+        .download-button {
+            top: 10px;
+            right: 10px;
+        }
+    }
     .content {
-      margin-bottom: 30px;
+        margin-top: 20px;
     }
-
-    .table-wrapper {
-      overflow-x: auto;
-      margin-top: 10px;
+    .table-responsive {
+        overflow-x: auto;
+        margin-bottom: 20px;
     }
-
     table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 10px;
+        width: 100%;
+        min-width: 800px;
+        border-collapse: collapse;
     }
-
+    table, th, td {
+        border: 1px solid black;
+    }
     th, td {
-      border: 1px solid #000;
-      padding: 6px 10px;
-      font-size: 13px;
-      text-align: left;
-      white-space: nowrap;
+        padding: 8px;
+        text-align: left;
+        white-space: nowrap;
     }
-
     th {
-      background-color: #f2f2f2;
+        background-color: #f2f2f2;
     }
-
+    .pagination {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        margin-top: 20px;
+        list-style: none;
+        font-size: 12px;
+    }
+    .pagination li {
+        display: inline;
+    }
+    .pagination li a {
+        padding: 3px 8px;
+        text-decoration: none;
+        color: #007bff;
+        border: 1px solid #dee2e6;
+        border-radius: 3px;
+        margin: 0 2px;
+        font-size: 12px;
+        line-height: 1.2;
+        display: inline-block;
+        text-align: center;
+    }
+    .pagination li a.prev, .pagination li a.next {
+        font-weight: bold;
+    }
     .overal-report {
-      text-align: right;
-      margin-top: 40px;
-      line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding-top: 10px;
+        text-align: right;
+        padding-right: 10px;
     }
-
     .footer {
-      text-align: center;
-      margin-top: 60px;
-      font-size: 12px;
-      color: #555;
+        clear: both;
+        text-align: center;
+        margin-top: 40px;
     }
-  </style>
+</style>
 </head>
 <body>
   <div class="container">
@@ -192,14 +222,13 @@
     </div>
 
     <div class="overal-report">
-      <h2>Completed: Ksh. {{ number_format($summary['total_completed'] ?? 0) }}</h2>
-      <h2>Incompletes: Ksh. {{ number_format($summary['total_incomplete'] ?? 0) }}</h2>
-      <h2>Still Ongoing: Ksh. {{ number_format($summary['total_ongoing'] ?? 0) }}</h2>
+      <h2>Completed:  {{ number_format($summary['total_completed'] ?? 0) }}</h2>
+      <h2>Incompletes:  {{ number_format($summary['total_incomplete'] ?? 0) }}</h2>
+      <h2>Still Ongoing:  {{ number_format($summary['total_ongoing'] ?? 0) }}</h2>
       <h2>Total Reward: {{ number_format($total_reward ?? 0) }}</h2>
       <h2>Total Payment: {{ number_format(($total_reward - $total_payment) ?? 0) }}</h2>
-      <h2>Pending Payments: {{ number_format($total_payment ?? 0) }}</h2>
+      <h2>Pending Payments: Ksh.{{ number_format($accountBalance ?? 0) }}</h2>
       <h2>Total Views: {{ number_format($summary['total_views_all_users'] ?? 0) }}</h2>
-      <h2>Total Reward Awarded: Ksh. {{ number_format($summary['total_invoices'] ?? 0, 2) }}</h2>
       <h2>Account Balance (Curr): Ksh. {{ number_format($accountBalance ?? 0, 2) }}</h2>
     </div>
 
