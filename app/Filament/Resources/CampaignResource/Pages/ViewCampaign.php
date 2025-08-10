@@ -45,18 +45,39 @@ class ViewCampaign extends ViewRecord
                                     Group::make([
                                         IconEntry::make('is_active')
                                             ->label('')
-                                            ->icon(fn($record) => $record->is_active ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
-                                            ->color(fn($record) => $record->is_active ? 'success' : 'danger'),
+                                            ->icon(
+                                                fn($record) =>
+                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
+                                                    ? 'heroicon-o-check-circle'
+                                                    : 'heroicon-o-x-circle'
+                                            )
+                                            ->color(
+                                                fn($record) =>
+                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
+                                                    ? 'success'
+                                                    : 'danger'
+                                            ),
 
                                         TextEntry::make('campaign_status')
                                             ->label('')
-                                            ->getStateUsing(fn($record) => $record->is_active ? 'ACTIVE CAMPAIGN' : 'EXPIRED CAMPAIGN')
+                                            ->getStateUsing(
+                                                fn($record) =>
+                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
+                                                    ? 'ACTIVE CAMPAIGN'
+                                                    : 'EXPIRED CAMPAIGN'
+                                            )
                                             ->badge()
-                                            ->color(fn($record) => $record->is_active ? 'success' : 'danger')
+                                            ->color(
+                                                fn($record) =>
+                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
+                                                    ? 'success'
+                                                    : 'danger'
+                                            )
                                             ->size('lg')
                                             ->weight(FontWeight::Bold),
                                     ])
                                         ->extraAttributes(['class' => 'flex items-center space-x-3']),
+
                                 ])
                                 ->columnSpan(2),
 
@@ -64,7 +85,8 @@ class ViewCampaign extends ViewRecord
                                 ->schema([
                                     TextEntry::make('capital_invested')
                                         ->label('Total Investment')
-                                        ->money('USD')
+                                        ->getStateUsing(fn($record) => $record->adverts->sum('capital_invested'))
+                                        ->money('KSH')
                                         ->color('primary')
                                         ->weight(FontWeight::Bold)
                                         ->size('xl')
@@ -72,12 +94,16 @@ class ViewCampaign extends ViewRecord
 
                                     TextEntry::make('remaining_budget')
                                         ->label('Remaining Budget')
-                                        ->getStateUsing(fn($record) => $record->remaining_budget)
-                                        ->money('USD')
+                                        ->getStateUsing(
+                                            fn($record) =>
+                                            $record->adverts->sum('capital_invested') - $record->adverts->sum(fn($advert) => $advert->screenshots->count() * $advert->reward)
+                                        )
+                                        ->money('KSH')
                                         ->color('success')
                                         ->weight(FontWeight::Bold)
                                         ->size('xl')
                                         ->icon('heroicon-o-wallet'),
+
                                 ])
                                 ->columnSpan(2),
                         ])
@@ -101,7 +127,10 @@ class ViewCampaign extends ViewRecord
 
                                 TextEntry::make('total_screenshots')
                                     ->label('Total Submissions')
-                                    ->getStateUsing(fn($record) => $record->total_screenshots)
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        $record->adverts->sum(fn($advert) => $advert->screenshots->count())
+                                    )
                                     ->badge()
                                     ->size('xl')
                                     ->color('success')
@@ -110,7 +139,10 @@ class ViewCampaign extends ViewRecord
 
                                 TextEntry::make('total_views')
                                     ->label('Total Engagement')
-                                    ->getStateUsing(fn($record) => number_format($record->total_views))
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        number_format($record->adverts->sum('views'))
+                                    )
                                     ->badge()
                                     ->size('xl')
                                     ->color('info')
@@ -119,7 +151,13 @@ class ViewCampaign extends ViewRecord
 
                                 TextEntry::make('rewards_distributed')
                                     ->label('Rewards Paid')
-                                    ->getStateUsing(fn($record) => $record->total_rewards_distributed)
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        $record->adverts->sum(
+                                            fn($advert) =>
+                                            $advert->screenshots->count() * $advert->reward
+                                        )
+                                    )
                                     ->money('USD')
                                     ->badge()
                                     ->size('xl')
@@ -131,25 +169,16 @@ class ViewCampaign extends ViewRecord
                         Grid::make(3)
                             ->schema([
                                 TextEntry::make('capacity')
-                                    ->label('Max Participants')
+                                    ->label('Total Expected Participants')
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        $record->adverts->sum('capacity')
+                                    )
                                     ->numeric()
                                     ->badge()
                                     ->color('gray')
                                     ->icon('heroicon-o-users'),
 
-                                TextEntry::make('reward')
-                                    ->label('Reward per Submission')
-                                    ->money('USD')
-                                    ->color('warning')
-                                    ->weight(FontWeight::Bold)
-                                    ->icon('heroicon-o-currency-dollar'),
-
-                                TextEntry::make('valid_until')
-                                    ->label('Campaign Ends')
-                                    ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y g:i A'))
-                                    ->badge()
-                                    ->color(fn($record) => $record->is_active ? 'success' : 'danger')
-                                    ->icon('heroicon-o-calendar'),
                             ]),
                     ])
                     ->collapsible(),
@@ -161,29 +190,51 @@ class ViewCampaign extends ViewRecord
                             ->schema([
                                 TextEntry::make('created_at')
                                     ->label('Campaign Launched')
-                                    ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y g:i A'))
+                                    ->formatStateUsing(
+                                        fn($state) =>
+                                        Carbon::parse($state)->format('M d, Y g:i A')
+                                    )
                                     ->color('success')
                                     ->icon('heroicon-o-rocket-launch')
                                     ->weight(FontWeight::Medium),
 
                                 TextEntry::make('days_running')
                                     ->label('Days Running')
-                                    ->getStateUsing(fn($record) => Carbon::parse($record->created_at)->diffInDays(now()) . ' days')
+                                    ->getStateUsing(function ($record) {
+                                        $start = Carbon::parse($record->created_at);
+                                        $diff = $start->diff(now());
+                                        return "{$diff->d} days {$diff->h} hours {$diff->i} minutes";
+                                    })
                                     ->badge()
                                     ->color('info')
                                     ->icon('heroicon-o-clock'),
 
                                 TextEntry::make('days_remaining')
                                     ->label('Days Remaining')
-                                    ->getStateUsing(fn($record) => $record->is_active ?
-                                        Carbon::parse($record->valid_until)->diffInDays(now()) . ' days' :
-                                        'Expired')
+                                    ->getStateUsing(function ($record) {
+                                        if (!$record->valid_until) {
+                                            return 'No End Date';
+                                        }
+                                        if (now()->greaterThan(Carbon::parse($record->valid_until))) {
+                                            return 'Expired';
+                                        }
+                                        $end = Carbon::parse($record->valid_until);
+                                        $diff = now()->diff($end);
+                                        return "{$diff->d} days {$diff->h} hours {$diff->i} minutes";
+                                    })
                                     ->badge()
-                                    ->color(fn($record) => $record->is_active ? 'primary' : 'danger')
+                                    ->color(
+                                        fn($record) =>
+                                        $record->valid_until &&
+                                            now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
+                                            ? 'primary'
+                                            : 'danger'
+                                    )
                                     ->icon('heroicon-o-calendar-days'),
                             ]),
                     ])
                     ->collapsible(),
+
 
                 // Main Content Tabs
                 Tabs::make('Campaign Management')
@@ -206,7 +257,12 @@ class ViewCampaign extends ViewRecord
                                                             ->label('')
                                                             ->height(150)
                                                             ->width(150)
-                                                            // ->extraImageAttributes(['class' => 'rounded-lg shadow-md'])
+                                                            ->getStateUsing(function ($record) {
+                                                                $path = $record->primaryImage?->image_path ?? $record->image_path;
+                                                                return $path
+                                                                    ? asset('storage/' . $path)
+                                                                    : asset('storage/products/default-product.png');
+                                                            })
                                                             ->columnSpan(1),
 
                                                         Group::make([
@@ -229,9 +285,9 @@ class ViewCampaign extends ViewRecord
                                                             ->columnSpan(2),
 
                                                         Group::make([
-                                                            TextEntry::make('selling_price')
-                                                                ->label('Price')
-                                                                ->money('USD')
+                                                            TextEntry::make('capital_invested')
+                                                                ->label('Capital Invested')
+                                                                ->money('KSH')
                                                                 ->color('success')
                                                                 ->weight(FontWeight::Bold)
                                                                 ->size('lg')
@@ -239,7 +295,7 @@ class ViewCampaign extends ViewRecord
 
                                                             TextEntry::make('reward')
                                                                 ->label('Reward')
-                                                                ->money('USD')
+                                                                ->money('KSH')
                                                                 ->color('warning')
                                                                 ->weight(FontWeight::Bold)
                                                                 ->size('lg')
@@ -295,7 +351,12 @@ class ViewCampaign extends ViewRecord
                                                                             ->label('')
                                                                             ->height(120)
                                                                             ->width(120)
-                                                                            // ->extraImageAttributes(['class' => 'rounded-lg shadow-sm'])
+                                                                            ->getStateUsing(function ($record) {
+                                                                                $path = $record->screenshot;
+                                                                                return $path
+                                                                                    ? asset('storage/' . $path)
+                                                                                    : asset('storage/screenshots/default-screenshot.png');
+                                                                            })
                                                                             ->columnSpan(1),
 
                                                                         TextEntry::make('user.fullname')
@@ -328,7 +389,7 @@ class ViewCampaign extends ViewRecord
                                                                         TextEntry::make('reward_earned')
                                                                             ->label('Reward Earned')
                                                                             ->getStateUsing(fn($record) => $record->advert->reward ?? 0)
-                                                                            ->money('USD')
+                                                                            ->money('kSH')
                                                                             ->color('warning')
                                                                             ->weight(FontWeight::Bold)
                                                                             ->columnSpan(1),
@@ -603,70 +664,14 @@ class ViewCampaign extends ViewRecord
             \Filament\Actions\EditAction::make()
                 ->icon('heroicon-o-pencil-square'),
 
-            \Filament\Actions\Action::make('duplicate')
-                ->label('Duplicate Campaign')
-                ->icon('heroicon-o-document-duplicate')
-                ->color('info')
-                ->requiresConfirmation()
-                ->modalHeading('Duplicate Campaign')
-                ->modalDescription('This will create an exact copy of this campaign with a 30-day extension.')
-                ->action(function () {
-                    $record = $this->record;
-                    $newCampaign = $record->replicate();
-                    $newCampaign->name = $record->name . ' (Copy ' . now()->format('M Y') . ')';
-                    $newCampaign->valid_until = now()->addDays(30);
-                    $newCampaign->save();
-
-                    // Duplicate adverts as well
-                    foreach ($record->adverts as $advert) {
-                        $newAdvert = $advert->replicate();
-                        $newAdvert->campaign_id = $newCampaign->id;
-                        $newAdvert->save();
-                    }
-
-                    \Filament\Notifications\Notification::make()
-                        ->title('Campaign Duplicated Successfully')
-                        ->body('New campaign created with ' . $record->adverts->count() . ' adverts')
-                        ->success()
-                        ->actions([
-                            \Filament\Notifications\Actions\Action::make('view')
-                                ->button()
-                                ->url(CampaignResource::getUrl('view', ['record' => $newCampaign]))
-                        ])
-                        ->send();
-
-                    return redirect()->to(CampaignResource::getUrl('view', ['record' => $newCampaign]));
-                }),
-
-            \Filament\Actions\Action::make('extend')
-                ->label('Extend Campaign')
-                ->icon('heroicon-o-calendar-days')
-                ->color('success')
-                ->visible(fn() => $this->record->is_active)
-                ->form([
-                    \Filament\Forms\Components\DateTimePicker::make('new_end_date')
-                        ->label('New End Date')
-                        ->required()
-                        ->minDate(now())
-                        ->default(now()->addDays(30)),
-                ])
-                ->action(function (array $data) {
-                    $this->record->update([
-                        'valid_until' => $data['new_end_date'],
-                    ]);
-
-                    \Filament\Notifications\Notification::make()
-                        ->title('Campaign Extended Successfully')
-                        ->body('Campaign will now run until ' . Carbon::parse($data['new_end_date'])->format('M d, Y'))
-                        ->success()
-                        ->send();
-                }),
-
             \Filament\Actions\Action::make('add_budget')
                 ->label('Generate Campaign Report')
                 ->icon('heroicon-o-banknotes')
                 ->color('warning')
-
+                ->extraAttributes([
+                    'class' => 'text-white font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors duration-200',
+                    'style' => 'background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border: none; color: white !important;',
+                ])
                 ->action(function ($record) {
                     return redirect()->route('campaign_report', [
                         'campaign_id' => $record->id,

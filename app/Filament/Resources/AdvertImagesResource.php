@@ -273,11 +273,17 @@ class AdvertImagesResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('image_path')
-                    ->size(60)
+                ImageColumn::make('image')
+                    ->label('Image')
                     ->circular()
-                    ->defaultImageUrl(url('/images/placeholder.png')),
+                    ->size(60)
+                    ->getStateUsing(function ($record) {
+                        $path = $record->image_path;
 
+                        return $path
+                            ? asset('storage/' . $path)
+                            : asset('storage/products/default-product.png');
+                    }),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()

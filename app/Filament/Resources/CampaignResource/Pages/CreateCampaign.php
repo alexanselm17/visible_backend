@@ -21,17 +21,9 @@ class CreateCampaign extends CreateRecord
         try {
             $data = $this->form->getState();
 
-            $validUntil = isset($data['valid_until_date'], $data['valid_until_time'])
-                ? Carbon::parse("{$data['valid_until_date']} {$data['valid_until_time']}")->toDateTimeString()
-                : null;
-
             $campaignRequest = new StartCampaignRequest();
             $campaignRequest->merge([
                 'name' => $data['name'],
-                'capital_invested' => $data['capital_invested'],
-                'reward' => $data['reward'],
-                'capacity' => $data['capacity'],
-                'valid_until' => $validUntil,
             ]);
 
             $productRepository = app(ProductRepositoryInterface::class);

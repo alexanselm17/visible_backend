@@ -262,7 +262,6 @@ class UserResource extends Resource
 
         TextColumn::make('location')
           ->label('Location')
-          ->searchable()
           ->toggleable(isToggledHiddenByDefault: true),
 
         TextColumn::make('created_at')
@@ -638,8 +637,6 @@ class UserResource extends Resource
       'username',
       'email',
       'phone',
-      'national_id',
-      'role.name',
     ];
   }
 

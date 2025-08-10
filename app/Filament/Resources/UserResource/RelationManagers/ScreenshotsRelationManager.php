@@ -23,6 +23,8 @@ use Filament\Infolists\Components\Grid;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Carbon\Carbon;
+
 
 class ScreenshotsRelationManager extends RelationManager
 {
@@ -86,13 +88,17 @@ class ScreenshotsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('screenshot')
             ->columns([
-                ImageColumn::make('screenshot')
-                    ->label('Screenshot')
-                    ->disk('public')
-                    ->height(60)
-                    ->width(80)
-                    ->extraAttributes(['class' => 'rounded-lg'])
-                    ->defaultImageUrl(url('/images/placeholder-image.png')),
+                ImageColumn::make('image')
+                    ->label('Image')
+                    ->circular()
+                    ->size(60)
+                    ->getStateUsing(function ($record) {
+                        $path = $record->screenshot;
+
+                        return $path
+                            ? asset('storage/' . $path)
+                            : asset('storage/products/default-product.png');
+                    }),
 
                 TextColumn::make('advert.name')
                     ->label('Advertisement')
@@ -115,19 +121,12 @@ class ScreenshotsRelationManager extends RelationManager
                     })
                     ->sortable(),
 
-                TextColumn::make('timestamp')
-                    ->label('Uploaded')
-                    ->dateTime('M j, Y \a\t g:i A')
-                    ->sortable()
-                    ->weight(FontWeight::Medium)
-                    ->since()
-                    ->tooltip(fn($state) => $state?->format('F j, Y \a\t g:i:s A')),
+
 
                 TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime('M j, Y')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable(),
 
                 TextColumn::make('updated_at')
                     ->label('Modified')
@@ -268,8 +267,6 @@ class ScreenshotsRelationManager extends RelationManager
     {
         return false;
     }
-
-
 
     protected function canEdit($record): bool
     {
