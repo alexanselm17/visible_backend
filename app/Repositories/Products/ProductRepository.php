@@ -850,7 +850,10 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Total reward invoices
             $rewardInvoices = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
+            ->where(function ($q) {
+                $q->where('type', 'Reward')
+                  ->orWhere('type', 'Referal');
+            })
                 ->get();
 
             $totalRewards = $rewardInvoices->sum('amount');
@@ -858,10 +861,13 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Today's rewards
             $todayRewards = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
-                ->whereBetween('created_at', [$startOfDay, $endOfDay])
-                ->get();
-
+            ->whereBetween('created_at', [$startOfDay, $endOfDay])
+            ->where(function ($q) {
+                $q->where('type', 'Reward')
+                  ->orWhere('type', 'Referal');
+            })
+            ->get();
+        
             $todayRewardTotal = $todayRewards->sum('amount');
             $todayRewardCount = $todayRewards->count();
 
