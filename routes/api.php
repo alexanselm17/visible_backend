@@ -55,6 +55,7 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('/assign_permissions', [AuthController::class, 'assignPermissionsToUser']);
 
         Route::get('/user_permissions/{userId}', [AuthController::class, 'getUserPermissions']);
+        Route::get('/user_referals/{userId}', [AuthController::class, 'getAllUserReferred']);
 
         Route::put('/reset_password', [AuthController::class, 'restorePassword']);
     });
