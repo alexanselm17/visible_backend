@@ -48,8 +48,7 @@ class ScreenshotObserver
             $this->scheduleReminderNotifications($user, $advert, $firstScreenshot);
         }
 
-        // If user has completed all 5 screenshots, send completion notification
-        if ($totalScreenshots === 5) {
+        if ($totalScreenshots === 2) {
             $this->sendCompletionNotification($user, $advert);
         }
     }
@@ -59,15 +58,13 @@ class ScreenshotObserver
      */
     private function scheduleReminderNotifications(User $user, AdvertImages $advert, Screenshots $firstScreenshot): void
     {
-        // Schedule notifications at different intervals
         $reminderIntervals = [
-            18 => '18 hours', 
+            18 => '18 hours',
         ];
 
         foreach ($reminderIntervals as $hours => $description) {
             $scheduledTime = $firstScreenshot->created_at->addHours($hours);
 
-            // Only schedule if the time hasn't passed yet
             if ($scheduledTime->isFuture()) {
                 SendIncompleteScreenshotNotification::dispatch($user, $advert, $hours)
                     ->delay($scheduledTime);
@@ -86,7 +83,7 @@ class ScreenshotObserver
             $firebase = new FirebaseService();
 
             $title = "Campaign Completed! 🎉";
-            $message = "Congratulations! You've successfully uploaded all 5 screenshots for '{$advert->name}'. Your reward is being processed.";
+            $message = "Congratulations! You've successfully uploaded all 2 screenshots for '{$advert->name}'. Your reward is being processed.";
 
             // Send push notification if user has FCM token
             if ($user->fcm_token) {

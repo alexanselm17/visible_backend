@@ -46,32 +46,44 @@ class ViewCampaign extends ViewRecord
                                         IconEntry::make('is_active')
                                             ->label('')
                                             ->icon(
-                                                fn($record) =>
-                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
-                                                    ? 'heroicon-o-check-circle'
-                                                    : 'heroicon-o-x-circle'
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle';
+                                                }
                                             )
                                             ->color(
-                                                fn($record) =>
-                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
-                                                    ? 'success'
-                                                    : 'danger'
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'success' : 'danger';
+                                                }
                                             ),
 
                                         TextEntry::make('campaign_status')
                                             ->label('')
                                             ->getStateUsing(
-                                                fn($record) =>
-                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
-                                                    ? 'ACTIVE CAMPAIGN'
-                                                    : 'EXPIRED CAMPAIGN'
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'ACTIVE CAMPAIGN' : 'EXPIRED CAMPAIGN';
+                                                }
                                             )
                                             ->badge()
                                             ->color(
-                                                fn($record) =>
-                                                $record->valid_until && now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
-                                                    ? 'success'
-                                                    : 'danger'
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'success' : 'danger';
+                                                }
                                             )
                                             ->size('lg')
                                             ->weight(FontWeight::Bold),
