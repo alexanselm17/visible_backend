@@ -271,4 +271,10 @@ class User extends Authenticatable implements FilamentUser
       ->where('views', '>', 0)
       ->orderBy('views', 'desc');
   }
+
+  public function referredUsers()
+  {
+    return $this->hasMany(User::class, 'my_code', 'referral_code')
+      ->where('id', '!=', $this->id);
+  }
 }

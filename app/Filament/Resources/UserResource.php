@@ -602,6 +602,8 @@ class UserResource extends Resource
       RelationManagers\PermissionsRelationManager::class,
       RelationManagers\NotificationsRelationManager::class,
       RelationManagers\ScreenshotsRelationManager::class,
+      RelationManagers\ReferredUsersRelationManager::class,
+
 
     ];
   }

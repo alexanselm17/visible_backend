@@ -18,12 +18,121 @@ use Filament\Infolists\Components\Group;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconSize;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ViewCampaign extends ViewRecord
 {
     protected static string $resource = CampaignResource::class;
 
     protected static ?string $title = 'Campaign Analytics Dashboard';
+
+    protected function detectFraudPatterns($campaignId): array
+    {
+        try {
+            // Get all advert IDs for the given campaign
+            $advertIds = DB::table('advert_images')
+                ->where('campaign_id', $campaignId)
+                ->pluck('id');
+
+            $fraudGroups = [];
+
+            foreach ($advertIds as $advertId) {
+                // Get all screenshots for this advert
+                $screenshots = DB::table('screenshots')
+                    ->where('advert_id', $advertId)
+                    ->get();
+
+                // Group screenshots by a combined key of views + timestamp
+                $patterns = [];
+
+                foreach ($screenshots as $screenshot) {
+                    $patternKey = "{$screenshot->views}_{$screenshot->timestamp}";
+
+                    $patterns[$patternKey][] = [
+                        'user_id' => $screenshot->processed_by,
+                        'name' => DB::table('users')->where('id', $screenshot->processed_by)->value('fullname'),
+                        'views' => $screenshot->views,
+                        'timestamp' => $screenshot->timestamp,
+                        'number' => $screenshot->number,
+                        'screenshot_id' => $screenshot->id,
+                        'url' => asset('storage/' . $screenshot->screenshot),
+                    ];
+                }
+
+                // Only include suspicious patterns shared by 2 or more users
+                foreach ($patterns as $pattern => $grouped) {
+                    $uniqueUsers = collect($grouped)->pluck('user_id')->unique();
+
+                    if ($uniqueUsers->count() >= 2) {
+                        $fraudGroups[] = [
+                            'advert_id' => $advertId,
+                            'advert_name' => DB::table('advert_images')->where('id', $advertId)->value('name'),
+                            'matching_pattern' => $pattern,
+                            'user_count' => $uniqueUsers->count(),
+                            'users' => $uniqueUsers->values(),
+                            'details' => $grouped,
+                            'risk_level' => $this->calculateRiskLevel($uniqueUsers->count(), $grouped),
+                        ];
+                    }
+                }
+            }
+
+            return $fraudGroups;
+        } catch (\Throwable $th) {
+            return [];
+        }
+    }
+
+    /**
+     * Calculate risk level based on pattern data
+     */
+    protected function calculateRiskLevel($userCount, $details): array
+    {
+        $riskScore = 0;
+        $factors = [];
+
+        // More users = higher risk
+        if ($userCount >= 5) {
+            $riskScore += 3;
+            $factors[] = "Large group coordination ({$userCount} users)";
+        } elseif ($userCount >= 3) {
+            $riskScore += 2;
+            $factors[] = "Medium group coordination ({$userCount} users)";
+        } else {
+            $riskScore += 1;
+            $factors[] = "Small group coordination ({$userCount} users)";
+        }
+
+        // Check if views are suspiciously high or identical
+        $views = collect($details)->pluck('views')->unique();
+        if ($views->count() === 1 && $views->first() > 1000) {
+            $riskScore += 2;
+            $factors[] = "Suspiciously high identical views ({$views->first()})";
+        }
+
+        // Determine risk level
+        if ($riskScore >= 4) {
+            $level = 'HIGH';
+            $color = 'danger';
+            $icon = 'heroicon-o-exclamation-triangle';
+        } elseif ($riskScore >= 2) {
+            $level = 'MEDIUM';
+            $color = 'warning';
+            $icon = 'heroicon-o-exclamation-circle';
+        } else {
+            $level = 'LOW';
+            $color = 'info';
+            $icon = 'heroicon-o-information-circle';
+        }
+
+        return [
+            'level' => $level,
+            'color' => $color,
+            'icon' => $icon,
+            'score' => $riskScore,
+            'factors' => $factors,
+        ];
+    }
 
     public function infolist(Infolist $infolist): Infolist
     {
@@ -251,6 +360,7 @@ class ViewCampaign extends ViewRecord
                 // Main Content Tabs
                 Tabs::make('Campaign Management')
                     ->tabs([
+
                         // Adverts & Screenshots Tab
                         Tabs\Tab::make('adverts')
                             ->label('Adverts & User Content')
@@ -270,7 +380,7 @@ class ViewCampaign extends ViewRecord
                                                             ->height(150)
                                                             ->width(150)
                                                             ->getStateUsing(function ($record) {
-                                                                $path = $record->primaryImage?->image_path ?? $record->image_path;
+                                                                $path = $record->image_path ?? $record->image_path;
                                                                 return $path
                                                                     ? asset('storage/' . $path)
                                                                     : asset('storage/products/default-product.png');
@@ -438,6 +548,165 @@ class ViewCampaign extends ViewRecord
                                     ])
                                     ->contained(false),
                             ]),
+
+                        Tabs\Tab::make('fraud_detection')
+                            ->label('Security & Fraud Detection')
+                            ->icon('heroicon-o-shield-exclamation')
+                            ->badge(function ($record) {
+                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                return count($fraudPatterns) > 0 ? count($fraudPatterns) : null;
+                            })
+                            ->badgeColor(function ($record) {
+                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                if (count($fraudPatterns) === 0) return 'success';
+
+                                $highRiskCount = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
+                                if ($highRiskCount > 0) return 'danger';
+
+                                $mediumRiskCount = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
+                                if ($mediumRiskCount > 0) return 'warning';
+
+                                return 'info';
+                            })
+                            ->schema([
+                                Section::make('Fraud Detection Overview')
+                                    ->schema([
+                                        Grid::make(4)
+                                            ->schema([
+                                                TextEntry::make('fraud_status')
+                                                    ->label('Security Status')
+                                                    ->getStateUsing(function ($record) {
+                                                        $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                                        if (count($fraudPatterns) === 0) {
+                                                            return '🛡️ SECURE';
+                                                        }
+
+                                                        $highRisk = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
+                                                        if ($highRisk > 0) return '🚨 HIGH RISK DETECTED';
+
+                                                        $mediumRisk = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
+                                                        if ($mediumRisk > 0) return '⚠️ MEDIUM RISK DETECTED';
+
+                                                        return '🔍 LOW RISK PATTERNS';
+                                                    })
+                                                    ->badge()
+                                                    ->size('xl')
+                                                    ->color(function ($record) {
+                                                        $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                                        if (count($fraudPatterns) === 0) return 'success';
+
+                                                        $highRisk = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
+                                                        if ($highRisk > 0) return 'danger';
+
+                                                        $mediumRisk = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
+                                                        if ($mediumRisk > 0) return 'warning';
+
+                                                        return 'info';
+                                                    }),
+
+                                                TextEntry::make('fraud_patterns_count')
+                                                    ->label('Suspicious Patterns')
+                                                    ->getStateUsing(fn($record) => count($this->detectFraudPatterns($record->id)))
+                                                    ->badge()
+                                                    ->size('xl')
+                                                    ->color(function ($record) {
+                                                        $count = count($this->detectFraudPatterns($record->id));
+                                                        return $count > 0 ? 'warning' : 'success';
+                                                    })
+                                                    ->icon('heroicon-o-exclamation-triangle'),
+
+                                                TextEntry::make('affected_users')
+                                                    ->label('Users Under Review')
+                                                    ->getStateUsing(function ($record) {
+                                                        $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                                        $allUsers = collect($fraudPatterns)->pluck('users')->flatten()->unique();
+                                                        return $allUsers->count();
+                                                    })
+                                                    ->badge()
+                                                    ->size('xl')
+                                                    ->color('info')
+                                                    ->icon('heroicon-o-users'),
+
+                                                TextEntry::make('last_scan')
+                                                    ->label('Last Security Scan')
+                                                    ->getStateUsing(fn() => now()->format('M d, Y g:i A'))
+                                                    ->badge()
+                                                    ->size('lg')
+                                                    ->color('gray')
+                                                    ->icon('heroicon-o-clock'),
+                                            ]),
+                                    ])
+                                    ->extraAttributes(['class' => 'bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-400']),
+
+                                Section::make('Detailed Fraud Analysis')
+                                    ->schema(function ($record) {
+                                        $fraudPatterns = $this->detectFraudPatterns($record->id);
+
+                                        if (count($fraudPatterns) === 0) {
+                                            return [
+                                                TextEntry::make('no_fraud')
+                                                    ->label('')
+                                                    ->default("🎉 **No suspicious patterns detected!**\n\nYour campaign appears to be clean with no coordinated fraud attempts detected.")
+                                                    ->markdown()
+                                                    ->columnSpanFull()
+                                            ];
+                                        }
+
+                                        $entries = [];
+
+                                        foreach ($fraudPatterns as $fraud) {
+                                            // Show advert name
+                                            $entries[] = TextEntry::make("advert_{$fraud['advert_name']}")
+                                                ->label('')
+                                                ->default("### 📌 Advert: {$fraud['advert_name']}")
+                                                ->markdown()
+                                                ->columnSpanFull();
+
+                                            // Group users into pairs for side-by-side comparison
+                                            $userPairs = array_chunk($fraud['details'], 2);
+
+                                            foreach ($userPairs as $pair) {
+                                                $columns = [];
+
+                                                foreach ($pair as $detail) {
+                                                    $columns[] = Grid::make(1)
+                                                        ->schema([
+                                                            TextEntry::make("user_info_{$detail['user_id']}")
+                                                                ->label('')
+                                                                ->default("**{$detail['name']}**\n{$detail['views']} views at {$detail['timestamp']}")
+                                                                ->markdown()
+                                                                ->columnSpan(1),
+
+                                                            ImageEntry::make("user_img_{$detail['user_id']}")
+                                                                ->label('')
+                                                                ->height(150)
+                                                                ->width(150)
+                                                                ->getStateUsing(fn() => $detail['url'] ?? 'https://visibledm.com/storage/products/default-product.png')
+                                                                ->url(fn() => $detail['url'] ?? null, true) // opens full-size in new tab
+                                                                ->columnSpan(1),
+                                                        ])
+                                                        ->columnSpan(1);
+                                                }
+
+                                                // If odd number, make right column empty
+                                                if (count($columns) < 2) {
+                                                    $columns[] = TextEntry::make('empty_col')->label('')->default('')->columnSpan(1);
+                                                }
+
+                                                $entries[] = Grid::make(2)
+                                                    ->schema($columns)
+                                                    ->columnSpanFull();
+                                            }
+                                        }
+
+                                        return $entries;
+                                    })
+                                    ->collapsible()
+                                    ->collapsed(fn($record) => count($this->detectFraudPatterns($record->id)) === 0),
+
+
+                            ]),
+
 
                         // Analytics Tab
                         Tabs\Tab::make('analytics')
