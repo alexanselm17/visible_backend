@@ -118,4 +118,9 @@ class AuthController extends Controller
   {
     return $this->authRepository->activateAllInactiveAcounts($request);
   }
+
+  public function getAllUserReferred(Request $request,$userId)
+  {
+    return $this->authRepository->getAllUserReferred($request,$userId);
+  }
 }

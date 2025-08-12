@@ -10,6 +10,7 @@ use App\Models\RolesModel;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\Invoice;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\Counties;
 use App\Repositories\Auth\AuthRepositoryInterface;
 use Illuminate\Http\Request;
@@ -744,6 +745,76 @@ class AuthRepository implements AuthRepositoryInterface
         }
     }
 
+    public function getAllUserReferred(Request $request, $userId)
+    {
+        try {
+            // Clamp per_page between 1 and 100
+            $perPage = (int) $request->query('per_page', 15);
+            $perPage = max(1, min(100, $perPage));
+            $page    = (int) $request->query('page', 1);
+
+            // 1) Find the user (UUID or int — works with findOrFail)
+            $user = User::findOrFail($userId);
+
+            // 2) Grab their my_code
+            $code = $user->my_code;
+
+            // 3) If user has no my_code, return an empty paginator
+            if (empty($code)) {
+                $empty = new LengthAwarePaginator([], 0, $perPage, $page, [
+                    'path'  => $request->url(),
+                    'query' => $request->query(),
+                ]);
+
+                return response()->json([
+                    'ok'      => true,
+                    'status'  => 'success',
+                    'message' => 'User has no referral code; no referrals found.',
+                    'user'    => [
+                        'id'       => $user->id,
+                        'fullname' => $user->fullname,
+                        'my_code'  => $code,
+                    ],
+                    'referrals' => $empty,
+                ]);
+            }
+
+            // 4) Fetch referred users (paginated)
+            $referrals = User::where('referal_code', $code) // matches your field
+                ->orderByDesc('created_at')
+                ->paginate($perPage)
+                ->appends($request->query());
+
+            return response()->json([
+                'ok'      => true,
+                'status'  => 'success',
+                'message' => 'Referrals fetched successfully.',
+                'user'    => [
+                    'id'       => $user->id,
+                    'fullname' => $user->fullname,
+                    'my_code'  => $code,
+                ],
+                'referrals' => $referrals,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'error',
+                'message' => 'User not found.',
+            ], 404);
+        } catch (\Throwable $th) {
+            Log::error('getAllUserReferred failed', [
+                'userId' => $userId,
+                'error'  => $th->getMessage(),
+            ]);
+
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'error',
+                'message' => 'Failed to fetch referrals.',
+            ], 500);
+        }
+    }
 
     public function getCountiesWithSubCounties(Request $request)
     {

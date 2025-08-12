@@ -1810,6 +1810,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 })
                 ->orderBy('invoices.created_at', 'desc')
                 ->leftJoin('users', 'invoices.processed_by', '=', 'users.id')
+                ->where('users.is_active',true)
                 ->select(
                     'users.fullname',
                     'invoices.id',
