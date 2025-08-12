@@ -98,10 +98,17 @@ class ScreenshotsResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('screenshot')
-                    ->size(80)
-                    ->square()
-                    ->defaultImageUrl(url('/images/placeholder.png')),
+                ImageColumn::make('image')
+                    ->label('Image')
+                    ->circular()
+                    ->size(60)
+                    ->getStateUsing(function ($record) {
+                        $path = $record->screenshot;
+
+                        return $path
+                            ? asset('storage/' . $path)
+                            : asset('storage/products/default-product.png');
+                    }),
 
                 TextColumn::make('advert.name')
                     ->label('Advertisement')

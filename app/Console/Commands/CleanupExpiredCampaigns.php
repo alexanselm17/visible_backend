@@ -43,7 +43,7 @@ class CleanupExpiredCampaigns extends Command
                 ->count();
 
             // Only process if user didn't complete all 5 screenshots
-            if ($totalScreenshots < 5) {
+            if ($totalScreenshots < 2) {
                 $user = User::find($record->processed_by);
                 $advert = AdvertImages::find($record->advert_id);
 
@@ -73,7 +73,7 @@ class CleanupExpiredCampaigns extends Command
     {
         try {
             $title = "Campaign Expired 😔";
-            $message = "The 24-hour window for '{$advert->name}' has expired. You completed {$completedCount} out of 5 screenshots.";
+            $message = "The 24-hour window for '{$advert->name}' has expired. You completed {$completedCount} out of 2 screenshots.";
 
             // Send push notification if user has FCM token
             if ($user->fcm_token) {
@@ -91,7 +91,7 @@ class CleanupExpiredCampaigns extends Command
                     'advert_id' => $advert->id,
                     'advert_name' => $advert->name,
                     'screenshots_uploaded' => $completedCount,
-                    'screenshots_required' => 5,
+                    'screenshots_required' => 2,
                     'action' => 'campaign_expired'
                 ],
             ]);

@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Models\Screenshots;
 use App\Models\AdvertImages;
 use Filament\Tables;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 
@@ -26,9 +27,17 @@ class RecentActivityWidget extends BaseWidget
                     ->limit(10)
             )
             ->columns([
-                Tables\Columns\ImageColumn::make('screenshot')
+                ImageColumn::make('image')
+                    ->label('Image')
                     ->circular()
-                    ->size(50),
+                    ->size(60)
+                    ->getStateUsing(function ($record) {
+                        $path = $record->screenshot;
+
+                        return $path
+                            ? asset('storage/' . $path)
+                            : asset('storage/products/default-product.png');
+                    }),
 
                 Tables\Columns\TextColumn::make('user.fullname')
                     ->label('User')

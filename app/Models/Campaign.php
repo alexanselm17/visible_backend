@@ -16,11 +16,7 @@ class Campaign extends Model
        
     ];
 
-    protected $casts = [
-        'valid_until' => 'datetime',
-        'capital_invested' => 'decimal:2',
-        'reward' => 'decimal:2',
-    ];
+  
 
     protected $keyType = 'string';
     public $incrementing = false;
