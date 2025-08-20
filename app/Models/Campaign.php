@@ -8,15 +8,13 @@ use Illuminate\Support\Str;
 
 class Campaign extends Model
 {
-    /** @use HasFactory<\Database\Factories\CampaignFactory> */
     use HasFactory;
 
     protected $fillable = [
         'name',
-       
     ];
 
-  
+
 
     protected $keyType = 'string';
     public $incrementing = false;

@@ -23,7 +23,7 @@ class RevenueChart extends LineChartWidget
 
             // Calculate daily revenue (sum of selling prices for adverts created that day)
             $dailyRevenue = AdvertImages::whereDate('created_at', $date)
-                ->sum('selling_price');
+                ->sum('capital_invested');
 
             // Calculate daily rewards distributed
             $dailyRewards = AdvertImages::whereHas('screenshots', function ($query) use ($date) {

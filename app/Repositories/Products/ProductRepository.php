@@ -1107,7 +1107,6 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 ->where('roles.slug', 'salesman')
                 ->count();
 
-
             $topCampaigns = $campaignStats->sortByDesc('completed')->take(5)->values();
 
             $latestInvoiceIds = Invoice::select(DB::raw('MAX(id) as id'))
