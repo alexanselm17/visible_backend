@@ -8,6 +8,8 @@ use Filament\Tables;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Filament\Tables\Actions\Action;
+
 
 class RecentActivityWidget extends BaseWidget
 {
@@ -37,7 +39,24 @@ class RecentActivityWidget extends BaseWidget
                         return $path
                             ? asset('storage/' . $path)
                             : asset('storage/products/default-product.png');
-                    }),
+                    })
+                    ->action(
+                        Action::make('preview')
+                            ->label('') // no button label, just clickable image
+                            ->modalHeading('Preview Image')
+                            ->modalSubmitAction(false)
+                            ->modalCancelAction(false)
+                            ->modalWidth('sm')
+                            ->modalContent(
+                                fn($record) =>
+                                view('filament.components.image-preview', [
+                                    'url' => $record->screenshot
+                                        ? asset('storage/' . $record->screenshot)
+                                        : asset('storage/products/default-product.png'),
+                                ])
+                            )
+                    ),
+
 
                 Tables\Columns\TextColumn::make('user.fullname')
                     ->label('User')

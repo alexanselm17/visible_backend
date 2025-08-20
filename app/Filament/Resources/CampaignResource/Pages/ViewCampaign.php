@@ -37,9 +37,10 @@ class ViewCampaign extends ViewRecord
             $fraudGroups = [];
 
             foreach ($advertIds as $advertId) {
-                // Get all screenshots for this advert
+
                 $screenshots = DB::table('screenshots')
                     ->where('advert_id', $advertId)
+                    ->where('views', '>', 10)
                     ->get();
 
                 // Group screenshots by a combined key of views + timestamp

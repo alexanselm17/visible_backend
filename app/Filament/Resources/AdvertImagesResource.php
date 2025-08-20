@@ -176,7 +176,6 @@ class AdvertImagesResource extends Resource
                                 Select::make('county_id')
                                     ->label('County')
                                     ->options(Counties::all()->pluck('name', 'id'))
-                                    ->required()
                                     ->searchable()
                                     ->preload()
                                     ->live()
@@ -193,7 +192,6 @@ class AdvertImagesResource extends Resource
                                             ? SubCounty::where('county_id', $get('county_id'))->pluck('name', 'id')->toArray()
                                             : []
                                     )
-                                    ->required()
                                     ->searchable()
                                     ->placeholder('Select Sub County')
                                     ->disabled(fn(Get $get): bool => !$get('county_id')),
@@ -204,7 +202,6 @@ class AdvertImagesResource extends Resource
                                         'male' => 'Male',
                                         'female' => 'Female',
                                     ])
-                                    ->required()
                                     ->placeholder('Select Gender'),
                             ])
                             ->columns(3)
@@ -283,7 +280,23 @@ class AdvertImagesResource extends Resource
                         return $path
                             ? asset('storage/' . $path)
                             : asset('storage/products/default-product.png');
-                    }),
+                    })
+                    ->action(
+                        Action::make('preview')
+                            ->label('')
+                            ->modalHeading('Preview Image')
+                            ->modalWidth('sm')
+                            ->modalSubmitAction(false)
+                            ->modalCancelAction(false)
+                            ->modalContent(
+                                fn($record) =>
+                                view('filament.components.image-preview', [
+                                    'url' => $record->image_path
+                                        ? asset('storage/' . $record->image_path)
+                                        : asset('storage/products/default-product.png'),
+                                ])
+                            )
+                    ),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
