@@ -15,7 +15,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use League\Csv\ByteSequence;
+use League\Csv\Bom;
 use League\Csv\Writer;
 use SplTempFileObject;
 
@@ -53,7 +53,7 @@ class PrepareCsvExport implements ShouldQueue
     public function handle(): void
     {
         $csv = Writer::createFromFileObject(new SplTempFileObject);
-        $csv->setOutputBOM(ByteSequence::BOM_UTF8);
+        $csv->setOutputBOM(Bom::Utf8);
         $csv->setDelimiter($this->exporter::getCsvDelimiter());
         $csv->insertOne(array_values($this->columnMap));
 
@@ -69,20 +69,45 @@ class PrepareCsvExport implements ShouldQueue
 
         if ($databaseConnection->getDriverName() === 'pgsql') {
             $originalOrders = collect($query->getQuery()->orders)
-                ->reject(fn (array $order): bool => in_array($order['column'] ?? null, [$keyName, $qualifiedKeyName]))
-                ->unique('column');
+                ->reject(function (array $order) use ($qualifiedKeyName): bool {
+                    if (($order['type'] ?? null) === 'Raw') {
+                        return false;
+                    }
+
+                    return ($order['column'] ?? null) === $qualifiedKeyName;
+                })
+                ->unique(function (array $order): string {
+                    if (($order['type'] ?? null) === 'Raw') {
+                        return 'raw:' . ($order['sql'] ?? '');
+                    }
+
+                    return 'column:' . ($order['column'] ?? '');
+                });
 
             /** @var array<string, mixed> $originalBindings */
             $originalBindings = $query->getRawBindings();
 
-            $query->reorder($qualifiedKeyName);
+            if (! empty($originalOrders->all())) {
+                $firstOrder = $originalOrders->first();
 
-            foreach ($originalOrders as $order) {
-                if (blank($order['column'] ?? null) || blank($order['direction'] ?? null)) {
-                    continue;
+                if (($firstOrder['type'] ?? null) === 'Raw') {
+                    $query->reorder();
+                    $query->orderByRaw($firstOrder['sql']);
+                } else {
+                    $query->reorder($firstOrder['column'], $firstOrder['direction']);
                 }
 
-                $query->orderBy($order['column'], $order['direction']);
+                $originalOrders->forget(0);
+            } else {
+                $query->reorder($qualifiedKeyName);
+            }
+
+            foreach ($originalOrders as $order) {
+                if (($order['type'] ?? null) === 'Raw') {
+                    $query->orderByRaw($order['sql']);
+                } elseif (filled($order['column'] ?? null) && filled($order['direction'] ?? null)) {
+                    $query->orderBy($order['column'], $order['direction']);
+                }
             }
 
             $newBindings = $query->getRawBindings();
@@ -144,7 +169,10 @@ class PrepareCsvExport implements ShouldQueue
         $chunkKeySize = $this->chunkSize * 10;
 
         $baseQuery = $query->toBase();
-        $baseQuery->distinct($qualifiedKeyName);
+
+        if (in_array($query->getQuery()->orders[0]['column'] ?? null, [$keyName, $qualifiedKeyName])) {
+            $baseQuery->distinct($qualifiedKeyName);
+        }
 
         /** @phpstan-ignore-next-line */
         $baseQueryOrders = $baseQuery->orders ?? [];

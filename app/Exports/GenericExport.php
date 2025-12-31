@@ -3,35 +3,64 @@
 namespace App\Exports;
 
 use Illuminate\Support\Collection;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class GenericExport implements FromCollection, WithHeadings, WithColumnFormatting
+class GenericExport extends DefaultValueBinder implements
+    FromCollection, WithHeadings, WithColumnFormatting, ShouldAutoSize, WithCustomValueBinder
 {
-    protected $data;
+    protected Collection $data;
 
     public function __construct(Collection $data)
     {
         $this->data = $data;
     }
 
-    public function collection()
+    // Force column B (phone) to be written as TEXT so leading + stays
+    public function bindValue(Cell $cell, $value)
     {
-        return $this->data;
+        if ($cell->getColumn() === 'B') {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+            return true;
+        }
+        return parent::bindValue($cell, $value);
     }
 
-    // Remove headings
+    public function collection()
+    {
+        // Ensure phone is a string and includes + if that’s your format
+        return $this->data->map(function ($row) {
+            // $row[1] == phone column
+            if (isset($row[1]) && $row[1] !== '') {
+                $phone = (string) $row[1];
+                // add + if it should be there and isn’t already
+                if ($phone[0] !== '+') {
+                    // adjust this rule to your needs
+                    $phone = '+' . $phone;
+                }
+                $row[1] = $phone;
+            }
+            return $row;
+        });
+    }
+
     public function headings(): array
     {
-        return [];
+        return ['PayeeName', 'PayeeMobileNo', 'Amount', 'Reference'];
     }
 
     public function columnFormats(): array
     {
         return [
-            'C' => NumberFormat::FORMAT_TEXT, // Column C = Account, treated as plain text
+            'B' => NumberFormat::FORMAT_TEXT,        // phone as text
+            'C' => NumberFormat::FORMAT_NUMBER_00,   // amount
         ];
     }
 }

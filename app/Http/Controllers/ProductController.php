@@ -17,23 +17,22 @@ class ProductController extends Controller
 {
     private ProductRepositoryInterface $productRepository;
     public function __construct(ProductRepositoryInterface $productRepository){
-        $this->middleware(['auth:api', 'permission:products_operations'])->only([
-            'createProduct',
-            'createChildProduct',
-            'updateProduct',
-        ]);
-        $this->middleware(['auth:api', 'permission:basic_setup_operations'])->only([
-            'createDrum',
-            'updateDrum',
-        ]);
-        $this->middleware(['auth:api', 'permission:basic_setup_operations'])->only([
-            'createPump',
-            'updatePump',
-        ]);
-        $this->middleware(['auth:api', 'permission:basic_setup_operations'])->only([
+       
+        $this->middleware(['auth:api', 'permission:advert_operations'])->only([
+            'updateAdvertProduct',
             'uploadAdvertProducts',
-            'uploadScreenShotPlusCompare',
         ]);
+        $this->middleware(['auth:api', 'permission:campaign_operations'])->only([
+            'startCampaigns',
+            'updateCampaign',
+        ]);
+        
+        $this->middleware(['auth:api', 'permission:payment_operations'])->only([
+            'uploadPaymentExcell',
+        ]);
+        
+        
+       
         $this->productRepository = $productRepository;
     }
     public function createProduct(ProductRequest $request){

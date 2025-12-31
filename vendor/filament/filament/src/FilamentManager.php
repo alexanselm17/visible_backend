@@ -225,6 +225,11 @@ class FilamentManager
         return $this->getCurrentPanel()->getMaxContentWidth();
     }
 
+    public function getSimplePageMaxContentWidth(): MaxWidth | string | null
+    {
+        return $this->getCurrentPanel()->getSimplePageMaxContentWidth();
+    }
+
     public function getModelResource(string | Model $model): ?string
     {
         return $this->getCurrentPanel()->getModelResource($model);
@@ -498,7 +503,7 @@ class FilamentManager
             return $user->getFilamentName();
         }
 
-        return $user->getAttributeValue('fullname');
+        return $user->getAttributeValue('username') ?? $user->getAttributeValue('name') ?? $user->getAttributeValue('email');
     }
 
     /**

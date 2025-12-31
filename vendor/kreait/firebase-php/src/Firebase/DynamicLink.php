@@ -50,7 +50,10 @@ final class DynamicLink implements JsonSerializable, Stringable
      */
     public static function fromApiResponse(ResponseInterface $response): self
     {
-        return new self(Json::decode((string) $response->getBody(), true));
+        /** @var DynamicLinkShape $decoded */
+        $decoded = Json::decode((string) $response->getBody(), true);
+
+        return new self($decoded);
     }
 
     public function uri(): UriInterface
@@ -90,7 +93,7 @@ final class DynamicLink implements JsonSerializable, Stringable
 
     public function hasWarnings(): bool
     {
-        return !empty($this->warnings());
+        return $this->warnings() !== [];
     }
 
     public function jsonSerialize(): array

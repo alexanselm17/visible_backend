@@ -113,6 +113,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::put('/deactivate', [AuthController::class, 'accountActivationCard']);
             Route::put('/assign_role', [AuthController::class, 'assignRole']);
             Route::put('/unassign_role', [AuthController::class, 'unAssignRole']);
+            Route::get('/user_referals/{userId}', [AuthController::class, 'getAllUserReferred']);
 
             Route::get('/get_Roles', [AuthController::class, 'getRoles']);
             // Route::put('/assign_role', [AuthController::class, 'assignRole']);

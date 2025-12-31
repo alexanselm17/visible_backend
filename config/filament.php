@@ -281,8 +281,7 @@ return [
     |
     */
 
-  'favicon' => null,
-
+'favicon' => '/favicon.ico',
   /*
     |--------------------------------------------------------------------------
     | Default Avatar Provider

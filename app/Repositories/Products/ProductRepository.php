@@ -436,7 +436,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Notify users
             $title = "📢 New Product posted!";
-            $body = "🔥 {$advert->name} is now live. Check it out before it’s gone!";
+            $body = "🔥 {$advert->name} is now live. Post it to on your  WhatsApp Status and earn ksh.{$advert->reward}";
             $request->merge([
                 'title' => $title,
                 'message' => $body,
@@ -701,6 +701,24 @@ class ProductRepository implements ProductRepositoryInterface
                     'advert_id' => $advert_id
                 ]);
                 $message = "Task Completed and rewarded Successfuly";
+                
+                //let's check that the user has been rewarded
+                $user=User::where('id',$request->user_id)->first();
+                $referedBy=User::where('my_code',$user->referal_code)->first();
+                $referInvoice=Invoice::where('processed_by',  $referedBy->id)->where('posted_by',$request->user_id)->first();
+                if( $referInvoice == null){
+                       $customerLastInvoice = Invoice::where('processed_by',  $referedBy->id)->latest()->first();
+                       $customerBalance = $customerLastInvoice?->customer_balance ?? 0;
+                       $rewardCoin = 30;
+
+            Invoice::create([
+                "type" => "Referal",
+                "amount" => $rewardCoin,
+                "processed_by" =>  $referedBy->id,
+                "customer_balance" => $customerBalance + $rewardCoin,
+                "posted_by" => $user->id,
+            ]);
+                }
             }
 
             // Return final success response
@@ -742,6 +760,7 @@ class ProductRepository implements ProductRepositoryInterface
                 // Get all screenshots for this advert, ordered by user and number
                 $screenshots = DB::table('screenshots')
                     ->where('advert_id', $advertId)
+                    ->where('views','>',10)
                     ->get();
     
                 // Group screenshots by a combined key of views + timestamp
@@ -849,18 +868,25 @@ class ProductRepository implements ProductRepositoryInterface
             $startOfMonth = $now->copy()->startOfMonth();
 
             // Total reward invoices
-            $rewardInvoices = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
+             $rewardInvoices = Invoice::where('processed_by', $userId)
+            ->where(function ($q) {
+                $q->where('type', 'Reward')
+                  ->orWhere('type', 'Referal');
+            })
                 ->get();
 
             $totalRewards = $rewardInvoices->sum('amount');
             $totalCampaigns = $rewardInvoices->count();
 
             // Today's rewards
-            $todayRewards = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
-                ->whereBetween('created_at', [$startOfDay, $endOfDay])
-                ->get();
+          $todayRewards = Invoice::where('processed_by', $userId)
+            ->whereBetween('created_at', [$startOfDay, $endOfDay])
+            ->where(function ($q) {
+                $q->where('type', 'Reward')
+                  ->orWhere('type', 'Referal');
+            })
+            ->get();
+        
 
             $todayRewardTotal = $todayRewards->sum('amount');
             $todayRewardCount = $todayRewards->count();
@@ -1804,39 +1830,32 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 })
                 ->orderBy('invoices.created_at', 'desc')
                 ->leftJoin('users', 'invoices.processed_by', '=', 'users.id')
+                  ->where('users.is_active',true)
                 ->select(
                     'users.fullname',
                     'invoices.id',
                     'invoices.customer_balance',
                     'users.phone',
-                    'users.town',
-                    'users.estate',
-                    'users.county'
+                  
                 )
                 ->where('invoices.customer_balance', '>', '0')
                 ->get();
                
     
-            // Transform data
-            $data = $latestInvoices->map(function ($invoice) {
-                return [
-                     99,
-                     "112",
-                     (string) $invoice->phone,
-                     $invoice->fullname,
-                     $invoice->customer_balance,
-                    'Payment',
-                    $invoice->town,
-                    $invoice->estate,
-                    $invoice->county,
-                    "SALA",
-                ];
-            });
-    
-            // Return Excel file for download
-            return Excel::download(
-                new GenericExport($data), 
-                'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+           $data = $latestInvoices->map(function ($invoice) {
+    return [
+        $invoice->fullname,
+          (string) $invoice->phone,       // keep as string
+        $invoice->customer_balance,
+        'Payment',
+    ];
+});
+
+return Excel::download(
+    new GenericExport($data),
+    'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx'
+);
+
         } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
@@ -1864,7 +1883,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
             $data = [];
             foreach ($rows as $index => $row) {
                 if (strtolower($row[2]) == 'payee name' || empty($row[11])) continue;
-    
+               // dd($row);
                 $data[] = [
                     'payee_name' => $row[2],
                     'phone' => $row[4],
@@ -1873,6 +1892,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                     'transaction_status' => $row[12],
                 ];
             }
+            //dd($data);
     
             DB::beginTransaction();
     

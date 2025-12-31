@@ -21,7 +21,7 @@
             this.step = this.getSteps()[nextStepIndex]
 
             this.autofocusFields()
-            this.scrollToTop()
+            this.scroll()
         },
 
         previousStep: function () {
@@ -34,13 +34,15 @@
             this.step = this.getSteps()[previousStepIndex]
 
             this.autofocusFields()
-            this.scrollToTop()
+            this.scroll()
         },
 
-        scrollToTop: function () {
-            this.$nextTick(() =>
-                this.$root.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-            )
+        scroll: function () {
+            this.$nextTick(() => {
+                this.$refs.header.children[
+                    this.getStepIndex(this.step)
+                ].scrollIntoView({ behavior: 'smooth', block: 'start' })
+            })
         },
 
         autofocusFields: function () {
@@ -135,6 +137,7 @@
             'border-b border-gray-200 dark:border-white/10' => $isContained,
             'rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10' => ! $isContained,
         ])
+        x-ref="header"
     >
         @foreach ($getChildComponentContainer()->getComponents() as $step)
             <li
@@ -148,7 +151,7 @@
                     type="button"
                     x-bind:aria-current="getStepIndex(step) === {{ $loop->index }} ? 'step' : null"
                     x-on:click="step = @js($step->getId())"
-                    x-bind:disabled="! isStepAccessible(@js($step->getId()))"
+                    x-bind:disabled="! isStepAccessible(@js($step->getId())) || @js($previousAction->isDisabled())"
                     role="step"
                     class="fi-fo-wizard-header-step-button flex h-full items-center gap-x-4 px-6 py-4 text-start"
                 >
@@ -289,12 +292,15 @@
                     )
                 "
             @endif
-            x-show="! isLastStep()"
+            x-bind:class="{ 'hidden': isLastStep(), 'block': ! isLastStep() }"
+            wire:loading.class="pointer-events-none opacity-70"
         >
             {{ $nextAction }}
         </span>
 
-        <span x-show="isLastStep()">
+        <span
+            x-bind:class="{ 'hidden': ! isLastStep(), 'block': isLastStep() }"
+        >
             {{ $getSubmitAction() }}
         </span>
     </div>

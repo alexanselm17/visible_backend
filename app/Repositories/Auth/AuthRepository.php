@@ -18,69 +18,157 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 
 class AuthRepository implements AuthRepositoryInterface
 {
 
 
-
-
-    public function signUpUser(Request $request)
+   public function getAllUserReferred(Request $request, $userId)
     {
         try {
-            // Define helper function inside this method
-            $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
-                do {
-                    $code = Str::random($length);
-                    $code = preg_replace('/[^0-9]/', '', $code);
-                    while (strlen($code) < $length) {
-                        $code .= rand(0, 9);
-                    }
-                    $exists = DB::table($table)->where($column, $code)->exists();
-                } while ($exists);
+            // Clamp per_page between 1 and 100
+            $perPage = (int) $request->query('per_page', 15);
+            $perPage = max(1, min(100, $perPage));
+            $page    = (int) $request->query('page', 1);
 
-                return $code;
-            };
+            // 1) Find the user (UUID or int — works with findOrFail)
+            $user = User::findOrFail($userId);
 
-            $role = RolesModel::where('name', '=', 'Customer Champion')->first();
-            $usersCount = User::count();
+            // 2) Grab their my_code
+            $code = $user->my_code;
 
-            $myCode = $generateUniqueCode('users', 'my_code');
-       
+            // 3) If user has no my_code, return an empty paginator
+            if (empty($code)) {
+                $empty = new LengthAwarePaginator([], 0, $perPage, $page, [
+                    'path'  => $request->url(),
+                    'query' => $request->query(),
+                ]);
 
-            $referalCode = $usersCount == 0
-                ?  $myCode
-                : $request['code'];
-                $userCode=User::where('my_code', $referalCode )->first();
+                return response()->json([
+                    'ok'      => true,
+                    'status'  => 'success',
+                    'message' => 'User has no referral code; no referrals found.',
+                    'user'    => [
+                        'id'       => $user->id,
+                        'fullname' => $user->fullname,
+                        'my_code'  => $code,
+                    ],
+                    'referrals' => $empty,
+                ]);
+            }
 
-            $user = User::create([
-                "fullname" => $request['fullname'],
-                "username" => $request['username'],
-                "email" => $request['email'],
-                "password" => $request["password"],
-                "phone" => $request['phone'],
-                "county_id" => $request['county'],
-                "subcounty_id" => $request['sub_county'],
-                "role_id" => $role->id,
-                "occupation" => $request['occupation'],
-                "location" => $request['location'],
-                "gender" => $request['gender'],
-                "town" => $request['town'],
-                "estate" => $request['estate'],
-                "county" => $request['county'],
-                "fcm_token"=>$request['fcm_token'],
-                "is_active" => false,
-                "referal_code" => $referalCode,
-                "my_code" =>  $userCode == null ? $myCode : $referalCode,
+            // 4) Fetch referred users (paginated)
+            $referrals = User::where('referal_code', $code) // matches your field
+                ->orderByDesc('created_at')
+                ->paginate($perPage)
+                ->appends($request->query());
+
+            return response()->json([
+                'ok'      => true,
+                'status'  => 'success',
+                'message' => 'Referrals fetched successfully.',
+                'user'    => [
+                    'id'       => $user->id,
+                    'fullname' => $user->fullname,
+                    'my_code'  => $code,
+                ],
+                'referrals' => $referrals,
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'error',
+                'message' => 'User not found.',
+            ], 404);
+        } catch (\Throwable $th) {
+            Log::error('getAllUserReferred failed', [
+                'userId' => $userId,
+                'error'  => $th->getMessage(),
             ]);
 
-            // Handle referral reward
-            $whoReferedMe = User::where("my_code", $referalCode)->first();
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'error',
+                'message' => 'Failed to fetch referrals.',
+            ], 500);
+        }
+    }
+
+
+   public function signUpUser(Request $request)
+{
+    try {
+        DB::beginTransaction();
+        
+     
+        
+
+        // Helper to generate unique code
+        $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
+            do {
+                $code = preg_replace('/[^0-9]/', '', Str::random($length));
+                while (strlen($code) < $length) {
+                    $code .= rand(0, 9);
+                }
+                $exists = DB::table($table)->where($column, $code)->exists();
+            } while ($exists);
+
+            return $code;
+        };
+
+         // Generate a unique my_code
+         $myCode = $generateUniqueCode('users', 'my_code');
+        $role = RolesModel::where('name', '=', 'Customer Champion')->first();
+        $usersCount = User::count();
+
+        $referalCode = $usersCount == 0 ?  $myCode : $request['code'];
+       // dd(  $referalCode);
+        $userCode = User::where('my_code', $referalCode)->first();
+
+       
+
+        if ($usersCount > 0 && !$userCode) {
+            DB::rollBack();
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => "Invalid referral code"
+            ],400);
+        }
+
+        $user = User::create([
+            "fullname" => $request['fullname'],
+            "username" => $request['username'],
+            "email" => $request['email'],
+            "password" => $request["password"],
+            "phone" => $request['phone'],
+            "county_id" => $request['county'],
+            "subcounty_id" => $request['sub_county'],
+            "role_id" => $role->id,
+            "occupation" => $request['occupation'],
+            "location" => $request['location'],
+            "gender" => $request['gender'],
+            "town" => $request['town'],
+            "estate" => $request['estate'],
+            "county" => $request['county'],
+            "fcm_token" => $request['fcm_token'],
+            "is_active" => false,
+            "referal_code" => $usersCount == 0 ? $myCode : $referalCode,
+            "my_code" => $usersCount == 0 ? $referalCode :  $myCode,
+        ]);
+/*
+        // Handle referral reward
+        if ($userCode) {
+            
+            
+            $whoReferedMe = $userCode;
 
             $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
-            $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
-            $rewardCoin=30;
+            $customerBalance = $customerLastInvoice?->customer_balance ?? 0;
+            $rewardCoin = 30;
+
             Invoice::create([
                 "type" => "Referal",
                 "amount" => $rewardCoin,
@@ -88,26 +176,35 @@ class AuthRepository implements AuthRepositoryInterface
                 "customer_balance" => $customerBalance + $rewardCoin,
                 "posted_by" => $user->id,
             ]);
-
-            $notificationController = new NotificationController();
-            $notificationRequest = new Request(['new_user_id' => $user->id]);
-            $notificationController->notifyAdminsNewAccount($notificationRequest);
-
-
-            return response()->json([
-                'ok' => true,
-                'status' => 'success',
-                'message' => "Account created successfully"
-            ]);
-        } catch (\Throwable $th) {
-            Log::debug('Sign Up Error: ' . $th->getMessage());
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => $th->getMessage()
-            ]);
+            
+           
         }
+         */
+
+        // Notify admins
+        $notificationController = new NotificationController();
+        $notificationRequest = new Request(['new_user_id' => $user->id]);
+        $notificationController->notifyAdminsNewAccount($notificationRequest);
+
+        DB::commit();
+
+        return response()->json([
+            'ok' => true,
+            'status' => 'success',
+            'message' => "Account created successfully"
+        ]);
+    } catch (\Throwable $th) {
+        DB::rollBack();
+        Log::debug('Sign Up Error: ' . $th->getMessage());
+
+        return response()->json([
+            'ok' => false,
+            'status' => 'error',
+            'message' => $th->getMessage()
+        ]);
     }
+}
+
 
 
 
@@ -142,16 +239,20 @@ class AuthRepository implements AuthRepositoryInterface
                     'message' => "Account not yet Activated",
                 ], Response::HTTP_UNAUTHORIZED);
             }
-
-            if ($user->is_logged_in == 1) {
+             $role = RolesModel::find($user->role_id);
+            if($role -> slug != "admin"){
+                 if ($user->is_logged_in == 1) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
                     'message' => "Already Logged in",
                 ], Response::HTTP_UNAUTHORIZED);
             }
+            }
 
-            $role = RolesModel::find($user->role_id);
+           
+
+           
             if (!$role) {
                 return response()->json([
                     'ok' => false,
