@@ -66,7 +66,7 @@ jobs:
 
             # Attempt Deployment Steps
             if git pull origin main && \
-               composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader && \
+               composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-sodium && \
                php artisan migrate --force && \
                php artisan optimize:clear; then
 
