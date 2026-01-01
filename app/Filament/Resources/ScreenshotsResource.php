@@ -98,10 +98,32 @@ class ScreenshotsResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('screenshot')
-                    ->size(80)
-                    ->square()
-                    ->defaultImageUrl(url('/images/placeholder.png')),
+                ImageColumn::make('image')
+                    ->label('Image')
+                    ->size(60)
+                    ->getStateUsing(function ($record) {
+                        $path = $record->screenshot;
+
+                        return $path
+                            ? asset('storage/' . $path)
+                            : asset('storage/products/default-product.png');
+                    })
+                    ->action(
+                        Action::make('preview')
+                            ->label('')
+                            ->modalHeading('Preview Image')
+                            ->modalWidth('sm')
+                            ->modalSubmitAction(false)   // 🔴 removes "Submit"
+                            ->modalCancelAction(false)   // 🔴 removes "Cancel"
+                            ->modalContent(
+                                fn($record) =>
+                                view('filament.components.image-preview', [
+                                    'url' => $record->screenshot
+                                        ? asset('storage/' . $record->screenshot)
+                                        : asset('storage/products/default-product.png'),
+                                ])
+                            )
+                    ),
 
                 TextColumn::make('advert.name')
                     ->label('Advertisement')

@@ -28,12 +28,12 @@ final class UpdateUser implements Request
     public const EMAIL = 'EMAIL';
 
     /**
-     * @var array<string>
+     * @var list<non-empty-string>
      */
     private array $attributesToDelete = [];
 
     /**
-     * @var string[]
+     * @var list<non-empty-string>
      */
     private array $providersToDelete = [];
 
@@ -128,7 +128,7 @@ final class UpdateUser implements Request
 
                 case 'phonenumber':
                 case 'phone':
-                    if (!$value) {
+                    if (in_array($value, [false, null, ''], true)) {
                         $request = $request->withRemovedPhoneNumber();
                     }
 
@@ -148,7 +148,7 @@ final class UpdateUser implements Request
                 case 'removeproviders':
                     $request = array_reduce(
                         (array) $value,
-                        static fn(self $request, $provider): \Kreait\Firebase\Request\UpdateUser => $request->withRemovedProvider($provider),
+                        static fn(self $request, $provider): UpdateUser => $request->withRemovedProvider($provider),
                         $request,
                     );
 
@@ -184,8 +184,14 @@ final class UpdateUser implements Request
      */
     public function withRemovedProvider($provider): self
     {
+        $providerString = trim((string) $provider);
+
+        if ($providerString === '') {
+            return $this;
+        }
+
         $request = clone $this;
-        $request->providersToDelete[] = (string) $provider;
+        $request->providersToDelete[] = $providerString;
 
         return $request;
     }
@@ -254,6 +260,13 @@ final class UpdateUser implements Request
         return $request;
     }
 
+    /**
+     * @return array{
+     *     customAttributes?: string,
+     *     deleteAttribute?: list<non-empty-string>,
+     *     deleteProvider?: list<non-empty-string>,
+     * }
+     */
     public function jsonSerialize(): array
     {
         if (!$this->hasUid()) {
@@ -263,14 +276,14 @@ final class UpdateUser implements Request
         $data = $this->prepareJsonSerialize();
 
         if (is_array($this->customAttributes)) {
-            $data['customAttributes'] = empty($this->customAttributes) ? '{}' : Json::encode($this->customAttributes);
+            $data['customAttributes'] = $this->customAttributes === [] ? '{}' : Json::encode($this->customAttributes);
         }
 
-        if (!empty($this->attributesToDelete)) {
+        if ($this->attributesToDelete !== []) {
             $data['deleteAttribute'] = array_unique($this->attributesToDelete);
         }
 
-        if (!empty($this->providersToDelete)) {
+        if ($this->providersToDelete !== []) {
             $data['deleteProvider'] = $this->providersToDelete;
         }
 

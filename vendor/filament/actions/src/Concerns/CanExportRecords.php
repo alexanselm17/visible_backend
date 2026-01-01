@@ -5,6 +5,7 @@ namespace Filament\Actions\Concerns;
 use AnourValar\EloquentSerialize\Facades\EloquentSerializeFacade;
 use Closure;
 use Filament\Actions\ExportAction;
+use Filament\Actions\Exports\Enums\Contracts\ExportFormat as ExportFormatInterface;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
@@ -54,7 +55,7 @@ trait CanExportRecords
     protected string | Closure | null $fileName = null;
 
     /**
-     * @var array<ExportFormat> | Closure | null
+     * @var array<ExportFormatInterface> | Closure | null
      */
     protected array | Closure | null $formats = null;
 
@@ -129,7 +130,7 @@ trait CanExportRecords
 
             $records = $action instanceof ExportTableBulkAction ? $action->getRecords() : null;
 
-            $totalRows = $records ? $records->count() : $query->count();
+            $totalRows = $records ? $records->count() : $query->toBase()->getCountForPagination();
             $maxRows = $action->getMaxRows() ?? $totalRows;
 
             if ($maxRows < $totalRows) {
@@ -174,6 +175,9 @@ trait CanExportRecords
             $export->file_disk = $action->getFileDisk() ?? $exporter->getFileDisk();
             // Temporary save to obtain the sequence number of the export file.
             $export->save();
+
+            // Delete the export directory to prevent data contamination from previous exports with the same ID.
+            $export->deleteFileDirectory();
 
             $export->file_name = $action->getFileName($export) ?? $exporter->getFileName($export);
             $export->save();
@@ -240,16 +244,21 @@ trait CanExportRecords
                 )
                 ->dispatch();
 
-            Notification::make()
-                ->title($action->getSuccessNotificationTitle())
-                ->body(trans_choice('filament-actions::export.notifications.started.body', $export->total_rows, [
-                    'count' => Number::format($export->total_rows),
-                ]))
-                ->success()
-                ->send();
+            if (
+                (filled($jobConnection) && ($jobConnection !== 'sync')) ||
+                (blank($jobConnection) && (config('queue.default') !== 'sync'))
+            ) {
+                Notification::make()
+                    ->title($action->getSuccessNotificationTitle())
+                    ->body(trans_choice('filament-actions::export.notifications.started.body', $export->total_rows, [
+                        'count' => Number::format($export->total_rows),
+                    ]))
+                    ->success()
+                    ->send();
+            }
         });
 
-        $this->color('gray');
+        $this->defaultColor('gray');
 
         $this->modalWidth('xl');
 
@@ -377,7 +386,7 @@ trait CanExportRecords
     }
 
     /**
-     * @param  array<ExportFormat> | Closure | null  $formats
+     * @param  array<ExportFormatInterface> | Closure | null  $formats
      */
     public function formats(array | Closure | null $formats): static
     {
@@ -387,7 +396,7 @@ trait CanExportRecords
     }
 
     /**
-     * @return array<ExportFormat> | null
+     * @return array<ExportFormatInterface> | null
      */
     public function getFormats(): ?array
     {

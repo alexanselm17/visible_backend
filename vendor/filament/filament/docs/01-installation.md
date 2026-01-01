@@ -17,7 +17,7 @@ Filament requires the following to run:
 Install the Filament Panel Builder by running the following commands in your Laravel project directory:
 
 ```bash
-composer require filament/filament:"^3.2" -W
+composer require filament/filament:"^3.3" -W
 
 php artisan filament:install --panels
 ```
@@ -86,7 +86,7 @@ You should also consider optimizing your Laravel app for production by running `
 
 ### Allowing users to access a panel
 
-By default, all `User` models can access Filament locally. However, when deploying to production, you must update your `App\Models\User.php` to implement the `FilamentUser` contract — ensuring that only the correct users can access your panel:
+By default, all `User` models can access Filament locally. However, when deploying to production or running unit tests, you must update your `App\Models\User.php` to implement the `FilamentUser` contract — ensuring that only the correct users can access your panel:
 
 ```php
 <?php

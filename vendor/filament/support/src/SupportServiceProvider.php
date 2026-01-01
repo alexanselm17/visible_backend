@@ -60,7 +60,6 @@ class SupportServiceProvider extends PackageServiceProvider
     public function packageBooted(): void
     {
         FilamentAsset::register([
-            Js::make('async-alpine', __DIR__ . '/../dist/async-alpine.js'),
             Css::make('support', __DIR__ . '/../dist/index.css'),
             Js::make('support', __DIR__ . '/../dist/index.js'),
         ], 'filament/support');
@@ -154,6 +153,7 @@ class SupportServiceProvider extends PackageServiceProvider
                 $this->optimizes(
                     optimize: 'filament:optimize', /** @phpstan-ignore-line */
                     clear: 'filament:optimize-clear', /** @phpstan-ignore-line */
+                    key: 'filament', /** @phpstan-ignore-line */
                 );
             }
         }

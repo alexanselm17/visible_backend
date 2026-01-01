@@ -24,7 +24,7 @@ class AuthController extends Controller
     $this->middleware(['auth:api', 'permission:manage_users'])->only('assignPermissionsToUser');
     $this->middleware(['auth:api', 'permission:users_roles'])->only([
       'assignRole',
-      'AccountActivationCard',
+      'accountActivationCard',
       'unAssignRole'
     ]);
   }
@@ -32,6 +32,10 @@ class AuthController extends Controller
   public function signup(SignUp $request)
   {
     return $this->authRepository->signUpUser($request);
+  }
+    public function getAllUserReferred(Request $request,$userId)
+  {
+    return $this->authRepository->getAllUserReferred($request,$userId);
   }
 
   public function signOut(Request $request)

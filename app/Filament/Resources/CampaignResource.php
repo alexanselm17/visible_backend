@@ -3,27 +3,16 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CampaignResource\Pages;
-use App\Filament\Resources\CampaignResource\RelationManagers;
 use App\Models\Campaign;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Forms\Components\DateTimePicker;
-
-use Carbon\Carbon;
-use Filament\Forms\Components\TimePicker;
 
 class CampaignResource extends Resource
 {
@@ -56,22 +45,67 @@ class CampaignResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->label('Campaign Name')
                     ->searchable()
                     ->sortable()
                     ->weight(FontWeight::Bold)
-                    ->copyable()
-                    ->description(fn($record) => "Capital: Ksh " . number_format($record->capital_invested, 2)),
+                    ->copyable(),
+
+                TextColumn::make('adverts_count')
+                    ->label('Total Adverts')
+                    ->badge()
+                    ->color(fn($state) => $state > 0 ? 'success' : 'gray')
+                    ->counts('adverts')
+                    ->sortable(),
+
+                TextColumn::make('active_adverts_count')
+                    ->label('Active Adverts')
+                    ->badge()
+                    ->color('info')
+                    ->getStateUsing(function ($record) {
+                        return $record->adverts()->where('valid_until', '>', now())->count() ?? 0;
+                    }),
+
+                TextColumn::make('total_screenshots')
+                    ->label('Screenshots')
+                    ->badge()
+                    ->color('warning')
+                    ->getStateUsing(fn($record) => $record->total_screenshots ?? 0),
+
+                TextColumn::make('total_views')
+                    ->label('Total Views')
+                    ->badge()
+                    ->color('purple')
+                    ->getStateUsing(fn($record) => number_format($record->total_views ?? 0)),
+
+                TextColumn::make('total_rewards_distributed')
+                    ->label('Rewards Paid')
+                    ->money('KSH')
+                    ->color('success')
+                    ->getStateUsing(fn($record) => $record->total_rewards_distributed ?? 0),
+
+                BadgeColumn::make('is_active')
+                    ->label('Status')
+                    ->getStateUsing(fn($record) => $record->is_active ? 'Active' : 'Expired')
+                    ->colors([
+                        'success' => 'Active',
+                        'danger' => 'Expired',
+                    ])
+                    ->icons([
+                        'heroicon-m-check-circle' => 'Active',
+                        'heroicon-m-x-circle' => 'Expired',
+                    ]),
 
             ])
-
             ->actions([
                 Tables\Actions\Action::make('campaignReport')
                     ->label('Generate Report')
-                    ->icon('heroicon-o-document-text')
-                    ->outlined(false) // ensures it's a solid button
+                    ->icon('heroicon-o-chart-bar')
+                    ->color('warning')
+                    ->size('sm')
+                    ->button()
                     ->extraAttributes([
-                        'class' => 'text-white font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors duration-200',
-                        'style' => 'background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); border: none; color: white !important;',
+                        'class' => 'bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200',
                     ])
                     ->action(function ($record) {
                         return redirect()->route('campaign_report', [
@@ -79,15 +113,23 @@ class CampaignResource extends Resource
                         ]);
                     }),
 
-
                 Tables\Actions\ViewAction::make()
                     ->icon('heroicon-o-eye')
-                    ->tooltip('View campaign details'),
+                    ->color('info')
+                    ->size('sm')
+                    ->button()
+                    ->extraAttributes([
+                        'class' => 'bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200',
+                    ]),
+
                 Tables\Actions\EditAction::make()
                     ->icon('heroicon-o-pencil')
-                    ->tooltip('Edit campaign'),
-
-
+                    ->color('success')
+                    ->size('sm')
+                    ->button()
+                    ->extraAttributes([
+                        'class' => 'bg-gradient-to-r from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200',
+                    ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

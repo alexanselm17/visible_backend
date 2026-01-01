@@ -7,67 +7,81 @@ use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\HttpFoundation\Response;
 
 class CheckPermission
 {
-    
     public function handle(Request $request, Closure $next, $requiredPermission)
     {
-        if (!$request->header('Authorization')) {
+        $authHeader = $request->header('Authorization');
+
+        if (!$authHeader) {
             Log::warning('Unauthorized access attempt: No token provided.', [
                 'ip' => $request->ip(),
                 'route' => $request->path(),
             ]);
+
             return response()->json([
-                'message' => "Unauthorized. No token provided.",
-                'error' => 'Unauthorized. No token provided.'
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Unauthorized. No token provided.',
             ], 401);
         }
 
-        $tokenString = str_replace('Bearer ', '', $request->header('Authorization'));
+        $tokenString = preg_replace('/^Bearer\s+/i', '', $authHeader);
         $token = PersonalAccessToken::findToken($tokenString);
 
         if (!$token) {
             Log::warning('Unauthorized access attempt: Invalid or expired token.', [
-                'token' => $tokenString,
                 'ip' => $request->ip(),
                 'route' => $request->path(),
             ]);
-            return response()->json(['error' => 'Invalid or expired token.'], 401);
+
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Invalid or expired token.',
+            ], 401);
         }
 
         $user = $token->tokenable;
 
         if (!$user) {
             Log::error('Token does not map to a valid user.', [
-                'token' => $tokenString,
                 'ip' => $request->ip(),
                 'route' => $request->path(),
             ]);
-            return response()->json(['error' => 'Unauthorized. User not found.'], 401);
+
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Unauthorized. User not found.',
+            ], 401);
         }
 
-
+        // Set authenticated user for the request lifecycle
         Auth::setUser($user);
 
-        Log::info('User authenticated.', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'permissions' => $user->permissions()->pluck('slug')->toArray(),
-            'requested_permission' => $requiredPermission,
-            'route' => $request->path(),
-            'ip' => $request->ip(),
-        ]);
+        // ✅ Permission check (IMPORTANT)
+        $hasPermission = $user->permissions()
+            ->where('slug', $requiredPermission)
+            ->exists();
 
+        if (!$hasPermission) {
+            Log::warning('Forbidden: Missing permission.', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'required_permission' => $requiredPermission,
+                'route' => $request->path(),
+                'ip' => $request->ip(),
+            ]);
 
-        Log::info('Permission granted.', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'requested_permission' => $requiredPermission,
-            'route' => $request->path(),
-            'ip' => $request->ip(),
-        ]);
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Forbidden. You do not have permission to perform this action.',
+                'required_permission' => $requiredPermission,
+            ], 403);
+        }
 
         return $next($request);
     }

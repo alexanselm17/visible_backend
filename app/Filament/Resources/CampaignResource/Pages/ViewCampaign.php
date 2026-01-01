@@ -18,12 +18,122 @@ use Filament\Infolists\Components\Group;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconSize;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ViewCampaign extends ViewRecord
 {
     protected static string $resource = CampaignResource::class;
 
     protected static ?string $title = 'Campaign Analytics Dashboard';
+
+    protected function detectFraudPatterns($campaignId): array
+    {
+        try {
+            // Get all advert IDs for the given campaign
+            $advertIds = DB::table('advert_images')
+                ->where('campaign_id', $campaignId)
+                ->pluck('id');
+
+            $fraudGroups = [];
+
+            foreach ($advertIds as $advertId) {
+
+                $screenshots = DB::table('screenshots')
+                    ->where('advert_id', $advertId)
+                    ->where('views', '>', 10)
+                    ->get();
+
+                // Group screenshots by a combined key of views + timestamp
+                $patterns = [];
+
+                foreach ($screenshots as $screenshot) {
+                    $patternKey = "{$screenshot->views}_{$screenshot->timestamp}";
+
+                    $patterns[$patternKey][] = [
+                        'user_id' => $screenshot->processed_by,
+                        'name' => DB::table('users')->where('id', $screenshot->processed_by)->value('fullname'),
+                        'views' => $screenshot->views,
+                        'timestamp' => $screenshot->timestamp,
+                        'number' => $screenshot->number,
+                        'screenshot_id' => $screenshot->id,
+                        'url' => asset('storage/' . $screenshot->screenshot),
+                    ];
+                }
+
+                // Only include suspicious patterns shared by 2 or more users
+                foreach ($patterns as $pattern => $grouped) {
+                    $uniqueUsers = collect($grouped)->pluck('user_id')->unique();
+
+                    if ($uniqueUsers->count() >= 2) {
+                        $fraudGroups[] = [
+                            'advert_id' => $advertId,
+                            'advert_name' => DB::table('advert_images')->where('id', $advertId)->value('name'),
+                            'matching_pattern' => $pattern,
+                            'user_count' => $uniqueUsers->count(),
+                            'users' => $uniqueUsers->values(),
+                            'details' => $grouped,
+                            'risk_level' => $this->calculateRiskLevel($uniqueUsers->count(), $grouped),
+                        ];
+                    }
+                }
+            }
+
+            return $fraudGroups;
+        } catch (\Throwable $th) {
+            return [];
+        }
+    }
+
+    /**
+     * Calculate risk level based on pattern data
+     */
+    protected function calculateRiskLevel($userCount, $details): array
+    {
+        $riskScore = 0;
+        $factors = [];
+
+        // More users = higher risk
+        if ($userCount >= 5) {
+            $riskScore += 3;
+            $factors[] = "Large group coordination ({$userCount} users)";
+        } elseif ($userCount >= 3) {
+            $riskScore += 2;
+            $factors[] = "Medium group coordination ({$userCount} users)";
+        } else {
+            $riskScore += 1;
+            $factors[] = "Small group coordination ({$userCount} users)";
+        }
+
+        // Check if views are suspiciously high or identical
+        $views = collect($details)->pluck('views')->unique();
+        if ($views->count() === 1 && $views->first() > 1000) {
+            $riskScore += 2;
+            $factors[] = "Suspiciously high identical views ({$views->first()})";
+        }
+
+        // Determine risk level
+        if ($riskScore >= 4) {
+            $level = 'HIGH';
+            $color = 'danger';
+            $icon = 'heroicon-o-exclamation-triangle';
+        } elseif ($riskScore >= 2) {
+            $level = 'MEDIUM';
+            $color = 'warning';
+            $icon = 'heroicon-o-exclamation-circle';
+        } else {
+            $level = 'LOW';
+            $color = 'info';
+            $icon = 'heroicon-o-information-circle';
+        }
+
+        return [
+            'level' => $level,
+            'color' => $color,
+            'icon' => $icon,
+            'score' => $riskScore,
+            'factors' => $factors,
+        ];
+    }
 
     public function infolist(Infolist $infolist): Infolist
     {
@@ -45,18 +155,51 @@ class ViewCampaign extends ViewRecord
                                     Group::make([
                                         IconEntry::make('is_active')
                                             ->label('')
-                                            ->icon(fn($record) => $record->is_active ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
-                                            ->color(fn($record) => $record->is_active ? 'success' : 'danger'),
+                                            ->icon(
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle';
+                                                }
+                                            )
+                                            ->color(
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'success' : 'danger';
+                                                }
+                                            ),
 
                                         TextEntry::make('campaign_status')
                                             ->label('')
-                                            ->getStateUsing(fn($record) => $record->is_active ? 'ACTIVE CAMPAIGN' : 'EXPIRED CAMPAIGN')
+                                            ->getStateUsing(
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'ACTIVE CAMPAIGN' : 'EXPIRED CAMPAIGN';
+                                                }
+                                            )
                                             ->badge()
-                                            ->color(fn($record) => $record->is_active ? 'success' : 'danger')
+                                            ->color(
+                                                function ($record) {
+                                                    // Check if any advert in this campaign is still active
+                                                    $hasActiveAdverts = $record->adverts->some(function ($advert) {
+                                                        return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
+                                                    });
+                                                    return $hasActiveAdverts ? 'success' : 'danger';
+                                                }
+                                            )
                                             ->size('lg')
                                             ->weight(FontWeight::Bold),
                                     ])
                                         ->extraAttributes(['class' => 'flex items-center space-x-3']),
+
                                 ])
                                 ->columnSpan(2),
 
@@ -64,7 +207,8 @@ class ViewCampaign extends ViewRecord
                                 ->schema([
                                     TextEntry::make('capital_invested')
                                         ->label('Total Investment')
-                                        ->money('USD')
+                                        ->getStateUsing(fn($record) => $record->adverts->sum('capital_invested'))
+                                        ->money('KSH')
                                         ->color('primary')
                                         ->weight(FontWeight::Bold)
                                         ->size('xl')
@@ -72,12 +216,16 @@ class ViewCampaign extends ViewRecord
 
                                     TextEntry::make('remaining_budget')
                                         ->label('Remaining Budget')
-                                        ->getStateUsing(fn($record) => $record->remaining_budget)
-                                        ->money('USD')
+                                        ->getStateUsing(
+                                            fn($record) =>
+                                            $record->adverts->sum('capital_invested') - $record->adverts->sum(fn($advert) => $advert->screenshots->count() * $advert->reward)
+                                        )
+                                        ->money('KSH')
                                         ->color('success')
                                         ->weight(FontWeight::Bold)
                                         ->size('xl')
                                         ->icon('heroicon-o-wallet'),
+
                                 ])
                                 ->columnSpan(2),
                         ])
@@ -101,7 +249,10 @@ class ViewCampaign extends ViewRecord
 
                                 TextEntry::make('total_screenshots')
                                     ->label('Total Submissions')
-                                    ->getStateUsing(fn($record) => $record->total_screenshots)
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        $record->adverts->sum(fn($advert) => $advert->screenshots->count())
+                                    )
                                     ->badge()
                                     ->size('xl')
                                     ->color('success')
@@ -110,7 +261,10 @@ class ViewCampaign extends ViewRecord
 
                                 TextEntry::make('total_views')
                                     ->label('Total Engagement')
-                                    ->getStateUsing(fn($record) => number_format($record->total_views))
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        number_format($record->adverts->sum('views'))
+                                    )
                                     ->badge()
                                     ->size('xl')
                                     ->color('info')
@@ -119,7 +273,13 @@ class ViewCampaign extends ViewRecord
 
                                 TextEntry::make('rewards_distributed')
                                     ->label('Rewards Paid')
-                                    ->getStateUsing(fn($record) => $record->total_rewards_distributed)
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        $record->adverts->sum(
+                                            fn($advert) =>
+                                            $advert->screenshots->count() * $advert->reward
+                                        )
+                                    )
                                     ->money('USD')
                                     ->badge()
                                     ->size('xl')
@@ -131,25 +291,16 @@ class ViewCampaign extends ViewRecord
                         Grid::make(3)
                             ->schema([
                                 TextEntry::make('capacity')
-                                    ->label('Max Participants')
+                                    ->label('Total Expected Participants')
+                                    ->getStateUsing(
+                                        fn($record) =>
+                                        $record->adverts->sum('capacity')
+                                    )
                                     ->numeric()
                                     ->badge()
                                     ->color('gray')
                                     ->icon('heroicon-o-users'),
 
-                                TextEntry::make('reward')
-                                    ->label('Reward per Submission')
-                                    ->money('USD')
-                                    ->color('warning')
-                                    ->weight(FontWeight::Bold)
-                                    ->icon('heroicon-o-currency-dollar'),
-
-                                TextEntry::make('valid_until')
-                                    ->label('Campaign Ends')
-                                    ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y g:i A'))
-                                    ->badge()
-                                    ->color(fn($record) => $record->is_active ? 'success' : 'danger')
-                                    ->icon('heroicon-o-calendar'),
                             ]),
                     ])
                     ->collapsible(),
@@ -161,33 +312,56 @@ class ViewCampaign extends ViewRecord
                             ->schema([
                                 TextEntry::make('created_at')
                                     ->label('Campaign Launched')
-                                    ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y g:i A'))
+                                    ->formatStateUsing(
+                                        fn($state) =>
+                                        Carbon::parse($state)->format('M d, Y g:i A')
+                                    )
                                     ->color('success')
                                     ->icon('heroicon-o-rocket-launch')
                                     ->weight(FontWeight::Medium),
 
                                 TextEntry::make('days_running')
                                     ->label('Days Running')
-                                    ->getStateUsing(fn($record) => Carbon::parse($record->created_at)->diffInDays(now()) . ' days')
+                                    ->getStateUsing(function ($record) {
+                                        $start = Carbon::parse($record->created_at);
+                                        $diff = $start->diff(now());
+                                        return "{$diff->d} days {$diff->h} hours {$diff->i} minutes";
+                                    })
                                     ->badge()
                                     ->color('info')
                                     ->icon('heroicon-o-clock'),
 
                                 TextEntry::make('days_remaining')
                                     ->label('Days Remaining')
-                                    ->getStateUsing(fn($record) => $record->is_active ?
-                                        Carbon::parse($record->valid_until)->diffInDays(now()) . ' days' :
-                                        'Expired')
+                                    ->getStateUsing(function ($record) {
+                                        if (!$record->valid_until) {
+                                            return 'No End Date';
+                                        }
+                                        if (now()->greaterThan(Carbon::parse($record->valid_until))) {
+                                            return 'Expired';
+                                        }
+                                        $end = Carbon::parse($record->valid_until);
+                                        $diff = now()->diff($end);
+                                        return "{$diff->d} days {$diff->h} hours {$diff->i} minutes";
+                                    })
                                     ->badge()
-                                    ->color(fn($record) => $record->is_active ? 'primary' : 'danger')
+                                    ->color(
+                                        fn($record) =>
+                                        $record->valid_until &&
+                                            now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
+                                            ? 'primary'
+                                            : 'danger'
+                                    )
                                     ->icon('heroicon-o-calendar-days'),
                             ]),
                     ])
                     ->collapsible(),
 
+
                 // Main Content Tabs
                 Tabs::make('Campaign Management')
                     ->tabs([
+
                         // Adverts & Screenshots Tab
                         Tabs\Tab::make('adverts')
                             ->label('Adverts & User Content')
@@ -206,7 +380,12 @@ class ViewCampaign extends ViewRecord
                                                             ->label('')
                                                             ->height(150)
                                                             ->width(150)
-                                                            // ->extraImageAttributes(['class' => 'rounded-lg shadow-md'])
+                                                            ->getStateUsing(function ($record) {
+                                                                $path = $record->image_path ?? $record->image_path;
+                                                                return $path
+                                                                    ? asset('storage/' . $path)
+                                                                    : asset('storage/products/default-product.png');
+                                                            })
                                                             ->columnSpan(1),
 
                                                         Group::make([
@@ -229,9 +408,9 @@ class ViewCampaign extends ViewRecord
                                                             ->columnSpan(2),
 
                                                         Group::make([
-                                                            TextEntry::make('selling_price')
-                                                                ->label('Price')
-                                                                ->money('USD')
+                                                            TextEntry::make('capital_invested')
+                                                                ->label('Capital Invested')
+                                                                ->money('KSH')
                                                                 ->color('success')
                                                                 ->weight(FontWeight::Bold)
                                                                 ->size('lg')
@@ -239,7 +418,7 @@ class ViewCampaign extends ViewRecord
 
                                                             TextEntry::make('reward')
                                                                 ->label('Reward')
-                                                                ->money('USD')
+                                                                ->money('KSH')
                                                                 ->color('warning')
                                                                 ->weight(FontWeight::Bold)
                                                                 ->size('lg')
@@ -295,7 +474,12 @@ class ViewCampaign extends ViewRecord
                                                                             ->label('')
                                                                             ->height(120)
                                                                             ->width(120)
-                                                                            // ->extraImageAttributes(['class' => 'rounded-lg shadow-sm'])
+                                                                            ->getStateUsing(function ($record) {
+                                                                                $path = $record->screenshot;
+                                                                                return $path
+                                                                                    ? asset('storage/' . $path)
+                                                                                    : asset('storage/screenshots/default-screenshot.png');
+                                                                            })
                                                                             ->columnSpan(1),
 
                                                                         TextEntry::make('user.fullname')
@@ -328,7 +512,7 @@ class ViewCampaign extends ViewRecord
                                                                         TextEntry::make('reward_earned')
                                                                             ->label('Reward Earned')
                                                                             ->getStateUsing(fn($record) => $record->advert->reward ?? 0)
-                                                                            ->money('USD')
+                                                                            ->money('kSH')
                                                                             ->color('warning')
                                                                             ->weight(FontWeight::Bold)
                                                                             ->columnSpan(1),
@@ -365,6 +549,381 @@ class ViewCampaign extends ViewRecord
                                     ])
                                     ->contained(false),
                             ]),
+
+                        Tabs\Tab::make('fraud_detection')
+                            ->label('Security & Fraud Detection')
+                            ->icon('heroicon-o-shield-exclamation')
+                            ->badge(function ($record) {
+                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                return count($fraudPatterns) > 0 ? count($fraudPatterns) : null;
+                            })
+                            ->badgeColor(function ($record) {
+                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                if (count($fraudPatterns) === 0) return 'success';
+
+                                $highRiskCount = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
+                                if ($highRiskCount > 0) return 'danger';
+
+                                $mediumRiskCount = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
+                                if ($mediumRiskCount > 0) return 'warning';
+
+                                return 'info';
+                            })
+
+
+
+
+                            ->schema([
+                                // Main Security Status Section
+                                Section::make('🔐 Security Dashboard')
+                                    ->description('Real-time fraud detection and security analysis')
+                                    ->schema([
+                                        Grid::make(2)
+                                            ->schema([
+                                                // Left column - Main status
+                                                Grid::make(1)
+                                                    ->schema([
+                                                        TextEntry::make('fraud_status')
+                                                            ->label('')
+                                                            ->getStateUsing(function ($record) {
+                                                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                                                if (count($fraudPatterns) === 0) {
+                                                                    return '🛡️ SECURE';
+                                                                }
+
+                                                                $highRisk = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
+                                                                if ($highRisk > 0) return '🚨 HIGH RISK';
+
+                                                                $mediumRisk = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
+                                                                if ($mediumRisk > 0) return '⚠️ MEDIUM RISK';
+
+                                                                return '🔍 LOW RISK';
+                                                            })
+                                                            ->badge()
+                                                            ->size('xl')
+                                                            ->color(function ($record) {
+                                                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                                                if (count($fraudPatterns) === 0) return 'success';
+
+                                                                $highRisk = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
+                                                                if ($highRisk > 0) return 'danger';
+
+                                                                $mediumRisk = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
+                                                                if ($mediumRisk > 0) return 'warning';
+
+                                                                return 'info';
+                                                            })
+                                                            ->extraAttributes(['class' => 'text-center']),
+                                                    ])
+                                                    ->columnSpan(1),
+
+                                                // Right column - Key metrics
+                                                Grid::make(3)
+                                                    ->schema([
+                                                        TextEntry::make('fraud_patterns_count')
+                                                            ->label('Patterns')
+                                                            ->getStateUsing(fn($record) => count($this->detectFraudPatterns($record->id)))
+                                                            ->badge()
+                                                            ->color(function ($record) {
+                                                                $count = count($this->detectFraudPatterns($record->id));
+                                                                return $count > 0 ? 'warning' : 'success';
+                                                            })
+                                                            ->icon('heroicon-o-shield-exclamation')
+                                                            ->extraAttributes(['class' => 'text-center']),
+
+                                                        TextEntry::make('affected_users')
+                                                            ->label('Users')
+                                                            ->getStateUsing(function ($record) {
+                                                                $fraudPatterns = $this->detectFraudPatterns($record->id);
+                                                                $allUsers = collect($fraudPatterns)->pluck('users')->flatten()->unique();
+                                                                return $allUsers->count();
+                                                            })
+                                                            ->badge()
+                                                            ->color('info')
+                                                            ->icon('heroicon-o-users')
+                                                            ->extraAttributes(['class' => 'text-center']),
+
+                                                        TextEntry::make('last_scan')
+                                                            ->label('Last Scan')
+                                                            ->getStateUsing(fn() => now()->format('H:i'))
+                                                            ->badge()
+                                                            ->color('gray')
+                                                            ->icon('heroicon-o-clock')
+                                                            ->extraAttributes(['class' => 'text-center']),
+                                                    ])
+                                                    ->columnSpan(1),
+                                            ]),
+                                    ])
+                                    ->extraAttributes([
+                                        'class' => 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm'
+                                    ]),
+
+                                // Detailed Analysis Section
+                                Section::make('🔍 Fraud Pattern Analysis')
+                                    ->description('Detailed breakdown of detected suspicious activities')
+                                    ->schema(function ($record) {
+                                        $fraudPatterns = $this->detectFraudPatterns($record->id);
+
+                                        if (count($fraudPatterns) === 0) {
+                                            return [
+                                                TextEntry::make('no_fraud')
+                                                    ->label('')
+                                                    ->getStateUsing(fn() => '✅ **No Suspicious Activity Detected**')
+                                                    ->markdown()
+                                                    ->columnSpanFull()
+                                                    ->extraAttributes([
+                                                        'class' => 'text-center p-6 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded-lg border border-green-200 dark:border-green-800'
+                                                    ])
+                                            ];
+                                        }
+
+                                        $entries = [];
+
+                                        foreach ($fraudPatterns as $index => $fraud) {
+                                            $riskLevel = $fraud['risk_level']['level'] ?? 'LOW';
+
+                                            // Pattern summary card
+                                            $entries[] = Grid::make(3)
+                                                ->schema([
+                                                    TextEntry::make("pattern_name_{$index}")
+                                                        ->label('Pattern')
+                                                        ->getStateUsing(fn() => $fraud['advert_name'])
+                                                        ->weight('bold')
+                                                        ->size('lg'),
+
+                                                    TextEntry::make("risk_level_{$index}")
+                                                        ->label('Risk Level')
+                                                        ->getStateUsing(fn() => $riskLevel)
+                                                        ->badge()
+                                                        ->color(match ($riskLevel) {
+                                                            'HIGH' => 'danger',
+                                                            'MEDIUM' => 'warning',
+                                                            default => 'info'
+                                                        }),
+
+                                                    TextEntry::make("pattern_users_{$index}")
+                                                        ->label('Affected Users')
+                                                        ->getStateUsing(fn() => count($fraud['details']) . ' users')
+                                                        ->badge()
+                                                        ->color('gray')
+                                                        ->icon('heroicon-o-users'),
+                                                ])
+                                                ->columnSpanFull()
+                                                ->extraAttributes([
+                                                    'class' => 'p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4'
+                                                ]);
+
+                                            // User comparison cards
+                                            $userPairs = array_chunk($fraud['details'], 2);
+                                            foreach ($userPairs as $pairIndex => $pair) {
+                                                if (count($pair) >= 2) {
+                                                    $entries[] = Grid::make(5)
+                                                        ->schema([
+                                                            // User 1
+                                                            Grid::make(1)
+                                                                ->schema([
+                                                                    ImageEntry::make("user1_img_{$index}_{$pairIndex}")
+                                                                        ->label('User 1')
+                                                                        ->height(80)
+                                                                        ->width(80)
+                                                                        ->getStateUsing(fn() => $pair[0]['url'] ?? 'https://via.placeholder.com/80x80.png?text=No+Image')
+                                                                        ->extraAttributes(['class' => 'rounded-lg']),
+
+                                                                    TextEntry::make("user1_name_{$index}_{$pairIndex}")
+                                                                        ->label('')
+                                                                        ->getStateUsing(fn() => $pair[0]['name'])
+                                                                        ->weight('semibold')
+                                                                        ->size('sm')
+                                                                        ->extraAttributes(['class' => 'text-center']),
+
+                                                                    TextEntry::make("user1_stats_{$index}_{$pairIndex}")
+                                                                        ->label('')
+                                                                        ->getStateUsing(fn() => $pair[0]['views'] . ' views')
+                                                                        ->color('gray')
+                                                                        ->size('xs')
+                                                                        ->extraAttributes(['class' => 'text-center']),
+                                                                ])
+                                                                ->columnSpan(2),
+
+                                                            // Comparison indicator with modal button
+                                                            Grid::make(1)
+                                                                ->schema([
+                                                                    TextEntry::make("compare_btn_{$index}_{$pairIndex}")
+                                                                        ->label('')
+                                                                        ->getStateUsing(fn() => '🔍 Compare')
+                                                                        ->badge()
+                                                                        ->color('primary')
+                                                                        ->size('sm')
+                                                                        ->extraAttributes([
+                                                                            'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200 text-center',
+                                                                            'onclick' => "
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = `
+            <div class=\"bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg w-full max-w-3xl max-h-[80vh] overflow-y-auto shadow-xl\">
+                <div class=\"sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center\">
+                    <div>
+                        <h2 class=\"text-lg font-bold\">🔍 Comparison</h2>
+                        <p class=\"text-xs text-gray-600 dark:text-gray-400\">Side-by-side view</p>
+                    </div>
+                    <button onclick=\"this.closest('.fixed').remove()\" class=\"text-gray-400 hover:text-gray-600 text-xl font-bold w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800\">&times;</button>
+                </div>
+                <div class=\"p-4\">
+                    <div class=\"flex flex-col md:flex-row gap-4 items-center\">
+                        <div class=\"text-center flex-1\">
+                            <div class=\"bg-blue-50 dark:bg-blue-900/20 rounded p-3\">
+                                <h3 class=\"font-medium text-blue-900 dark:text-blue-100 mb-2 text-sm\">{$pair[0]['name']}</h3>
+                                <img src=\"{$pair[0]['url']}\" class=\"w-40 h-40 object-cover rounded shadow mx-auto border-2 border-blue-200 dark:border-blue-600\" onerror=\"this.src='https://via.placeholder.com/160x160.png?text=No+Image'\" />
+                                <div class=\"mt-2 text-xs space-y-1\">
+                                    <span class=\"inline-flex items-center px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200\">
+                                        {$pair[0]['views']} views
+                                    </span>
+                                    <p class=\"text-gray-500 dark:text-gray-400\">{$pair[0]['timestamp']}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class=\"flex-shrink-0 text-xl\">↔️</div>
+                        
+                        <div class=\"text-center flex-1\">
+                            <div class=\"bg-red-50 dark:bg-red-900/20 rounded p-3\">
+                                <h3 class=\"font-medium text-red-900 dark:text-red-100 mb-2 text-sm\">{$pair[1]['name']}</h3>
+                                <img src=\"{$pair[1]['url']}\" class=\"w-40 h-40 object-cover rounded shadow mx-auto border-2 border-red-200 dark:border-red-600\" onerror=\"this.src='https://via.placeholder.com/160x160.png?text=No+Image'\" />
+                                <div class=\"mt-2 text-xs space-y-1\">
+                                    <span class=\"inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200\">
+                                        {$pair[1]['views']} views
+                                    </span>
+                                    <p class=\"text-gray-500 dark:text-gray-400\">{$pair[1]['timestamp']}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    "
+                                                                        ])
+
+                                                                ])
+                                                                ->columnSpan(1),
+
+                                                            // User 2
+                                                            Grid::make(1)
+                                                                ->schema([
+                                                                    ImageEntry::make("user2_img_{$index}_{$pairIndex}")
+                                                                        ->label('User 2')
+                                                                        ->height(80)
+                                                                        ->width(80)
+                                                                        ->getStateUsing(fn() => $pair[1]['url'] ?? 'https://via.placeholder.com/80x80.png?text=No+Image')
+                                                                        ->extraAttributes(['class' => 'rounded-lg']),
+
+                                                                    TextEntry::make("user2_name_{$index}_{$pairIndex}")
+                                                                        ->label('')
+                                                                        ->getStateUsing(fn() => $pair[1]['name'])
+                                                                        ->weight('semibold')
+                                                                        ->size('sm')
+                                                                        ->extraAttributes(['class' => 'text-center']),
+
+                                                                    TextEntry::make("user2_stats_{$index}_{$pairIndex}")
+                                                                        ->label('')
+                                                                        ->getStateUsing(fn() => $pair[1]['views'] . ' views')
+                                                                        ->color('gray')
+                                                                        ->size('xs')
+                                                                        ->extraAttributes(['class' => 'text-center']),
+                                                                ])
+                                                                ->columnSpan(2),
+                                                        ])
+                                                        ->columnSpanFull()
+                                                        ->extraAttributes([
+                                                            'class' => 'p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-3'
+                                                        ]);
+                                                }
+                                            }
+
+                                            // Add divider between patterns
+                                            if ($index < count($fraudPatterns) - 1) {
+                                                $entries[] = TextEntry::make("divider_{$index}")
+                                                    ->label('')
+                                                    ->getStateUsing(fn() => '')
+                                                    ->columnSpanFull()
+                                                    ->extraAttributes(['class' => 'border-t border-gray-200 dark:border-gray-700 my-4']);
+                                            }
+                                        }
+
+                                        return $entries;
+                                    })
+                                    ->collapsible()
+                                    ->collapsed(fn($record) => count($this->detectFraudPatterns($record->id)) === 0)
+                                    ->extraAttributes([
+                                        'class' => 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm'
+                                    ]),
+
+                                // Quick Actions Section
+                                Section::make('🛠️ Security Actions')
+                                    ->description('Manage security settings and generate reports')
+                                    ->schema([
+                                        Grid::make(4)
+                                            ->schema([
+                                                TextEntry::make('refresh_scan')
+                                                    ->label('Refresh Scan')
+                                                    ->getStateUsing(fn() => '🔄 Refresh')
+                                                    ->badge()
+                                                    ->color('primary')
+                                                    ->icon('heroicon-o-arrow-path')
+                                                    ->extraAttributes([
+                                                        'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
+                                                        'onclick' => 'window.location.reload()'
+                                                    ]),
+
+                                                TextEntry::make('export_report')
+                                                    ->label('Export Report')
+                                                    ->getStateUsing(fn() => '📄 Export')
+                                                    ->badge()
+                                                    ->color('success')
+                                                    ->icon('heroicon-o-document-arrow-down')
+                                                    ->extraAttributes([
+                                                        'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
+                                                        'onclick' => 'alert("Export report functionality")'
+                                                    ]),
+
+                                                TextEntry::make('whitelist_users')
+                                                    ->label('Whitelist Users')
+                                                    ->getStateUsing(fn() => '✅ Whitelist')
+                                                    ->badge()
+                                                    ->color('warning')
+                                                    ->icon('heroicon-o-shield-check')
+                                                    ->extraAttributes([
+                                                        'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
+                                                        'onclick' => 'if(confirm("Whitelist all flagged users?")) { alert("Whitelist functionality"); }'
+                                                    ]),
+
+                                                TextEntry::make('settings')
+                                                    ->label('Security Settings')
+                                                    ->getStateUsing(fn() => '⚙️ Settings')
+                                                    ->badge()
+                                                    ->color('gray')
+                                                    ->icon('heroicon-o-cog-6-tooth')
+                                                    ->extraAttributes([
+                                                        'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
+                                                        'onclick' => 'alert("Security settings panel")'
+                                                    ]),
+                                            ])
+                                    ])
+                                    ->extraAttributes([
+                                        'class' => 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg'
+                                    ]),
+                            ]),
+
+
+
+
 
                         // Analytics Tab
                         Tabs\Tab::make('analytics')
@@ -603,70 +1162,14 @@ class ViewCampaign extends ViewRecord
             \Filament\Actions\EditAction::make()
                 ->icon('heroicon-o-pencil-square'),
 
-            \Filament\Actions\Action::make('duplicate')
-                ->label('Duplicate Campaign')
-                ->icon('heroicon-o-document-duplicate')
-                ->color('info')
-                ->requiresConfirmation()
-                ->modalHeading('Duplicate Campaign')
-                ->modalDescription('This will create an exact copy of this campaign with a 30-day extension.')
-                ->action(function () {
-                    $record = $this->record;
-                    $newCampaign = $record->replicate();
-                    $newCampaign->name = $record->name . ' (Copy ' . now()->format('M Y') . ')';
-                    $newCampaign->valid_until = now()->addDays(30);
-                    $newCampaign->save();
-
-                    // Duplicate adverts as well
-                    foreach ($record->adverts as $advert) {
-                        $newAdvert = $advert->replicate();
-                        $newAdvert->campaign_id = $newCampaign->id;
-                        $newAdvert->save();
-                    }
-
-                    \Filament\Notifications\Notification::make()
-                        ->title('Campaign Duplicated Successfully')
-                        ->body('New campaign created with ' . $record->adverts->count() . ' adverts')
-                        ->success()
-                        ->actions([
-                            \Filament\Notifications\Actions\Action::make('view')
-                                ->button()
-                                ->url(CampaignResource::getUrl('view', ['record' => $newCampaign]))
-                        ])
-                        ->send();
-
-                    return redirect()->to(CampaignResource::getUrl('view', ['record' => $newCampaign]));
-                }),
-
-            \Filament\Actions\Action::make('extend')
-                ->label('Extend Campaign')
-                ->icon('heroicon-o-calendar-days')
-                ->color('success')
-                ->visible(fn() => $this->record->is_active)
-                ->form([
-                    \Filament\Forms\Components\DateTimePicker::make('new_end_date')
-                        ->label('New End Date')
-                        ->required()
-                        ->minDate(now())
-                        ->default(now()->addDays(30)),
-                ])
-                ->action(function (array $data) {
-                    $this->record->update([
-                        'valid_until' => $data['new_end_date'],
-                    ]);
-
-                    \Filament\Notifications\Notification::make()
-                        ->title('Campaign Extended Successfully')
-                        ->body('Campaign will now run until ' . Carbon::parse($data['new_end_date'])->format('M d, Y'))
-                        ->success()
-                        ->send();
-                }),
-
             \Filament\Actions\Action::make('add_budget')
                 ->label('Generate Campaign Report')
                 ->icon('heroicon-o-banknotes')
                 ->color('warning')
-
+                ->extraAttributes([
+                    'class' => 'text-white font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors duration-200',
+                    'style' => 'background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border: none; color: white !important;',
+                ])
                 ->action(function ($record) {
                     return redirect()->route('campaign_report', [
                         'campaign_id' => $record->id,

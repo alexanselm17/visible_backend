@@ -49,6 +49,7 @@ export default function fileUploadFormComponent({
     isDownloadable,
     isMultiple,
     isOpenable,
+    isPasteable,
     isPreviewable,
     isReorderable,
     itemPanelAspectRatio,
@@ -57,6 +58,8 @@ export default function fileUploadFormComponent({
     maxFiles,
     maxSize,
     minSize,
+    maxParallelUploads,
+    mimeTypeMap,
     panelAspectRatio,
     panelLayout,
     placeholder,
@@ -101,7 +104,7 @@ export default function fileUploadFormComponent({
             this.pond = FilePond.create(this.$refs.input, {
                 acceptedFileTypes,
                 allowImageExifOrientation: shouldOrientImageFromExif,
-                allowPaste: false,
+                allowPaste: isPasteable,
                 allowRemove: isDeletable,
                 allowReorder: isReorderable,
                 allowImagePreview: isPreviewable,
@@ -122,6 +125,7 @@ export default function fileUploadFormComponent({
                 maxFiles,
                 maxFileSize: maxSize,
                 minFileSize: minSize,
+                ...(maxParallelUploads && { maxParallelUploads }),
                 styleButtonProcessItemPosition: uploadButtonPosition,
                 styleButtonRemoveItemPosition: removeUploadedFileButtonPosition,
                 styleItemPanelAspectRatio: itemPanelAspectRatio,
@@ -200,9 +204,15 @@ export default function fileUploadFormComponent({
                 },
                 fileValidateTypeDetectType: (source, detectedType) => {
                     return new Promise((resolve, reject) => {
+                        const extension = source.name
+                            .split('.')
+                            .pop()
+                            .toLowerCase()
                         const mimeType =
+                            mimeTypeMap[extension] ||
                             detectedType ||
-                            mime.getType(source.name.split('.').pop())
+                            mime.getType(extension)
+
                         mimeType ? resolve(mimeType) : reject()
                     })
                 },
@@ -745,21 +755,30 @@ export default function fileUploadFormComponent({
     }
 }
 
+import am from 'filepond/locale/am-et'
 import ar from 'filepond/locale/ar-ar'
+import az from 'filepond/locale/az-az'
 import ca from 'filepond/locale/ca-ca'
 import ckb from 'filepond/locale/ku-ckb'
 import cs from 'filepond/locale/cs-cz'
 import da from 'filepond/locale/da-dk'
 import de from 'filepond/locale/de-de'
+import el from 'filepond/locale/el-el'
 import en from 'filepond/locale/en-en'
 import es from 'filepond/locale/es-es'
 import fa from 'filepond/locale/fa_ir'
 import fi from 'filepond/locale/fi-fi'
 import fr from 'filepond/locale/fr-fr'
+import he from 'filepond/locale/he-he'
+import hr from 'filepond/locale/hr-hr'
 import hu from 'filepond/locale/hu-hu'
 import id from 'filepond/locale/id-id'
 import it from 'filepond/locale/it-it'
+import ja from 'filepond/locale/ja-ja'
 import km from 'filepond/locale/km-km'
+import ko from 'filepond/locale/ko-kr'
+import lt from 'filepond/locale/lt-lt'
+import lv from 'filepond/locale/lv-lv'
 import nl from 'filepond/locale/nl-nl'
 import no from 'filepond/locale/no_nb'
 import pl from 'filepond/locale/pl-pl'
@@ -767,6 +786,7 @@ import pt_BR from 'filepond/locale/pt-br'
 import pt_PT from 'filepond/locale/pt-br'
 import ro from 'filepond/locale/ro-ro'
 import ru from 'filepond/locale/ru-ru'
+import sk from 'filepond/locale/sk-sk'
 import sv from 'filepond/locale/sv_se'
 import tr from 'filepond/locale/tr-tr'
 import uk from 'filepond/locale/uk-ua'
@@ -775,21 +795,30 @@ import zh_CN from 'filepond/locale/zh-cn'
 import zh_TW from 'filepond/locale/zh-tw'
 
 const locales = {
+    am,
     ar,
+    az,
     ca,
     ckb,
     cs,
     da,
     de,
+    el,
     en,
     es,
     fa,
     fi,
     fr,
+    he,
+    hr,
     hu,
     id,
     it,
+    ja,
     km,
+    ko,
+    lt,
+    lv,
     nl,
     no,
     pl,
@@ -797,6 +826,7 @@ const locales = {
     pt_PT,
     ro,
     ru,
+    sk,
     sv,
     tr,
     uk,

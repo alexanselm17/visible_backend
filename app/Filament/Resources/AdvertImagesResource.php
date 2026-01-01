@@ -176,7 +176,6 @@ class AdvertImagesResource extends Resource
                                 Select::make('county_id')
                                     ->label('County')
                                     ->options(Counties::all()->pluck('name', 'id'))
-                                    ->required()
                                     ->searchable()
                                     ->preload()
                                     ->live()
@@ -193,7 +192,6 @@ class AdvertImagesResource extends Resource
                                             ? SubCounty::where('county_id', $get('county_id'))->pluck('name', 'id')->toArray()
                                             : []
                                     )
-                                    ->required()
                                     ->searchable()
                                     ->placeholder('Select Sub County')
                                     ->disabled(fn(Get $get): bool => !$get('county_id')),
@@ -204,7 +202,6 @@ class AdvertImagesResource extends Resource
                                         'male' => 'Male',
                                         'female' => 'Female',
                                     ])
-                                    ->required()
                                     ->placeholder('Select Gender'),
                             ])
                             ->columns(3)
@@ -273,11 +270,32 @@ class AdvertImagesResource extends Resource
     {
         return $table
             ->columns([
-                ImageColumn::make('image_path')
+                ImageColumn::make('image')
+                    ->label('Image')
                     ->size(60)
-                    ->circular()
-                    ->defaultImageUrl(url('/images/placeholder.png')),
+                    ->getStateUsing(function ($record) {
+                        $path = $record->image_path;
 
+                        return $path
+                            ? asset('storage/' . $path)
+                            : asset('storage/products/default-product.png');
+                    })
+                    ->action(
+                        Action::make('preview')
+                            ->label('')
+                            ->modalHeading('Preview Image')
+                            ->modalWidth('sm')
+                            ->modalSubmitAction(false)
+                            ->modalCancelAction(false)
+                            ->modalContent(
+                                fn($record) =>
+                                view('filament.components.image-preview', [
+                                    'url' => $record->image_path
+                                        ? asset('storage/' . $record->image_path)
+                                        : asset('storage/products/default-product.png'),
+                                ])
+                            )
+                    ),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
@@ -421,64 +439,8 @@ class AdvertImagesResource extends Resource
                         ],
                     ]))
                     ->visible(fn($record) => $record->screenshots_count > 0),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-
-                    Tables\Actions\BulkAction::make('update_category')
-                        ->label('Update Category')
-                        ->icon('heroicon-o-tag')
-                        ->color('info')
-                        ->form([
-                            Select::make('category')
-                                ->required()
-                                ->options([
-                                    'electronics' => 'Electronics',
-                                    'fashion' => 'Fashion',
-                                    'food' => 'Food & Beverage',
-                                    'automotive' => 'Automotive',
-                                    'health' => 'Health & Beauty',
-                                    'home' => 'Home & Garden',
-                                    'sports' => 'Sports & Recreation',
-                                    'entertainment' => 'Entertainment',
-                                    'education' => 'Education',
-                                    'services' => 'Services',
-                                    'other' => 'Other',
-                                ]),
-                        ])
-                        ->action(function ($records, array $data) {
-                            $records->each(function ($record) use ($data) {
-                                $record->update(['category' => $data['category']]);
-                            });
-
-                            Notification::make()
-                                ->title('Categories Updated')
-                                ->success()
-                                ->send();
-                        }),
-
-                    Tables\Actions\BulkAction::make('extend_validity')
-                        ->label('Extend Validity')
-                        ->icon('heroicon-o-calendar')
-                        ->color('warning')
-                        ->form([
-                            DatePicker::make('valid_until')
-                                ->required()
-                                ->minDate(now())
-                                ->label('New Expiry Date'),
-                        ])
-                        ->action(function ($records, array $data) {
-                            $records->each(function ($record) use ($data) {
-                                $record->update(['valid_until' => $data['valid_until']]);
-                            });
-
-                            Notification::make()
-                                ->title('Validity Extended')
-                                ->success()
-                                ->send();
-                        }),
-                ]),
+        
+       
             ])
             ->defaultSort('created_at', 'desc')
             ->striped()

@@ -38,10 +38,11 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use App\Exports\GenericExport;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+
 class ProductRepository implements ProductRepositoryInterface
 {
 
-   
+
 
     public function updateAdvertProduct(ProductAdvertRequest $request, $advertId)
     {
@@ -110,7 +111,8 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Update the campaign with validated input
             $campaign->update([
-                'name' => $request->input('name', $campaign->name)]);
+                'name' => $request->input('name', $campaign->name)
+            ]);
 
 
             return response()->json([
@@ -132,7 +134,7 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-   
+
 
 
 
@@ -142,7 +144,7 @@ class ProductRepository implements ProductRepositoryInterface
             // Create and save the campaign
             $campaign = Campaign::create([
                 'name' => $request->input('name'),
-               
+
             ]);
 
             return response()->json([
@@ -235,52 +237,50 @@ class ProductRepository implements ProductRepositoryInterface
                 ], 400);
             }
 
-    $user = User::with(['county', 'subCounty'])->find($userId);
-    if (!$user) {
-        return response()->json([
-            'message' => 'User not found.',
-        ], 404);
-    }
+            $user = User::with(['county', 'subCounty'])->find($userId);
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not found.',
+                ], 404);
+            }
 
             $adverts = AdvertImages::query();
 
             if ($status === 'available') {
                 $adverts->where('advert_images.valid_until', '>', Carbon::now('Africa/Nairobi'));
-        
+
                 $adverts->whereDoesntHave('screenshots', function ($query) use ($userId) {
                     $query->where('processed_by', $userId);
                 });
-        
-           $adverts->where(function ($query) use ($user) {
-    // 1. If target_audience is null, allow all records (target everyone)
-    $query->whereNull('target_audience')
-    
-        // 2. If gender is set, filter by gender
-        ->orWhere(function ($subQuery) use ($user) {
-            if ($user->gender) {
-                $subQuery->whereJsonContains('target_audience->gender', $user->gender);
-            }
-        })
-        
-        // 3. If county_id is set, filter by county
-        ->orWhere(function ($subQuery) use ($user) {
-            if ($user->county_id) {
-                $subQuery->whereJsonContains('target_audience->county_id', $user->county_id);
-            }
-        })
 
-        // 4. If subcounty_id is set, filter by subcounty
-        ->orWhere(function ($subQuery) use ($user) {
-            if ($user->subcounty_id) {
-                $subQuery->whereJsonContains('target_audience->subcounty_id', $user->subcounty_id);
-            } else {
-                // If subcounty is not provided, allow entries where subcounty is null
-                $subQuery->orWhereNull('target_audience->subcounty_id');
-            }
-        });
-});
+                $adverts->where(function ($query) use ($user) {
+                    // 1. If target_audience is null, allow all records (target everyone)
+                    $query->whereNull('target_audience')
 
+                        // 2. If gender is set, filter by gender
+                        ->orWhere(function ($subQuery) use ($user) {
+                            if ($user->gender) {
+                                $subQuery->whereJsonContains('target_audience->gender', $user->gender);
+                            }
+                        })
 
+                        // 3. If county_id is set, filter by county
+                        ->orWhere(function ($subQuery) use ($user) {
+                            if ($user->county_id) {
+                                $subQuery->whereJsonContains('target_audience->county_id', $user->county_id);
+                            }
+                        })
+
+                        // 4. If subcounty_id is set, filter by subcounty
+                        ->orWhere(function ($subQuery) use ($user) {
+                            if ($user->subcounty_id) {
+                                $subQuery->whereJsonContains('target_audience->subcounty_id', $user->subcounty_id);
+                            } else {
+                                // If subcounty is not provided, allow entries where subcounty is null
+                                $subQuery->orWhereNull('target_audience->subcounty_id');
+                            }
+                        });
+                });
             }
 
             if ($status === 'ongoing') {
@@ -436,7 +436,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Notify users
             $title = "📢 New Product posted!";
-            $body = "🔥 {$advert->name} is now live. Check it out before it’s gone!";
+            $body = "🔥 {$advert->name} is now live. Post it to on your  WhatsApp Status and earn ksh.{$advert->reward}";
             $request->merge([
                 'title' => $title,
                 'message' => $body,
@@ -444,7 +444,7 @@ class ProductRepository implements ProductRepositoryInterface
                 'send_push' => true,
             ]);
 
-            app(NotificationController::class)->notifyAllUsers($request);
+            // app(NotificationController::class)->notifyAllUsers($request);
             return response()->json([
                 'ok' => true,
                 'status' => "Success",
@@ -464,7 +464,6 @@ class ProductRepository implements ProductRepositoryInterface
     {
         DB::beginTransaction();
         try {
-
             $request->validate([
                 'screenshot' => 'required|image|mimes:jpeg,png,jpg|max:3072',
                 'user_id' => 'required|exists:users,id',
@@ -475,7 +474,7 @@ class ProductRepository implements ProductRepositoryInterface
                 ->select('campaigns.*')
                 ->first();
 
-             $advert=AdvertImages::where('id',$advert_id)->first();   
+            $advert = AdvertImages::where('id', $advert_id)->first();
 
             if (!$campaign) {
                 DB::rollBack();
@@ -486,17 +485,18 @@ class ProductRepository implements ProductRepositoryInterface
                 ], 404);
             }
 
+            // Check capacity
+            $allStarted = Screenshots::where('advert_id', $advert_id)
+                ->where('number', 1)
+                ->count();
+
             $previousScreenshot = Screenshots::where('advert_id', $advert_id)
                 ->where('processed_by', $request->user_id)
                 ->latest()
                 ->first();
 
-            $allStarted = Screenshots::where('advert_id', $advert_id)
-                ->where('number', 1)
-                ->count();
-
             if (is_null($previousScreenshot)) {
-                if ($allStarted >=  $advert->capacity) {
+                if ($allStarted >= $advert->capacity) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
@@ -506,34 +506,17 @@ class ProductRepository implements ProductRepositoryInterface
                 }
             }
 
-
-
-
-
-            $advert = AdvertImages::find($advert_id);
             if (!$advert) {
                 return response()->json(['message' => '❌ Advert not found.'], 404);
             }
 
             $advertPath = public_path('storage/' . $advert->image_path);
-            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
-                ->where('processed_by', $request->user_id)
-                ->latest()
-                ->first();
 
-                //let's ensure that the first screenshot and second have a differences of 18 hours 
-                $previousScreenshot = Screenshots::where('advert_id', $advert_id)
-                ->where('processed_by', $request->user_id)
-                ->latest()
-                ->first();
-            
+            // 18-Hour Rule Check
             if ($previousScreenshot !== null) {
-                // Convert the previous time to Nairobi timezone
                 $previousTime = Carbon::parse($previousScreenshot->created_at)->timezone('Africa/Nairobi');
-            
-                // Get current time minus 18 hours
                 $eighteenHoursAgo = Carbon::now('Africa/Nairobi')->subHours(18);
-            
+
                 if ($previousTime > $eighteenHoursAgo) {
                     DB::rollBack();
                     return response()->json([
@@ -542,8 +525,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'message' => "You can only process this after 18 hours since your last submission."
                     ], 400);
                 }
-            }
-            if ($previousScreenshot != null) {
+
                 if ($previousScreenshot->number == 2) {
                     DB::rollBack();
                     return response()->json([
@@ -563,76 +545,70 @@ class ProductRepository implements ProductRepositoryInterface
 
             $screenshotPath = public_path("storage/screenshots/{$filename}");
 
-            // Encode images to base64
-            $advertBase64 = base64_encode(file_get_contents($advertPath));
-            $screenshotBase64 = base64_encode(file_get_contents($screenshotPath));
 
-            // Prepare OpenAI request
-            $apiKey = "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"; 
-            // Get from .env file for security
-            $prompt = "
-            You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
-            
-            Instructions:
-            1. Confirm the screenshot is from WhatsApp and clearly displays 'My status' and a visible timestamp (e.g., 'Just now', 'Yesterday', '10:24pm', or '9 minutes ago').
-            2. Confirm that the media shown in the screenshot (either a static image or a thumbnail/frame from a video) matches the original media provided.
-               - If the original is a video, compare the screenshot to the provided video thumbnail or a representative frame.
-               - Ensure layout, colors, and content alignment are consistent.
-            3. Extract the number of views from the screenshot if it is clearly visible.
-            4. Extract the timestamp shown below 'My status'.
-            
-            Respond only in this valid JSON format:
-            
-            {
-              \"status\": \"✅ Verified: The media was successfully posted.\" OR \"❌ Not Verified\",
-              \"reason\": \"[If not verified, explain why. If verified, return null]\",
-              \"views\": \"[Exact number of views like '91', or 'Not visible']\",
-              \"timestamp\": \"[e.g., 'Just now', 'Today, 1:06 PM', or '43 minutes ago']\"
-            }
-            
-            Do not include any other text before or after the JSON.
-            ";
-            
+            // =========================================================
+            //  NEW: PYTHON OCR SERVICE INTEGRATION (Replaces ChatGPT)
+            // =========================================================
 
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-4o',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => [
-                            ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $advertBase64]], // image OR video thumbnail
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $screenshotBase64]],
-                        ]
-                    ]
-                ],
-                'max_tokens' => 300,
-            ]);
+            // URL from your Postman screenshot
+            // Note: If this PHP code runs on the same server, 'http://127.0.0.1:5000/verify' is faster.
+            $ocrUrl = 'http://46.202.155.75:5000/verify';
 
+            try {
+                // Send multipart/form-data request
+                $response = Http::timeout(120) // Increase timeout for OCR processing
+                    ->attach(
+                        'original',
+                        file_get_contents($advertPath),
+                        basename($advertPath)
+                    )
+                    ->attach(
+                        'screenshot',
+                        file_get_contents($screenshotPath),
+                        basename($screenshotPath)
+                    )
+                    ->post($ocrUrl);
 
-            $output = $response->json('choices.0.message.content') ?? '❌ Not Verified';
-            
+                if ($response->failed()) {
+                    throw new \Exception("OCR Service returned error: " . $response->status());
+                }
 
-            // Remove markdown formatting like ```json ... ``` if present
-            $output = trim($output);
-            $output = preg_replace('/^```json|```$/i', '', $output);
-            $output = trim($output);
-
-            // Decode cleaned JSON
-            $json = json_decode($output, true);
-
-            // Handle invalid or unexpected response
-            if (!$json || !isset($json['status'])) {
+                $ocrResult = $response->json();
+            } catch (\Exception $e) {
                 @unlink($screenshotPath);
+                Log::error("OCR Service Failure: " . $e->getMessage());
                 return response()->json([
-                    'message' => '❌ Not Verified',
-                    'reason' => 'Invalid format from the verification model...',
-                    'raw' => $output 
-                ], 400);
+                    'message' => '❌ Verification Service Error',
+                    'reason' => 'Could not verify screenshot at this time.',
+                    'debug' => $e->getMessage()
+                ], 500);
             }
+
+            // Map Python response to the format your existing logic expects
+            $json = [];
+
+            // Handle Views (Ensure it's a number for comparison later)
+            $rawViews = $ocrResult['views'] ?? '0';
+            $json['views'] = is_numeric($rawViews) ? (int)$rawViews : 0;
+            $json['timestamp'] = $ocrResult['timestamp'] ?? 'N/A';
+            $reason = $ocrResult['reason'] ?? '';
+
+            // Check Status
+            // Your Python service returns "status": "fail" or "success" (assumed)
+            if (isset($ocrResult['status']) && $ocrResult['status'] === 'success') {
+                $json['status'] = '✅ Verified: The media was successfully posted.';
+            } else {
+                $json['status'] = '❌ Not Verified';
+                // Combine reason and verdict for clarity
+                $reason = $ocrResult['reason'] ?? '';
+                $verdict = $ocrResult['verdict'] ?? '';
+                $json['reason'] = trim("$verdict $reason") ?: 'Unknown mismatch';
+            }
+
+            // =========================================================
+            //  END NEW INTEGRATION
+            // =========================================================
+
 
             // If verification failed
             if (str_starts_with($json['status'], '❌')) {
@@ -644,10 +620,9 @@ class ProductRepository implements ProductRepositoryInterface
                 ], 400);
             }
 
-
             $number = $previousScreenshot ? $previousScreenshot->number + 1 : 1;
 
-            //let's ensure that views is progressive
+            // Ensure views are progressive (New views must be >= Old views)
             if ($previousScreenshot != null) {
                 $lastViews = $previousScreenshot->views;
                 if ($lastViews >= $json['views']) {
@@ -655,12 +630,10 @@ class ProductRepository implements ProductRepositoryInterface
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "This screenshot has already been uploaded or not valid"
+                        'message' => "Views mismatch: New screenshot has fewer or equal views ($json[views]) than previous ($lastViews)."
                     ], 400);
                 }
             }
-
-
 
             // Save the verified screenshot to the database
             $screenshot = new Screenshots();
@@ -671,26 +644,24 @@ class ProductRepository implements ProductRepositoryInterface
             $screenshot->processed_by = $request->user_id;
             $screenshot->number = $number;
             $screenshot->save();
+
             $message = $json['status'] . ' | Views: ' . ($json['views'] ?? 'Not visible');
+
             if ($number == 2) {
-                //let's also ensure that only more than 50 views for last screenshot
+                // Ensure more than 50 views for last screenshot
                 if ($json['views'] < 50) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Minimum threshold not attained"
+                        'message' => "Minimum threshold (50 views) not attained. Current: " . $json['views']
                     ], 400);
                 }
-                //we now proceed to reward the users
-                $advert = AdvertImages::where('id', $advert_id)->first();
-               // $campaign = Campaign::where('id', $advert->campaign_id)->first();
+
+                // Proceed to reward the users
                 $reward = $advert->reward;
-
-
                 $customerLastInvoice = Invoice::where('processed_by', $request->user_id)->latest()->first();
                 $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
-
 
                 $invoice = Invoice::create([
                     "type" => "Reward",
@@ -700,7 +671,32 @@ class ProductRepository implements ProductRepositoryInterface
                     "posted_by" => $request->user_id,
                     'advert_id' => $advert_id
                 ]);
-                $message = "Task Completed and rewarded Successfuly";
+                $message = "Task Completed and rewarded Successfully";
+
+                // Check referral
+                $user = User::where('id', $request->user_id)->first();
+                if ($user->referal_code) {
+                    $referedBy = User::where('my_code', $user->referal_code)->first();
+                    if ($referedBy) {
+                        $referInvoice = Invoice::where('processed_by', $referedBy->id)
+                            ->where('posted_by', $request->user_id)
+                            ->first();
+
+                        if ($referInvoice == null) {
+                            $customerLastInvoice = Invoice::where('processed_by', $referedBy->id)->latest()->first();
+                            $customerBalance = $customerLastInvoice?->customer_balance ?? 0;
+                            $rewardCoin = 30;
+
+                            Invoice::create([
+                                "type" => "Referal",
+                                "amount" => $rewardCoin,
+                                "processed_by" => $referedBy->id,
+                                "customer_balance" => $customerBalance + $rewardCoin,
+                                "posted_by" => $user->id,
+                            ]);
+                        }
+                    }
+                }
             }
 
             // Return final success response
@@ -727,7 +723,6 @@ class ProductRepository implements ProductRepositoryInterface
 
 
 
-
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
@@ -735,21 +730,22 @@ class ProductRepository implements ProductRepositoryInterface
             $advertIds = DB::table('advert_images')
                 ->where('campaign_id', $campaignId)
                 ->pluck('id');
-    
+
             $fraudGroups = [];
-    
+
             foreach ($advertIds as $advertId) {
                 // Get all screenshots for this advert, ordered by user and number
                 $screenshots = DB::table('screenshots')
                     ->where('advert_id', $advertId)
+                    ->where('views', '>', 10)
                     ->get();
-    
+
                 // Group screenshots by a combined key of views + timestamp
                 $patterns = [];
-    
+
                 foreach ($screenshots as $screenshot) {
                     $patternKey = "{$screenshot->views}_{$screenshot->timestamp}";
-    
+
                     $patterns[$patternKey][] = [
                         'user_id' => $screenshot->processed_by,
                         'name' => DB::table('users')->where('id', $screenshot->processed_by)->value('fullname'),
@@ -759,12 +755,12 @@ class ProductRepository implements ProductRepositoryInterface
                         'url' => URL::to('storage/' . $screenshot->screenshot),
                     ];
                 }
-    
+
                 // Only include suspicious patterns shared by 2 or more users
                 foreach ($patterns as $pattern => $grouped) {
                     // Extract unique user IDs to avoid repetition
                     $uniqueUsers = collect($grouped)->pluck('user_id')->unique();
-    
+
                     if ($uniqueUsers->count() >= 2) {
                         $fraudGroups[] = [
                             'advert_id' => $advertId,
@@ -775,7 +771,7 @@ class ProductRepository implements ProductRepositoryInterface
                     }
                 }
             }
-    
+
             return response()->json([
                 'fraud_groups' => $fraudGroups,
             ]);
@@ -786,7 +782,7 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
-    
+
 
 
     public function getAdvertCampaigns(Request $request, $campaignId)
@@ -850,7 +846,10 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Total reward invoices
             $rewardInvoices = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
+                ->where(function ($q) {
+                    $q->where('type', 'Reward')
+                        ->orWhere('type', 'Referal');
+                })
                 ->get();
 
             $totalRewards = $rewardInvoices->sum('amount');
@@ -858,9 +857,13 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Today's rewards
             $todayRewards = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
                 ->whereBetween('created_at', [$startOfDay, $endOfDay])
+                ->where(function ($q) {
+                    $q->where('type', 'Reward')
+                        ->orWhere('type', 'Referal');
+                })
                 ->get();
+
 
             $todayRewardTotal = $todayRewards->sum('amount');
             $todayRewardCount = $todayRewards->count();
@@ -922,17 +925,17 @@ class ProductRepository implements ProductRepositoryInterface
                 }])
                 ->having('user_screenshot_count', '<', 2);
 
-         
+
             $adverts = $adverts
                 ->with([
                     'screenshots' => function ($query) use ($userId) {
                         $query->where('processed_by', $userId)
                             ->orderBy('created_at', 'asc');
                     },
-                   
+
                 ])
                 ->paginate(10);
-               
+
 
             $ongoingData = [
                 'message' => 'Adverts retrieved successfully.',
@@ -1035,13 +1038,13 @@ class ProductRepository implements ProductRepositoryInterface
                 ->whereBetween('created_at', [$start, $end])
                 ->get();
 
-               
 
-                // Collect campaign IDs
-$campaignIds = $campaigns->pluck('id');
 
-$advertCampaigns = AdvertImages::whereIn('campaign_id', $campaignIds)->get();
-$capacitySum=$advertCampaigns->sum('capacity');
+            // Collect campaign IDs
+            $campaignIds = $campaigns->pluck('id');
+
+            $advertCampaigns = AdvertImages::whereIn('campaign_id', $campaignIds)->get();
+            $capacitySum = $advertCampaigns->sum('capacity');
 
             $campaignCount = $campaigns->count();
             $completed = 0;
@@ -1051,13 +1054,13 @@ $capacitySum=$advertCampaigns->sum('capacity');
             $paymentDone = 0;
             $pendingPayment = 0;
 
-            
 
-            $campaignStats = $campaigns->map(function ($campaign) use (&$completed, &$ongoing, &$rewardAssigned, &$pending, &$paymentDone, $capacitySum,&$pendingPayment) {
+
+            $campaignStats = $campaigns->map(function ($campaign) use (&$completed, &$ongoing, &$rewardAssigned, &$pending, &$paymentDone, $capacitySum, &$pendingPayment) {
                 $comp = $campaign->adverts->filter(fn($ad) => $ad->invoices->isNotEmpty())->count();
-                $adverts=AdvertImages::where('campaign_id',$campaign->id)->get();
+                $adverts = AdvertImages::where('campaign_id', $campaign->id)->get();
                 $advertIds = $adverts->pluck('id');
-                $totalRewards=Invoice::whereIn('advert_id',$advertIds)->get()->sum('amount');
+                $totalRewards = Invoice::whereIn('advert_id', $advertIds)->get()->sum('amount');
 
 
                 $ong = $campaign->adverts->filter(function ($ad) {
@@ -1082,7 +1085,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                         if ($invoice->type == 'Payment') {
                             $paymentDone += $invoice->amount ?? 0;
                         }
-                
+
                         if (!is_null($invoice->customer_balance)) {
                             $pendingPayment += $invoice->customer_balance;
                         }
@@ -1105,15 +1108,15 @@ $capacitySum=$advertCampaigns->sum('capacity');
             $topCampaigns = $campaignStats->sortByDesc('completed')->take(5)->values();
 
             $latestInvoiceIds = Invoice::select(DB::raw('MAX(id) as id'))
-            ->groupBy('processed_by');
-        
-        // Fetch those latest invoices and sum their customer_balance
-        $totalBalance = Invoice::whereIn('id', $latestInvoiceIds)
-            ->get()
-            ->sum('customer_balance');
-        $paymentDone = Invoice::whereBetween('created_at', [$start, $end])
-            ->where('type','Payment')
-            ->get()->sum('amount');    
+                ->groupBy('processed_by');
+
+            // Fetch those latest invoices and sum their customer_balance
+            $totalBalance = Invoice::whereIn('id', $latestInvoiceIds)
+                ->get()
+                ->sum('customer_balance');
+            $paymentDone = Invoice::whereBetween('created_at', [$start, $end])
+                ->where('type', 'Payment')
+                ->get()->sum('amount');
             return response()->json([
                 'success' => true,
                 'message' => 'Admin dashboard data fetched successfully',
@@ -1228,7 +1231,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 'completed_users' => $completedUsers,
                 'incomplete_users' => $incompleteUsers,
                 'ongoing_users' => $ongoingUsers,
-                'total_views_all_users' => $totalViewsAllUsers, 
+                'total_views_all_users' => $totalViewsAllUsers,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1282,7 +1285,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 $totalOngoing = 0;
                 $totalViewsAllUsers = 0;
 
-               // dd($campaign);
+                // dd($campaign);
 
                 foreach ($campaign->adverts as $advert) {
                     $userScreenshots = $advert->screenshots->groupBy('processed_by');
@@ -1325,7 +1328,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                         if ($hasInvoice) {
                             $views = $lastScreenshot->views ?? 0;
                             $totalViewsAllUsers += $views;
-                        
+
                             $entry = [
                                 'full_name' => $user->fullname,
                                 'phone' => $user->phone ?? null,
@@ -1395,7 +1398,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 'summary' => $summary,
                 'startDate' => $from,
                 'upto' => $to,
-                'campaigns' => $campaigns 
+                'campaigns' => $campaigns
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1800,43 +1803,35 @@ $capacitySum=$advertCampaigns->sum('capacity');
                                 FROM invoices 
                                 GROUP BY processed_by) AS latest'), function ($join) {
                     $join->on('invoices.processed_by', '=', 'latest.processed_by')
-                         ->on('invoices.created_at', '=', 'latest.latest_created');
+                        ->on('invoices.created_at', '=', 'latest.latest_created');
                 })
                 ->orderBy('invoices.created_at', 'desc')
                 ->leftJoin('users', 'invoices.processed_by', '=', 'users.id')
+                ->where('users.is_active', true)
                 ->select(
                     'users.fullname',
                     'invoices.id',
                     'invoices.customer_balance',
                     'users.phone',
-                    'users.town',
-                    'users.estate',
-                    'users.county'
+
                 )
                 ->where('invoices.customer_balance', '>', '0')
                 ->get();
-               
-    
-            // Transform data
+
+
             $data = $latestInvoices->map(function ($invoice) {
                 return [
-                     99,
-                     "112",
-                     (string) $invoice->phone,
-                     $invoice->fullname,
-                     $invoice->customer_balance,
+                    $invoice->fullname,
+                    (string) $invoice->phone,       // keep as string
+                    $invoice->customer_balance,
                     'Payment',
-                    $invoice->town,
-                    $invoice->estate,
-                    $invoice->county,
-                    "SALA",
                 ];
             });
-    
-            // Return Excel file for download
+
             return Excel::download(
-                new GenericExport($data), 
-                'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx');
+                new GenericExport($data),
+                'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx'
+            );
         } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
@@ -1846,25 +1841,25 @@ $capacitySum=$advertCampaigns->sum('capacity');
         }
     }
 
- 
-    
-  
-    
+
+
+
+
     public function uploadPaymentExcell(Request $request)
     {
         try {
             $request->validate([
                 'file' => 'required|file|mimes:xlsx,xls'
             ]);
-    
+
             $spreadsheet = IOFactory::load($request->file('file'));
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray();
-    
+
             $data = [];
             foreach ($rows as $index => $row) {
                 if (strtolower($row[2]) == 'payee name' || empty($row[11])) continue;
-    
+                // dd($row);
                 $data[] = [
                     'payee_name' => $row[2],
                     'phone' => $row[4],
@@ -1873,18 +1868,19 @@ $capacitySum=$advertCampaigns->sum('capacity');
                     'transaction_status' => $row[12],
                 ];
             }
-    
+            //dd($data);
+
             DB::beginTransaction();
-    
+
             foreach ($data as $payment) {
                 $user = User::where('phone', $payment['phone'])->first();
                 if (!$user) continue; // Skip if user not found
-    
+
                 $method = SysMeta::where('meta_shortcode', 'mpesa')->first();
                 $latestInvoice = Invoice::where('processed_by', $user->id)->latest()->first();
                 $lastBalance = $latestInvoice ? $latestInvoice->customer_balance : 0;
                 $newBalance = $lastBalance - $payment['amount'];
-    
+
                 $newBanking = Banking::create([
                     'reference' => $payment['transaction_receipt'],
                     'amount' => $payment['amount'],
@@ -1895,7 +1891,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                     'phone' => $payment['phone'],
                     'deposit_method' => $method?->id,
                 ]);
-    
+
                 Invoice::create([
                     "type" => "Payment",
                     "amount" => $payment['amount'],
@@ -1905,15 +1901,14 @@ $capacitySum=$advertCampaigns->sum('capacity');
                     "banking" => $newBanking->id
                 ]);
             }
-    
+
             DB::commit();
-    
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
                 'message' => 'Payment processed successfully.',
             ]);
-    
         } catch (\Throwable $th) {
             DB::rollBack();
             return response()->json([
@@ -1921,10 +1916,7 @@ $capacitySum=$advertCampaigns->sum('capacity');
                 'status' => 'error',
                 'message' => 'Failed to process the Excel file.',
                 'error' => $th->getMessage()
-            ],400);
+            ], 400);
         }
     }
-    
-    
-    
 }

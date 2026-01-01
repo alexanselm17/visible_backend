@@ -43,7 +43,7 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
                 ->count();
 
             // If user has completed all 5 screenshots, don't send notification
-            if ($currentScreenshotCount >= 5) {
+            if ($currentScreenshotCount >= 2) {
                 Log::info("User {$this->user->id} has completed all screenshots for advert {$this->advert->id}. Skipping reminder.");
                 return;
             }
@@ -78,11 +78,11 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
      */
     private function sendReminderNotification(int $currentCount): void
     {
-        $remainingCount = 5 - $currentCount;
+        $remainingCount = 2 - $currentCount;
         $timeLeft = $this->getTimeLeftMessage();
 
         $title = "Complete Your Campaign! ⏰";
-        $message = "You have {$remainingCount} screenshots remaining for '{$this->advert->name}'. {$timeLeft}";
+        $message = "You have {$remainingCount} screenshots remaining for '{$this->advert->name}'. Please upload them after 18 hours to complete your campaign.";
 
         $this->sendNotification($title, $message, 'warning', [
             'advert_id' => $this->advert->id,
