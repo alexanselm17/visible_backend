@@ -1,0 +1,96 @@
+name: Deploy to Hostinger with Backup & Rollback
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            # ----------------------------------------------------------------------
+            # CONFIGURATION
+            # ----------------------------------------------------------------------
+            # CHANGE THIS to your actual project path found in Hostinger File Manager
+            PROJECT_ROOT="/home/${{ secrets.SSH_USER }}/domains/visibledm.com/public_html"
+            BACKUP_DIR="/home/${{ secrets.SSH_USER }}/backups"
+
+            # ----------------------------------------------------------------------
+            # 1. PREPARATION
+            # ----------------------------------------------------------------------
+            echo "🚀 Starting Deployment..."
+            mkdir -p $BACKUP_DIR
+            cd $PROJECT_ROOT
+
+            # Capture the current commit hash (for rollback)
+            PREVIOUS_COMMIT=$(git rev-parse HEAD)
+            echo "📝 Current Commit: $PREVIOUS_COMMIT"
+
+            # ----------------------------------------------------------------------
+            # 2. DATABASE BACKUP
+            # ----------------------------------------------------------------------
+            TIMESTAMP=$(date +%F_%H-%M-%S)
+            BACKUP_FILE="$BACKUP_DIR/backup_$TIMESTAMP.sql.gz"
+
+            echo "📦 Creating Database Backup..."
+            # Note: No space between -p and the password variable
+            mysqldump -u ${{ secrets.DB_USER }} -p'${{ secrets.DB_PASSWORD }}' ${{ secrets.DB_NAME }} | gzip > $BACKUP_FILE
+
+            # Verify backup creation
+            if [ -f "$BACKUP_FILE" ]; then
+                echo "✅ Backup Successful: $BACKUP_FILE"
+            else
+                echo "❌ Backup FAILED. Aborting deployment to protect data."
+                exit 1
+            fi
+
+            # ----------------------------------------------------------------------
+            # 3. DEPLOYMENT (Try/Catch Block)
+            # ----------------------------------------------------------------------
+            echo "🔧 Starting Update Process..."
+
+            # Enter Maintenance Mode
+            php artisan down || true
+
+            # Attempt Deployment Steps
+            if git pull origin main && \
+               composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader && \
+               php artisan migrate --force && \
+               php artisan optimize:clear; then
+
+                # --- SUCCESS ---
+                echo "✅ Deployment Successful!"
+                php artisan up
+                exit 0
+
+            else
+                # --- FAILURE & ROLLBACK ---
+                echo "🚨 ERROR DETECTED! INITIATING ROLLBACK..."
+                
+                # 1. Revert files to the previous commit
+                git reset --hard $PREVIOUS_COMMIT
+                
+                # 2. Clear caches to remove any broken config
+                php artisan optimize:clear
+                
+                # 3. Bring site back online
+                php artisan up
+                
+                echo "🔄 Rollback complete. Site restored to version: $PREVIOUS_COMMIT"
+                echo "⚠️  Check $BACKUP_FILE if you need to manually inspect the database."
+                
+                # Fail the action so GitHub notifies you
+                exit 1
+            fi

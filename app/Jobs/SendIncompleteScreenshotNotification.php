@@ -82,7 +82,7 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
         $timeLeft = $this->getTimeLeftMessage();
 
         $title = "Complete Your Campaign! ⏰";
-        $message = "You have {$remainingCount} screenshots remaining for '{$this->advert->name}'. {$timeLeft}. Please upload them after 18 hours to complete your campaign.";
+        $message = "You have {$remainingCount} screenshots remaining for '{$this->advert->name}'. Please upload them after 18 hours to complete your campaign.";
 
         $this->sendNotification($title, $message, 'warning', [
             'advert_id' => $this->advert->id,
