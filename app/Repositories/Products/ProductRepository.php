@@ -586,23 +586,33 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Map Python response to the format your existing logic expects
             $json = [];
+            $metadata = $ocrResult['metadata'] ?? [];
 
-            // Handle Views (Ensure it's a number for comparison later)
-            $rawViews = $ocrResult['views'] ?? '0';
-            $json['views'] = is_numeric($rawViews) ? (int)$rawViews : 0;
-            $json['timestamp'] = $ocrResult['timestamp'] ?? 'N/A';
-            $reason = $ocrResult['reason'] ?? '';
+            // 1. Extract Views (Now inside metadata)
+            // The API returns "Not detected" (string) or a number string like "45"
+            $rawViews = $metadata['views'] ?? '0';
 
-            // Check Status
-            // Your Python service returns "status": "fail" or "success" (assumed)
-            if (isset($ocrResult['status']) && $ocrResult['status'] === 'success') {
+            // Force it to an integer. (int)"Not detected" becomes 0 in PHP, which is safe.
+            $json['views'] = (int)$rawViews;
+
+            // 2. Extract Timestamp
+            $json['timestamp'] = $metadata['timestamp'] ?? 'N/A';
+
+            // 3. Handle Status & Messages
+            // Python now sends "verdict_title" and "message"
+            $apiStatus = $ocrResult['status'] ?? 'fail';
+
+            if ($apiStatus === 'success') {
                 $json['status'] = '✅ Verified: The media was successfully posted.';
+                $json['reason'] = '';
             } else {
                 $json['status'] = '❌ Not Verified';
-                // Combine reason and verdict for clarity
-                $reason = $ocrResult['reason'] ?? '';
-                $verdict = $ocrResult['verdict'] ?? '';
-                $json['reason'] = trim("$verdict $reason") ?: 'Unknown mismatch';
+
+                // Combine the short title and long message for the user
+                $title = $ocrResult['verdict_title'] ?? 'Verification Failed';
+                $msg = $ocrResult['message'] ?? 'Unknown mismatch error';
+
+                $json['reason'] = "$title: $msg";
             }
 
             // =========================================================
