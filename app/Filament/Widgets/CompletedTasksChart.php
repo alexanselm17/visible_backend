@@ -4,25 +4,25 @@ namespace App\Filament\Widgets;
 
 use Filament\Widgets\BarChartWidget;
 
-class ViewsChart extends BarChartWidget
+class CompletedTasksChart extends BarChartWidget
 {
-    protected static ?string $heading = 'Daily Views (Last 5 Days)';
+    protected static ?string $heading = 'Completed Tasks (Last 5 Days)';
 
     protected function getData(): array
     {
         $labels = [];
-        $views = [];
+        $completed = [];
 
         foreach (range(4, 0) as $i) {
             $labels[] = now()->subDays($i)->format('D');
-            $views[] = rand(100, 300);
+            $completed[] = rand(20, 100);
         }
 
         return [
             'datasets' => [[
-                'label' => 'Views',
-                'data' => $views,
-                'backgroundColor' => '#10b981',
+                'label' => 'Completed Tasks',
+                'data' => $completed,
+                'backgroundColor' => '#f59e0b',
             ]],
             'labels' => $labels,
         ];

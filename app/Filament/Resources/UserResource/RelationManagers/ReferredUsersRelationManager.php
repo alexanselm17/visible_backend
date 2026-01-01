@@ -20,6 +20,22 @@ class ReferredUsersRelationManager extends RelationManager
 
     protected static ?string $pluralModelLabel = 'Referred Users';
 
+    protected function getTableQuery(): Builder
+    {
+        // Get the current user's my_code
+        $user = $this->getOwnerRecord();
+        $code = $user->my_code;
+        
+        // If user has no my_code, return empty query
+        if (empty($code)) {
+            return \App\Models\User::whereRaw('1 = 0'); // Empty result
+        }
+        
+        // Fetch users who have this user's code as their referal_code
+        return \App\Models\User::where('referal_code', $code)
+            ->orderByDesc('created_at');
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -82,11 +98,22 @@ class ReferredUsersRelationManager extends RelationManager
                     // Add bulk actions if needed
                 ]),
             ])
-            ->modifyQueryUsing(fn(Builder $query) => $query->withoutGlobalScopes([
+            ->modifyQueryUsing(fn (Builder $query) => $query->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]))
+            ->defaultPaginationPageOption(15)
+            ->paginationPageOptions([15, 25, 50, 100])
             ->emptyStateHeading('No Referred Users')
-            ->emptyStateDescription('This user hasn\'t referred anyone yet.')
+            ->emptyStateDescription(function () {
+                $user = $this->getOwnerRecord();
+                $code = $user->my_code;
+                
+                if (empty($code)) {
+                    return 'This user has no referral code set up yet.';
+                }
+                
+                return "No users have used referral code: {$code}";
+            })
             ->emptyStateIcon('heroicon-o-user-plus');
     }
 }

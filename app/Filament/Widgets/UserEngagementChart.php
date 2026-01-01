@@ -25,7 +25,7 @@ class UserEngagementChart extends BarChartWidget
         $counts = [];
 
         foreach ($topUsers as $userStats) {
-            $userName = $userStats->user ? $userStats->user->name : 'Unknown User';
+            $userName = $userStats->user ? $userStats->user->username : 'Unknown User';
             $labels[] = \Str::limit($userName, 15);
             $counts[] = $userStats->screenshot_count;
         }

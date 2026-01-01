@@ -30,6 +30,4 @@ interface AuthRepositoryInterface
 
  
     public function activateAllInactiveAcounts(Request $request);
-
-    public function getAllUserReferred(Request $request,$userId);
 }

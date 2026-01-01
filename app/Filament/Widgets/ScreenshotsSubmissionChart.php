@@ -18,10 +18,10 @@ class ScreenshotsSubmissionChart extends LineChartWidget
         foreach (range(6, 0) as $i) {
             $date = now()->subDays($i);
             $labels[] = $date->format('M d');
-
+            
             $dailySubmissions = Screenshots::whereDate('created_at', $date)
                 ->count();
-
+            
             $submissions[] = $dailySubmissions;
         }
 

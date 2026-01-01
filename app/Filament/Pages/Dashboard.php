@@ -28,11 +28,8 @@ class Dashboard extends BaseDashboard
       \App\Filament\Widgets\CampaignCardsWidget::class,
       \App\Filament\Widgets\RecentActivityWidget::class,
       \App\Filament\Widgets\ViewsChart::class,
-      \App\Filament\Widgets\ScreenshotsSubmissionChart::class,
-      \App\Filament\Widgets\RevenueChart::class,
-      \App\Filament\Widgets\UserEngagementChart::class,
-      \App\Filament\Widgets\TopPerformingAdvertsChart::class,
-      
+      \App\Filament\Widgets\RewardsChart::class,
+      \App\Filament\Widgets\CompletedTasksChart::class,
     ];
   }
 }
