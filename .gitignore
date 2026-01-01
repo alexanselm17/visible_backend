@@ -33,3 +33,4 @@ storage/logs/*.log
 # Composer dump files
 composer.lock
 phpunit.result.cache
+composer.phar
