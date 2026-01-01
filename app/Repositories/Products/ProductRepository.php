@@ -614,7 +614,7 @@ class ProductRepository implements ProductRepositoryInterface
             if (str_starts_with($json['status'], '❌')) {
                 @unlink($screenshotPath);
                 return response()->json([
-                    'message' => $json['status'],
+                    'message' => $json['reason'],
                     'reason' => $json['reason'] ?? 'No reason provided',
                     'views' => $json['views'] ?? 'Not visible'
                 ], 400);
