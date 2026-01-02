@@ -347,7 +347,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'reward' => $advert->reward,
                         'capacity' => $advert->capacity,
                         'updated_at' => $advert->updated_at,
-                        'valid_until' => $advert->campaign?->valid_until,
+                        'valid_until' => $advert->valid_until,
                         'image_path' => $advert->image_path,
                         'image_url' => asset($imagePath),
                         'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
@@ -522,8 +522,6 @@ class ProductRepository implements ProductRepositoryInterface
                     ->attach('original', file_get_contents($advertPath), basename($advertPath))
                     ->attach('screenshot', file_get_contents($screenshotPath), basename($screenshotPath))
                     ->post($ocrUrl);
-
-                // Get the RAW Python response (contains status, verdict_title, metadata, scores)
                 $ocrResult = $response->json();
             } catch (\Exception $e) {
                 @unlink($screenshotPath);
@@ -535,7 +533,7 @@ class ProductRepository implements ProductRepositoryInterface
             }
 
             // Extract Key Data for Logic
-            $pythonStatus = $ocrResult['status'] ?? 'fail'; // "success" or "fail"
+            $pythonStatus = $ocrResult['status'] ?? 'fail';
             $detectedViews = (int)($ocrResult['metadata']['views'] ?? 0);
             $detectedTime = $ocrResult['metadata']['timestamp'] ?? 'N/A';
             $verdictTitle = $ocrResult['verdict_title'] ?? 'Unknown Error';
@@ -554,7 +552,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'status' => 'failed',
                     'message' => "❌ $verdictTitle: $verdictMsg",
                     'reason' => $verdictMsg,
-                    'verification_details' => $ocrResult // <--- RETURNING ALL PYTHON DATA
+                    'verification_details' => $ocrResult
                 ], 400);
             }
 
@@ -568,7 +566,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'ok' => false,
                         'status' => 'failed',
                         'message' => "Views mismatch: New views ($detectedViews) must be higher than previous ({$previousScreenshot->views}).",
-                        'verification_details' => $ocrResult // <--- RETURNING ALL PYTHON DATA
+                        'verification_details' => $ocrResult
                     ], 400);
                 }
             }
@@ -599,11 +597,6 @@ class ProductRepository implements ProductRepositoryInterface
                         'verification_details' => $ocrResult
                     ], 400);
                 }
-
-                // ... (Reward Logic: Invoice creation, Referral checks, etc.) ...
-                // [Kept your existing reward logic here for brevity, assuming it runs fine]
-
-                // Add reward logic here (Invoice create, etc)
                 $reward = $advert->reward;
                 $customerLastInvoice = Invoice::where('processed_by', $request->user_id)->latest()->first();
                 Invoice::create([
@@ -619,17 +612,11 @@ class ProductRepository implements ProductRepositoryInterface
             }
 
             DB::commit();
-
-            // =========================================================
-            //  FINAL SUCCESS RESPONSE
-            // =========================================================
             return response()->json([
                 'ok' => true,
                 'message' => $userMessage,
                 'views' => $detectedViews,
                 'path' => 'screenshots/' . $filename,
-
-                // Here is the full python response you asked for:
                 'verification_details' => $ocrResult
             ]);
         } catch (\Throwable $th) {

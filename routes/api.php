@@ -15,8 +15,6 @@ Route::group(['prefix' => 'v1'], function () {
     //Auth Routes
     Route::group(['prefix' => 'auth'], function () {
         Route::post('/fcm-token', [NotificationController::class, 'updateFcmToken']);
-
-
         //Admin and manager only
         Route::post('/signup', [AuthController::class, 'signup']);
         Route::get('/location', [AuthController::class, 'getCountiesWithSubCounties']);
@@ -30,6 +28,7 @@ Route::group(['prefix' => 'v1'], function () {
     Route::get('/download/advert/{path}', function ($path) {
         $fullPath = public_path("storage/" . $path);
 
+        
         if (!file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
@@ -51,15 +50,12 @@ Route::group(['prefix' => 'v1'], function () {
 
 
     Route::group(['prefix' => 'user'], function () {
-
         Route::post('/assign_permissions', [AuthController::class, 'assignPermissionsToUser']);
-
         Route::get('/user_permissions/{userId}', [AuthController::class, 'getUserPermissions']);
-
         Route::put('/reset_password', [AuthController::class, 'restorePassword']);
     });
 
-   
+
 
     Route::group(['prefix' => 'setup'], function () {
 
@@ -72,7 +68,6 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
-
         Route::group(['prefix' => 'campaign'], function () {
             Route::post('/', [ProductController::class, 'startCampaigns']);
             Route::put('/{id}', [ProductController::class, 'updateCampaign']);
@@ -97,14 +92,12 @@ Route::group(['prefix' => 'v1'], function () {
 
     Route::group(['prefix' => 'campaign'], function () {
         Route::post('/payment', [ProductController::class, 'uploadPaymentExcell']);
-   
     });
 
 
 
 
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
-
         //User Routes
         Route::group(['prefix' => 'user'], function () {
 
@@ -143,7 +136,7 @@ Route::group(['prefix' => 'v1'], function () {
 
 
 
-       
+
 
         Route::group(['prefix' => 'customers'], function () {
 
@@ -154,17 +147,16 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/{petrolStationId}', [CustomersController::class, 'fetchCustomers']);
             Route::get('/{petrolStationId}/search', [CustomersController::class, 'searchCustomers']);
         });
-      
-  
 
-    Route::prefix('notifications')->group(function () {
-        Route::get('/user', [NotificationController::class, 'getUserNotifications']);
-        Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
-        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
-        Route::delete('/delete', [NotificationController::class, 'deleteNotification']);
 
-        // Statistics
-        Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
+
+        Route::prefix('notifications')->group(function () {
+            Route::get('/user', [NotificationController::class, 'getUserNotifications']);
+            Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
+            Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+            Route::delete('/delete', [NotificationController::class, 'deleteNotification']);
+            // Statistics
+            Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
+        });
     });
-});
 });
