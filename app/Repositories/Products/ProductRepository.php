@@ -612,7 +612,7 @@ class ProductRepository implements ProductRepositoryInterface
                 $title = $ocrResult['verdict_title'] ?? 'Verification Failed';
                 $msg = $ocrResult['message'] ?? 'Unknown mismatch error';
 
-                $json['reason'] = "$title: $msg";
+                $json['reason'] = "$title: $msg : $metadata";
             }
 
             // =========================================================
