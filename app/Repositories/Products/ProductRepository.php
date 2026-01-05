@@ -361,6 +361,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'all_screenshots' => $advert->screenshots->map(function ($ss) {
                             return [
                                 'views' => $ss->views,
+                                'created_at' => $ss->created_at,
                             ];
                         })->values(),
                     ];
