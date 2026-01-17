@@ -361,6 +361,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'all_screenshots' => $advert->screenshots->map(function ($ss) {
                             return [
                                 'views' => $ss->views,
+                                'created_at' => $ss->created_at,
                             ];
                         })->values(),
                     ];
@@ -550,7 +551,7 @@ class ProductRepository implements ProductRepositoryInterface
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => "❌ $verdictTitle: $verdictMsg",
+                    'message' => "Verification failed: Please ensure you uploaded the correct screenshot and try again.",
                     'reason' => $verdictMsg,
                     'verification_details' => $ocrResult
                 ], 400);
@@ -585,7 +586,7 @@ class ProductRepository implements ProductRepositoryInterface
             $screenshot->number = $number;
             $screenshot->save();
 
-            $userMessage = "✅ Verified: " . $verdictMsg;
+            $userMessage = "Screenshot verified successfully as number $number with $detectedViews views.";
 
             if ($number == 2) {
                 if ($detectedViews < 50) {
