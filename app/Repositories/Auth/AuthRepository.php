@@ -621,7 +621,7 @@ class AuthRepository implements AuthRepositoryInterface
     {
         try {
             // Set the number of users per page, e.g., 10 users per page
-            $perPage = 5;
+            $perPage = 100;
 
             // Retrieve users with pagination
             $users = User::where('users.id', '!=', null)
