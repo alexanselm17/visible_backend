@@ -620,16 +620,36 @@ class AuthRepository implements AuthRepositoryInterface
     public function getAllUsers()
     {
         try {
-            // Set the number of users per page, e.g., 10 users per page
             $perPage = 100;
 
-            // Retrieve users with pagination
-            $users = User::where('users.id', '!=', null)
-                ->leftJoin('roles', 'users.role_id', '=', 'roles.id')
-                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone', 'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
-                ->select('users.id', 'users.fullname', 'users.username', 'users.email', 'users.phone',  'users.is_active', 'users.created_at', 'users.updated_at', 'users.deleted_at', 'roles.id as role_id', 'roles.name as role', 'roles.slug')
-                ->orderBy('users.id')
+            $users = User::with(['role', 'latestFraudFlag'])
+                ->orderBy('created_at', 'desc')
                 ->paginate($perPage);
+
+            $users->getCollection()->transform(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'fullname' => $u->fullname,
+                    'username' => $u->username,
+                    'email' => $u->email,
+                    'phone' => $u->phone,
+                    'is_active' => $u->is_active,
+                    'created_at' => $u->created_at,
+                    'updated_at' => $u->updated_at,
+                    'deleted_at' => $u->deleted_at,
+                    'role_id' => $u->role?->id,
+                    'role' => $u->role?->name,
+                    'slug' => $u->role?->slug,
+
+                    'is_banned' => (bool) $u->latestFraudFlag,
+                    'fraud' => $u->latestFraudFlag ? [
+                        'reason' => $u->latestFraudFlag->reason,
+                        'details' => $u->latestFraudFlag->details,
+                        'reported_by' => $u->latestFraudFlag->reported_by,
+                        'flagged_at' => optional($u->latestFraudFlag->flagged_at)->toDateTimeString(),
+                    ] : null,
+                ];
+            });
 
             return response()->json([
                 'ok' => true,
@@ -641,11 +661,12 @@ class AuthRepository implements AuthRepositoryInterface
             Log::debug('Get User Error: ' . $th->getMessage());
             return response()->json([
                 'ok' => false,
-                'error',
+                'status' => 'error',
                 'message' => $th->getMessage(),
-            ]);
+            ], 500);
         }
     }
+
 
 
     public function getAllUsersWithoutRole()

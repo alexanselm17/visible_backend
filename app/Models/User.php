@@ -280,6 +280,12 @@ class User extends Authenticatable implements FilamentUser
 
   public function fraudFlags()
   {
-    return $this->hasMany(UserFraud::class);
+    return $this->hasMany(\App\Models\UserFraud::class, 'user_id', 'id');
+  }
+
+  public function latestFraudFlag()
+  {
+    return $this->hasOne(\App\Models\UserFraud::class, 'user_id', 'id')
+      ->latestOfMany('flagged_at'); // or latestOfMany() if using id
   }
 }
