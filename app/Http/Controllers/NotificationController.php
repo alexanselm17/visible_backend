@@ -373,4 +373,54 @@ class NotificationController extends Controller
 
         return response()->json($stats);
     }
+
+    /**
+     * Send notification to user when their account has been deactivated due to fraud
+     */
+    public function notifyUserAccountFlaggedFraud(Request $request): JsonResponse
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'send_push' => 'nullable|boolean',
+        ]);
+
+        $user = User::find($request->user_id);
+
+        $title = 'Account Deactivated';
+        $message = 'Your account has been deactivated due to suspicious activity. If you believe this is a mistake, please contact support for assistance.';
+
+        $notificationData = [
+            'action_type' => 'account_flagged_fraud',
+            'account_status' => 'deactivated',
+            'flagged_at' => now()->toDateTimeString(),
+        ];
+
+        // Store notification in database
+        $notification = Notification::create([
+            'user_id' => $user->id,
+            'title' => $title,
+            'message' => $message,
+            'type' => 'security',
+            'data' => $notificationData,
+        ]);
+
+        if (($request->send_push ?? true) && $user->fcm_token) {
+            try {
+                $firebase = new FirebaseService();
+                $firebase->sendToDevice($user->fcm_token, $title, $message);
+            } catch (\Exception $e) {
+                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'message' => 'Fraud deactivation notification sent successfully',
+            'notification' => $notification,
+            'user' => [
+                'id' => $user->id,
+                'fullname' => $user->fullname,
+                'username' => $user->username,
+            ],
+        ]);
+    }
 }

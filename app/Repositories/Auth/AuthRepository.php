@@ -25,7 +25,7 @@ class AuthRepository implements AuthRepositoryInterface
 {
 
 
-   public function getAllUserReferred(Request $request, $userId)
+    public function getAllUserReferred(Request $request, $userId)
     {
         try {
             // Clamp per_page between 1 and 100
@@ -97,68 +97,68 @@ class AuthRepository implements AuthRepositoryInterface
     }
 
 
-   public function signUpUser(Request $request)
-{
-    try {
-        DB::beginTransaction();
-        
-     
-        
+    public function signUpUser(Request $request)
+    {
+        try {
+            DB::beginTransaction();
 
-        // Helper to generate unique code
-        $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
-            do {
-                $code = preg_replace('/[^0-9]/', '', Str::random($length));
-                while (strlen($code) < $length) {
-                    $code .= rand(0, 9);
-                }
-                $exists = DB::table($table)->where($column, $code)->exists();
-            } while ($exists);
 
-            return $code;
-        };
 
-         // Generate a unique my_code
-         $myCode = $generateUniqueCode('users', 'my_code');
-        $role = RolesModel::where('name', '=', 'Customer Champion')->first();
-        $usersCount = User::count();
 
-        $referalCode = $usersCount == 0 ?  $myCode : $request['code'];
-       // dd(  $referalCode);
-        $userCode = User::where('my_code', $referalCode)->first();
+            // Helper to generate unique code
+            $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
+                do {
+                    $code = preg_replace('/[^0-9]/', '', Str::random($length));
+                    while (strlen($code) < $length) {
+                        $code .= rand(0, 9);
+                    }
+                    $exists = DB::table($table)->where($column, $code)->exists();
+                } while ($exists);
 
-       
+                return $code;
+            };
 
-        if ($usersCount > 0 && !$userCode) {
-            DB::rollBack();
-            return response()->json([
-                'ok' => false,
-                'status' => 'error',
-                'message' => "Invalid referral code"
-            ],400);
-        }
+            // Generate a unique my_code
+            $myCode = $generateUniqueCode('users', 'my_code');
+            $role = RolesModel::where('name', '=', 'Customer Champion')->first();
+            $usersCount = User::count();
 
-        $user = User::create([
-            "fullname" => $request['fullname'],
-            "username" => $request['username'],
-            "email" => $request['email'],
-            "password" => $request["password"],
-            "phone" => $request['phone'],
-            "county_id" => $request['county'],
-            "subcounty_id" => $request['sub_county'],
-            "role_id" => $role->id,
-            "occupation" => $request['occupation'],
-            "location" => $request['location'],
-            "gender" => $request['gender'],
-            "town" => $request['town'],
-            "estate" => $request['estate'],
-            "county" => $request['county'],
-            "fcm_token" => $request['fcm_token'],
-            "is_active" => false,
-            "referal_code" => $usersCount == 0 ? $myCode : $referalCode,
-            "my_code" => $usersCount == 0 ? $referalCode :  $myCode,
-        ]);
-/*
+            $referalCode = $usersCount == 0 ?  $myCode : $request['code'];
+            // dd(  $referalCode);
+            $userCode = User::where('my_code', $referalCode)->first();
+
+
+
+            if ($usersCount > 0 && !$userCode) {
+                DB::rollBack();
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'error',
+                    'message' => "Invalid referral code"
+                ], 400);
+            }
+
+            $user = User::create([
+                "fullname" => $request['fullname'],
+                "username" => $request['username'],
+                "email" => $request['email'],
+                "password" => $request["password"],
+                "phone" => $request['phone'],
+                "county_id" => $request['county'],
+                "subcounty_id" => $request['sub_county'],
+                "role_id" => $role->id,
+                "occupation" => $request['occupation'],
+                "location" => $request['location'],
+                "gender" => $request['gender'],
+                "town" => $request['town'],
+                "estate" => $request['estate'],
+                "county" => $request['county'],
+                "fcm_token" => $request['fcm_token'],
+                "is_active" => false,
+                "referal_code" => $usersCount == 0 ? $myCode : $referalCode,
+                "my_code" => $usersCount == 0 ? $referalCode :  $myCode,
+            ]);
+            /*
         // Handle referral reward
         if ($userCode) {
             
@@ -181,29 +181,29 @@ class AuthRepository implements AuthRepositoryInterface
         }
          */
 
-        // Notify admins
-        $notificationController = new NotificationController();
-        $notificationRequest = new Request(['new_user_id' => $user->id]);
-        $notificationController->notifyAdminsNewAccount($notificationRequest);
+            // Notify admins
+            $notificationController = new NotificationController();
+            $notificationRequest = new Request(['new_user_id' => $user->id]);
+            $notificationController->notifyAdminsNewAccount($notificationRequest);
 
-        DB::commit();
+            DB::commit();
 
-        return response()->json([
-            'ok' => true,
-            'status' => 'success',
-            'message' => "Account created successfully"
-        ]);
-    } catch (\Throwable $th) {
-        DB::rollBack();
-        Log::debug('Sign Up Error: ' . $th->getMessage());
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'message' => "Account created successfully"
+            ]);
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            Log::debug('Sign Up Error: ' . $th->getMessage());
 
-        return response()->json([
-            'ok' => false,
-            'status' => 'error',
-            'message' => $th->getMessage()
-        ]);
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => $th->getMessage()
+            ]);
+        }
     }
-}
 
 
 
@@ -239,20 +239,20 @@ class AuthRepository implements AuthRepositoryInterface
                     'message' => "Account not yet Activated",
                 ], Response::HTTP_UNAUTHORIZED);
             }
-             $role = RolesModel::find($user->role_id);
-            if($role -> slug != "admin"){
-                 if ($user->is_logged_in == 1) {
-                return response()->json([
-                    'ok' => false,
-                    'status' => 'failed',
-                    'message' => "Already Logged in",
-                ], Response::HTTP_UNAUTHORIZED);
-            }
+            $role = RolesModel::find($user->role_id);
+            if ($role->slug != "admin") {
+                if ($user->is_logged_in == 1) {
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "Already Logged in",
+                    ], Response::HTTP_UNAUTHORIZED);
+                }
             }
 
-           
 
-           
+
+
             if (!$role) {
                 return response()->json([
                     'ok' => false,
@@ -641,7 +641,7 @@ class AuthRepository implements AuthRepositoryInterface
             Log::debug('Get User Error: ' . $th->getMessage());
             return response()->json([
                 'ok' => false,
-               'error',
+                'error',
                 'message' => $th->getMessage(),
             ]);
         }
@@ -697,6 +697,15 @@ class AuthRepository implements AuthRepositoryInterface
     public function accountActivationCard(Request $request)
     {
         try {
+            $request->validate([
+                'user_id' => 'required|exists:users,id',
+                'is_fraud' => 'sometimes|boolean',
+                'fraud_reason' => 'nullable|string|max:255',
+                'fraud_details' => 'nullable|string',
+                'reported_by' => 'required_if:is_fraud,true|exists:users,id',
+            ]);
+
+
             $user = User::find($request->input('user_id'));
 
             if (!$user) {
@@ -707,6 +716,7 @@ class AuthRepository implements AuthRepositoryInterface
                 ], 404);
             }
 
+            // Toggle login status (if requested)
             if ($request->has('login_status')) {
                 $user->is_logged_in = !$user->is_logged_in;
                 $user->save();
@@ -714,27 +724,77 @@ class AuthRepository implements AuthRepositoryInterface
                 return response()->json([
                     'ok' => true,
                     'status' => 'success',
-                    'message' => 'Account Logged Out Successfully',
+                    'message' => $user->is_logged_in ? 'User logged in.' : 'User logged out.',
                 ]);
             }
 
-            $previousStatus = $user->is_active;
+            $previousStatus = (bool) $user->is_active;
+
+            // Toggle active status
             $user->is_active = !$user->is_active;
             $user->save();
 
-            if (!$previousStatus && $user->is_active) {
+            // If we are DEACTIVATING now...
+            if ($previousStatus === true && $user->is_active === false) {
+
+                $isFraud = (bool) $request->input('is_fraud', false);
+
+                if ($isFraud) {
+                    // Require a reason if fraud is true
+                    $reason = $request->input('fraud_reason');
+                    if (!$reason) {
+                        return response()->json([
+                            'ok' => false,
+                            'status' => 'error',
+                            'message' => 'Please provide a fraud reason.',
+                        ], 422);
+                    }
+
+                    \App\Models\UserFraud::create([
+                        'user_id' => $user->id,
+                        'reason' => $request->input('fraud_reason'),
+                        'details' => $request->input('fraud_details'),
+                        'reported_by' => $request->input('reported_by'),
+                        'flagged_at' => now(),
+                    ]);
+
+                    $notificationController = new NotificationController();
+                    $notificationRequest = new Request([
+                        'user_id' => $user->id,
+                        'send_push' => true,
+                    ]);
+
+                    $notificationController->notifyUserAccountFlaggedFraud($notificationRequest);
+                }
+
+                return response()->json([
+                    'ok' => true,
+                    'status' => 'success',
+                    'message' => $isFraud
+                        ? 'Account deactivated and flagged for review.'
+                        : 'Account deactivated successfully.',
+                ]);
+            }
+
+            if ($previousStatus === false && $user->is_active === true) {
                 $notificationController = new NotificationController();
                 $notificationRequest = new Request([
                     'user_id' => $user->id,
                     'send_push' => true,
                 ]);
                 $notificationController->notifyUserAccountActivated($notificationRequest);
+
+                return response()->json([
+                    'ok' => true,
+                    'status' => 'success',
+                    'message' => 'Account activated successfully.',
+                ]);
             }
 
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => $user->is_active ? 'Account Activated Successfully' : 'Account Deactivated Successfully',
+                'message' => $user->is_active ? 'Account activated successfully.' : 'Account deactivated successfully.',
             ]);
         } catch (\Throwable $th) {
             Log::debug('Account Activation Error: ' . $th->getMessage());
@@ -743,7 +803,6 @@ class AuthRepository implements AuthRepositoryInterface
                 'ok' => false,
                 'status' => 'error',
                 'message' => 'An unexpected error occurred.',
-                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -901,4 +960,3 @@ class AuthRepository implements AuthRepositoryInterface
         }
     }
 }
-
