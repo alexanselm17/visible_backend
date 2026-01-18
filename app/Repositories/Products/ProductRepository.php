@@ -445,7 +445,7 @@ class ProductRepository implements ProductRepositoryInterface
                 'send_push' => true,
             ]);
 
-            // app(NotificationController::class)->notifyAllUsers($request);
+            app(NotificationController::class)->notifyAllUsers($request);
             return response()->json([
                 'ok' => true,
                 'status' => "Success",
