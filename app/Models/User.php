@@ -277,4 +277,9 @@ class User extends Authenticatable implements FilamentUser
     return $this->hasMany(User::class, 'my_code', 'referral_code')
       ->where('id', '!=', $this->id);
   }
+
+  public function fraudFlags()
+  {
+    return $this->hasMany(UserFraud::class);
+  }
 }
