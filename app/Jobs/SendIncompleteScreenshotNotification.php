@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\User;
 use App\Models\AdvertImages;
 use App\Models\Screenshots;
+use App\Models\Notification;
 use App\Services\FirebaseService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,13 +18,14 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    private const REQUIRED_SCREENSHOTS = 2;
+    private const EXPIRY_HOURS = 24;
+    private const REMINDER_HOURS = 18;
+
     protected User $user;
     protected AdvertImages $advert;
     protected int $hoursAfterFirst;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(User $user, AdvertImages $advert, int $hoursAfterFirst)
     {
         $this->user = $user;
@@ -31,24 +33,39 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
         $this->hoursAfterFirst = $hoursAfterFirst;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         try {
-            // Check if user has already completed all 5 screenshots
-            $currentScreenshotCount = Screenshots::where('advert_id', $this->advert->id)
-                ->where('processed_by', $this->user->id)
-                ->count();
-
-            // If user has completed all 5 screenshots, don't send notification
-            if ($currentScreenshotCount >= 2) {
-                Log::info("User {$this->user->id} has completed all screenshots for advert {$this->advert->id}. Skipping reminder.");
+            // Safety: this job should only ever send at 18 hours
+            if ($this->hoursAfterFirst !== self::REMINDER_HOURS) {
+                Log::info("Skipping reminder: hoursAfterFirst={$this->hoursAfterFirst} (expected " . self::REMINDER_HOURS . ")");
                 return;
             }
 
-            // Check if campaign is still valid (within 24 hours of first upload)
+            // Prevent duplicates (queue retries, multiple schedules, etc.)
+            $alreadySent = Notification::where('user_id', $this->user->id)
+                ->where('data->action', 'incomplete_reminder')
+                ->where('data->advert_id', $this->advert->id)
+                ->where('data->hours_after_first', self::REMINDER_HOURS)
+                ->exists();
+
+            if ($alreadySent) {
+                Log::info("Reminder already sent (18h) for user {$this->user->id} advert {$this->advert->id}. Skipping.");
+                return;
+            }
+
+            // Count current screenshots
+            $currentCount = Screenshots::where('advert_id', $this->advert->id)
+                ->where('processed_by', $this->user->id)
+                ->count();
+
+            // Completed => do nothing
+            if ($currentCount >= self::REQUIRED_SCREENSHOTS) {
+                Log::info("User {$this->user->id} completed campaign for advert {$this->advert->id}. Skipping reminder.");
+                return;
+            }
+
+            // First screenshot check (also used for expiry window)
             $firstScreenshot = Screenshots::where('advert_id', $this->advert->id)
                 ->where('processed_by', $this->user->id)
                 ->orderBy('created_at', 'asc')
@@ -59,72 +76,61 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
                 return;
             }
 
-            // Check if 24 hours have passed since first upload
-            if ($firstScreenshot->created_at->addHours(24)->isPast()) {
+            // Expired (24 hours since first upload) => send expiry message (optional)
+            if ($firstScreenshot->created_at->copy()->addHours(self::EXPIRY_HOURS)->isPast()) {
                 Log::info("Campaign expired for user {$this->user->id} and advert {$this->advert->id}");
-                $this->sendExpirationNotification($currentScreenshotCount);
+                $this->sendExpirationNotification($currentCount);
                 return;
             }
 
-            // Send reminder notification
-            $this->sendReminderNotification($currentScreenshotCount);
-        } catch (\Exception $e) {
+            // Send the one and only reminder (at 18 hours)
+            $this->sendReminderNotification($currentCount);
+        } catch (\Throwable $e) {
             Log::error("Error in SendIncompleteScreenshotNotification job: " . $e->getMessage());
         }
     }
 
-    /**
-     * Send reminder notification
-     */
     private function sendReminderNotification(int $currentCount): void
     {
-        $remainingCount = 2 - $currentCount;
-        $timeLeft = $this->getTimeLeftMessage();
+        $remaining = self::REQUIRED_SCREENSHOTS - $currentCount;
 
         $title = "Complete Your Campaign! ⏰";
-        $message = "You have {$remainingCount} screenshots remaining for '{$this->advert->name}'. Please upload them after 18 hours to complete your campaign.";
+        $message = "You have {$remaining} screenshot(s) remaining for '{$this->advert->name}'. Upload to complete your campaign.";
 
         $this->sendNotification($title, $message, 'warning', [
             'advert_id' => $this->advert->id,
             'advert_name' => $this->advert->name,
             'screenshots_uploaded' => $currentCount,
-            'screenshots_remaining' => $remainingCount,
+            'screenshots_remaining' => $remaining,
+            'screenshots_required' => self::REQUIRED_SCREENSHOTS,
             'action' => 'incomplete_reminder',
-            'hours_after_first' => $this->hoursAfterFirst
+            'hours_after_first' => self::REMINDER_HOURS,
         ]);
     }
 
-    /**
-     * Send expiration notification
-     */
     private function sendExpirationNotification(int $currentCount): void
     {
         $title = "Campaign Expired 😔";
-        $message = "Unfortunately, the 24-hour window for '{$this->advert->name}' has expired. You uploaded {$currentCount} out of 5 screenshots.";
+        $message = "Unfortunately, the " . self::EXPIRY_HOURS . "-hour window for '{$this->advert->name}' has expired. You uploaded {$currentCount} out of " . self::REQUIRED_SCREENSHOTS . " screenshot(s).";
 
         $this->sendNotification($title, $message, 'error', [
             'advert_id' => $this->advert->id,
             'advert_name' => $this->advert->name,
             'screenshots_uploaded' => $currentCount,
-            'screenshots_required' => 5,
-            'action' => 'campaign_expired'
+            'screenshots_required' => self::REQUIRED_SCREENSHOTS,
+            'action' => 'campaign_expired',
         ]);
     }
 
-    /**
-     * Send notification via Firebase and store in database
-     */
     private function sendNotification(string $title, string $message, string $type, array $data): void
     {
         try {
-            // Send push notification if user has FCM token
-            if ($this->user->fcm_token) {
+            if (!empty($this->user->fcm_token)) {
                 $firebase = new FirebaseService();
                 $firebase->sendToDevice($this->user->fcm_token, $title, $message);
             }
 
-            // Store notification in database
-            \App\Models\Notification::create([
+            Notification::create([
                 'user_id' => $this->user->id,
                 'title' => $title,
                 'message' => $message,
@@ -133,24 +139,8 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
             ]);
 
             Log::info("Sent notification to user {$this->user->id} for advert {$this->advert->id}: {$title}");
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error("Failed to send notification to user {$this->user->id}: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get time left message based on hours after first upload
-     */
-    private function getTimeLeftMessage(): string
-    {
-        $hoursLeft = 24 - $this->hoursAfterFirst;
-
-        if ($hoursLeft <= 1) {
-            return "Only 1 hour left!";
-        } elseif ($hoursLeft <= 4) {
-            return "Only {$hoursLeft} hours left!";
-        } else {
-            return "You have {$hoursLeft} hours left.";
         }
     }
 }
