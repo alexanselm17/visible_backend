@@ -490,7 +490,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             if (is_null($previousScreenshot) && $allStarted >= $advert->capacity) {
                 DB::rollBack();
-                return response()->json(['ok' => false, 'message' => "Capacity already attained"], 400);
+                return response()->json(['ok' => false, 'message' => "This campaign has reached full capacity. Thank you for your interest."], 400);
             }
 
             // 18-Hour Rule
