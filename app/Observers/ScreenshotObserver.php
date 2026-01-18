@@ -8,9 +8,15 @@ use App\Models\User;
 use App\Services\FirebaseService;
 use App\Jobs\SendIncompleteScreenshotNotification;
 use Illuminate\Support\Facades\Log;
+use App\Models\Notification;
 
 class ScreenshotObserver
 {
+    /**
+     * How many screenshots are required to mark the campaign as completed
+     */
+    private const REQUIRED_SCREENSHOTS = 2;
+
     /**
      * Handle the Screenshots "created" event.
      */
@@ -26,7 +32,7 @@ class ScreenshotObserver
     {
         // Get the advert and user
         $advert = $screenshot->advert ?? AdvertImages::find($screenshot->advert_id);
-        $user = $screenshot->user ?? User::find($screenshot->processed_by);
+        $user   = $screenshot->user ?? User::find($screenshot->processed_by);
 
         if (!$advert || !$user) {
             return;
@@ -37,20 +43,22 @@ class ScreenshotObserver
             ->where('processed_by', $user->id)
             ->count();
 
-        // Get the first screenshot timestamp for this user and advert
-        $firstScreenshot = Screenshots::where('advert_id', $advert->id)
-            ->where('processed_by', $user->id)
-            ->orderBy('created_at', 'asc')
-            ->first();
-
         // If this is the first screenshot, schedule reminder notifications
+        // (Use current $screenshot as the first timestamp to avoid extra query)
         if ($totalScreenshots === 1) {
-            $this->scheduleReminderNotifications($user, $advert, $firstScreenshot);
+            $this->scheduleReminderNotifications($user, $advert, $screenshot);
         }
 
-        // If user has completed all 5 screenshots, send completion notification
-        if ($totalScreenshots === 5) {
-            $this->sendCompletionNotification($user, $advert);
+        // If user has completed all required screenshots, send completion notification once
+        if ($totalScreenshots >= self::REQUIRED_SCREENSHOTS) {
+            $alreadySent = Notification::where('user_id', $user->id)
+                ->where('data->action', 'campaign_completed')
+                ->where('data->advert_id', $advert->id)
+                ->exists();
+
+            if (!$alreadySent) {
+                $this->sendCompletionNotification($user, $advert);
+            }
         }
     }
 
@@ -59,13 +67,13 @@ class ScreenshotObserver
      */
     private function scheduleReminderNotifications(User $user, AdvertImages $advert, Screenshots $firstScreenshot): void
     {
-        // Schedule notifications at different intervals
         $reminderIntervals = [
-            18 => '18 hours', 
+            18 => '18 hours',
         ];
 
         foreach ($reminderIntervals as $hours => $description) {
-            $scheduledTime = $firstScreenshot->created_at->addHours($hours);
+            // IMPORTANT: copy() to avoid mutating created_at
+            $scheduledTime = $firstScreenshot->created_at->copy()->addHours($hours);
 
             // Only schedule if the time hasn't passed yet
             if ($scheduledTime->isFuture()) {
@@ -78,7 +86,7 @@ class ScreenshotObserver
     }
 
     /**
-     * Send completion notification when user uploads all 5 screenshots
+     * Send completion notification when user uploads all required screenshots
      */
     private function sendCompletionNotification(User $user, AdvertImages $advert): void
     {
@@ -86,15 +94,13 @@ class ScreenshotObserver
             $firebase = new FirebaseService();
 
             $title = "Campaign Completed! 🎉";
-            $message = "Congratulations! You've successfully uploaded all 5 screenshots for '{$advert->name}'. Your reward is being processed.";
+            $message = "Congratulations! You've successfully uploaded all screenshots for '{$advert->name}'. Your reward is being processed.";
 
-            // Send push notification if user has FCM token
-            if ($user->fcm_token) {
+            if (!empty($user->fcm_token)) {
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             }
 
-            // Store in database
-            \App\Models\Notification::create([
+            Notification::create([
                 'user_id' => $user->id,
                 'title' => $title,
                 'message' => $message,
@@ -103,12 +109,13 @@ class ScreenshotObserver
                     'advert_id' => $advert->id,
                     'advert_name' => $advert->name,
                     'reward' => $advert->reward,
-                    'action' => 'campaign_completed'
+                    'action' => 'campaign_completed',
+                    'required_screenshots' => self::REQUIRED_SCREENSHOTS,
                 ],
             ]);
 
             Log::info("Sent completion notification to user {$user->id} for advert {$advert->id}");
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error("Failed to send completion notification to user {$user->id}: " . $e->getMessage());
         }
     }
