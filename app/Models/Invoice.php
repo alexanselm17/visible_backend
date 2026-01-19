@@ -21,12 +21,12 @@ class Invoice extends Model
     'banking',
   ];
 
-// App\Models\Invoice.php
+  // App\Models\Invoice.php
 
-public function processedByUser()
-{
+  public function processedByUser()
+  {
     return $this->belongsTo(User::class, 'processed_by');
-}
+  }
 
 
 

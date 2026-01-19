@@ -113,8 +113,8 @@ class ScreenshotsResource extends Resource
                             ->label('')
                             ->modalHeading('Preview Image')
                             ->modalWidth('sm')
-                            ->modalSubmitAction(false)   // 🔴 removes "Submit"
-                            ->modalCancelAction(false)   // 🔴 removes "Cancel"
+                            ->modalSubmitAction(false)
+                            ->modalCancelAction(false)
                             ->modalContent(
                                 fn($record) =>
                                 view('filament.components.image-preview', [
