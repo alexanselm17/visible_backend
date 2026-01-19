@@ -28,7 +28,7 @@ Route::group(['prefix' => 'v1'], function () {
     Route::get('/download/advert/{path}', function ($path) {
         $fullPath = public_path("storage/" . $path);
 
-        
+
         if (!file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
@@ -139,11 +139,6 @@ Route::group(['prefix' => 'v1'], function () {
 
 
         Route::group(['prefix' => 'customers'], function () {
-
-
-
-
-
             Route::get('/{petrolStationId}', [CustomersController::class, 'fetchCustomers']);
             Route::get('/{petrolStationId}/search', [CustomersController::class, 'searchCustomers']);
         });
@@ -155,7 +150,6 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
             Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
             Route::delete('/delete', [NotificationController::class, 'deleteNotification']);
-            // Statistics
             Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
         });
     });
