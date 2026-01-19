@@ -1085,19 +1085,20 @@ class ProductRepository implements ProductRepositoryInterface
 
             // ======= Top Earners (by views) =======
             $topEarners = Screenshots::query()
-                ->whereIn('advert_id', $advertIds)
-                ->whereBetween('created_at', [$start, $end])
+                ->whereIn('screenshots.advert_id', $advertIds)
+                ->whereBetween('screenshots.created_at', [$start, $end])
                 ->leftJoin('users', 'users.id', '=', 'screenshots.processed_by')
                 ->selectRaw('
-                screenshots.processed_by as user_id,
-                users.fullname as name,
-                COUNT(*) as screenshots_count,
-                COALESCE(SUM(screenshots.views),0) as views_sum
-            ')
+        screenshots.processed_by as user_id,
+        users.fullname as name,
+        COUNT(*) as screenshots_count,
+        COALESCE(SUM(screenshots.views),0) as views_sum
+    ')
                 ->groupBy('screenshots.processed_by', 'users.fullname')
                 ->orderByDesc('views_sum')
                 ->limit(5)
                 ->get();
+
 
             // Trends
             $screenshotsByDay = Screenshots::query()
