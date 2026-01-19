@@ -13,14 +13,10 @@ class Campaign extends Model
 
     protected $fillable = [
         'name',
-       
+
     ];
 
-    protected $casts = [
-        'valid_until' => 'datetime',
-        'capital_invested' => 'decimal:2',
-        'reward' => 'decimal:2',
-    ];
+
 
     protected $keyType = 'string';
     public $incrementing = false;

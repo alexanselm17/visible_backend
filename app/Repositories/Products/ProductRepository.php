@@ -919,6 +919,8 @@ class ProductRepository implements ProductRepositoryInterface
 
 
 
+
+
     public function getAdminDashboardData(Request $request)
     {
         try {
@@ -927,142 +929,189 @@ class ProductRepository implements ProductRepositoryInterface
             $now = Carbon::now('Africa/Nairobi');
             [$start, $end] = $this->resolveTimeRange($timeQuery, $now);
 
-            // 1) Campaigns in range (created within range)
+            // Campaigns created in range
             $campaigns = Campaign::query()
-                ->with(['adverts']) // load adverts once
                 ->whereBetween('created_at', [$start, $end])
                 ->get();
 
             $campaignIds = $campaigns->pluck('id');
 
-            // 2) Adverts for those campaigns (single query)
+            // Adverts for those campaigns (or if you want ALL adverts regardless of campaign created date,
+            // remove whereIn(campaign_id, $campaignIds) and instead use created_at range on advert_images)
             $adverts = AdvertImages::query()
                 ->whereIn('campaign_id', $campaignIds)
                 ->get();
 
             $advertIds = $adverts->pluck('id');
 
-            // 3) Screenshots in range (single query)
-            $screenshotsAgg = Screenshots::query()
+            // If no campaigns/adverts in range, return empty-safe structure
+            if ($advertIds->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Admin dashboard data fetched successfully',
+                    'meta' => [
+                        'time_filter' => $timeQuery,
+                        'timezone' => 'Africa/Nairobi',
+                        'start' => $start->toDateTimeString(),
+                        'end' => $end->toDateTimeString(),
+                    ],
+                    'kpis' => [
+                        'campaigns_created' => (int) $campaigns->count(),
+                        'adverts_created' => 0,
+                        'active_adverts' => 0,
+                        'expired_adverts' => 0,
+                        'total_capacity' => 0,
+                        'total_capital_invested' => 0,
+                        'screenshots_submitted' => 0,
+                        'total_views' => 0,
+                        'unique_earners' => 0,
+                        'rewards_earned' => 0,
+                        'payments_done' => 0,
+                        'pending_balance_latest' => 0,
+                    ],
+                    'top_lists' => [
+                        'campaigns' => [],
+                        'adverts' => [],
+                        'earners' => [],
+                    ],
+                    'trends' => [
+                        'screenshots_by_day' => [],
+                        'views_by_day' => [],
+                        'payments_by_day' => [],
+                    ],
+                ]);
+            }
+
+            // Active/Expired adverts (status by expiry)
+            $activeAdverts = $adverts->where('valid_until', '>=', $now)->count();
+            $expiredAdverts = $adverts->where('valid_until', '<', $now)->count();
+
+            // Capacity + invested (from adverts)
+            $totalCapacity = (int) $adverts->sum('capacity');
+            $totalInvested = (float) $adverts->sum('capital_invested');
+
+            // Screenshots aggregates in range
+            $screensAgg = Screenshots::query()
                 ->whereIn('advert_id', $advertIds)
                 ->whereBetween('created_at', [$start, $end])
                 ->selectRaw('COUNT(*) as screenshots_count, COALESCE(SUM(views),0) as views_sum, COUNT(DISTINCT processed_by) as unique_earners')
                 ->first();
 
-            // 4) Payments + rewards in range (single query)
+            // Payments + rewards in range
             $paymentsDone = Invoice::query()
                 ->whereIn('advert_id', $advertIds)
                 ->whereBetween('created_at', [$start, $end])
                 ->where('type', 'Payment')
                 ->sum('amount');
 
+            // If you have a Reward type, change this to ->where('type','Reward')
             $rewardsEarned = Invoice::query()
                 ->whereIn('advert_id', $advertIds)
                 ->whereBetween('created_at', [$start, $end])
-                ->where('type', '!=', 'Payment') // adjust if you have a specific "Reward" type
+                ->where('type', '!=', 'Payment')
                 ->sum('amount');
 
-            // 5) Latest customer balance per processed_by (latest invoice per user)
-            // If "pending balance" is meant as latest customer_balance per processed_by:
+            // Pending balance (latest invoice per processed_by)
             $latestInvoiceIds = Invoice::query()
                 ->selectRaw('MAX(id) as id')
                 ->groupBy('processed_by');
 
-            $pendingBalanceLatest = Invoice::query()
+            $pendingBalanceLatest = (float) Invoice::query()
                 ->whereIn('id', $latestInvoiceIds)
                 ->sum('customer_balance');
 
-            // 6) Capacity + slot usage logic (define clearly!)
-            // Assuming capacity is stored per advert (advert_images.capacity):
-            $totalCapacity = (int) $adverts->sum('capacity');
-
-            // Define "slots used" based on completion + ongoing (you can refine rules)
-            // Example: completed adverts = adverts with >=1 invoice in range
-            $completedAdvertIds = Invoice::query()
-                ->whereIn('advert_id', $advertIds)
-                ->whereBetween('created_at', [$start, $end])
-                ->distinct()
-                ->pluck('advert_id');
-
-            $completedCount = $completedAdvertIds->count();
-
-            // Example ongoing = adverts with screenshots in range but no invoice in range
-            $ongoingAdvertIds = Screenshots::query()
-                ->whereIn('advert_id', $advertIds)
-                ->whereBetween('created_at', [$start, $end])
-                ->distinct()
-                ->pluck('advert_id')
-                ->diff($completedAdvertIds);
-
-            $ongoingCount = $ongoingAdvertIds->count();
-
-            $slotsUsed = $completedCount + $ongoingCount;
-            $slotsUnused = max(0, $totalCapacity - $slotsUsed);
-
-            // 7) Top campaigns table (compute per campaign from aggregates)
-            // Aggregate per campaign using DB (fast and clean)
-            $campaignCompletionAgg = AdvertImages::query()
-                ->whereIn('campaign_id', $campaignIds)
-                ->leftJoin('invoices', function ($join) use ($start, $end) {
-                    $join->on('invoices.advert_id', '=', 'advert_images.id')
-                        ->whereBetween('invoices.created_at', [$start, $end]);
-                })
+            // ======= Top Campaigns table (fast aggregation) =======
+            $campaignAgg = AdvertImages::query()
+                ->whereIn('advert_images.campaign_id', $campaignIds)
                 ->leftJoin('screenshots', function ($join) use ($start, $end) {
                     $join->on('screenshots.advert_id', '=', 'advert_images.id')
                         ->whereBetween('screenshots.created_at', [$start, $end]);
                 })
+                ->leftJoin('invoices', function ($join) use ($start, $end) {
+                    $join->on('invoices.advert_id', '=', 'advert_images.id')
+                        ->whereBetween('invoices.created_at', [$start, $end]);
+                })
                 ->selectRaw('
-                advert_images.campaign_id as campaign_id,
+                advert_images.campaign_id,
                 COUNT(DISTINCT advert_images.id) as adverts_count,
                 COALESCE(SUM(advert_images.capacity),0) as capacity_sum,
-                COUNT(DISTINCT CASE WHEN invoices.id IS NOT NULL THEN advert_images.id END) as completed,
-                COUNT(DISTINCT CASE WHEN invoices.id IS NULL AND screenshots.id IS NOT NULL THEN advert_images.id END) as ongoing,
-                COUNT(screenshots.id) as screenshots_count,
+                COALESCE(SUM(advert_images.capital_invested),0) as invested_sum,
                 COALESCE(SUM(screenshots.views),0) as views_sum,
-                COALESCE(SUM(CASE WHEN invoices.type = "Payment" THEN invoices.amount ELSE 0 END),0) as payments_done,
-                COALESCE(SUM(CASE WHEN invoices.type != "Payment" THEN invoices.amount ELSE 0 END),0) as rewards_earned
+                COUNT(screenshots.id) as screenshots_count,
+                COALESCE(SUM(CASE WHEN invoices.type = "Payment" THEN invoices.amount ELSE 0 END),0) as payments_sum,
+                COALESCE(SUM(CASE WHEN invoices.type != "Payment" THEN invoices.amount ELSE 0 END),0) as rewards_sum
             ')
                 ->groupBy('advert_images.campaign_id')
                 ->get()
                 ->keyBy('campaign_id');
 
-            $campaignStats = $campaigns->map(function ($c) use ($campaignCompletionAgg) {
-                $agg = $campaignCompletionAgg->get($c->id);
+            $topCampaigns = $campaigns->map(function ($c) use ($campaignAgg) {
+                $a = $campaignAgg->get($c->id);
 
                 return [
                     'id' => $c->id,
                     'name' => $c->name,
-                    'valid_until' => optional($c->valid_until)->toDateTimeString(),
-                    'adverts_created' => (int) ($agg->adverts_count ?? 0),
-                    'capacity' => (int) ($agg->capacity_sum ?? 0),
-                    'completed' => (int) ($agg->completed ?? 0),
-                    'ongoing' => (int) ($agg->ongoing ?? 0),
-                    'screenshots' => (int) ($agg->screenshots_count ?? 0),
-                    'views' => (int) ($agg->views_sum ?? 0),
-                    'rewards_earned' => (float) ($agg->rewards_earned ?? 0),
-                    'payments_done' => (float) ($agg->payments_done ?? 0),
-                    'slots_used' => (int) (($agg->completed ?? 0) + ($agg->ongoing ?? 0)),
-                    'slots_unused' => max(0, (int) ($agg->capacity_sum ?? 0) - (int)(($agg->completed ?? 0) + ($agg->ongoing ?? 0))),
+                    'adverts_created' => (int) ($a->adverts_count ?? 0),
+                    'capacity' => (int) ($a->capacity_sum ?? 0),
+                    'capital_invested' => (float) ($a->invested_sum ?? 0),
+                    'screenshots' => (int) ($a->screenshots_count ?? 0),
+                    'views' => (int) ($a->views_sum ?? 0),
+                    'payments_done' => (float) ($a->payments_sum ?? 0),
+                    'rewards_earned' => (float) ($a->rewards_sum ?? 0),
                 ];
-            });
+            })->sortByDesc('views')->take(5)->values();
 
-            $topCampaigns = $campaignStats->sortByDesc('completed')->take(5)->values();
+            // ======= Top Adverts (by views) =======
+            $topAdverts = AdvertImages::query()
+                ->whereIn('advert_images.id', $advertIds)
+                ->leftJoin('screenshots', function ($join) use ($start, $end) {
+                    $join->on('screenshots.advert_id', '=', 'advert_images.id')
+                        ->whereBetween('screenshots.created_at', [$start, $end]);
+                })
+                ->selectRaw('
+                advert_images.id,
+                advert_images.name,
+                advert_images.campaign_id,
+                advert_images.capacity,
+                advert_images.reward,
+                advert_images.valid_until,
+                COUNT(screenshots.id) as screenshots_count,
+                COALESCE(SUM(screenshots.views),0) as views_sum
+            ')
+                ->groupBy('advert_images.id', 'advert_images.name', 'advert_images.campaign_id', 'advert_images.capacity', 'advert_images.reward', 'advert_images.valid_until')
+                ->orderByDesc('views_sum')
+                ->limit(5)
+                ->get();
 
-            // 8) Trends (simple daily buckets)
+            // ======= Top Earners (by views) =======
+            $topEarners = Screenshots::query()
+                ->whereIn('advert_id', $advertIds)
+                ->whereBetween('created_at', [$start, $end])
+                ->leftJoin('users', 'users.id', '=', 'screenshots.processed_by')
+                ->selectRaw('
+                screenshots.processed_by as user_id,
+                users.fullname as name,
+                COUNT(*) as screenshots_count,
+                COALESCE(SUM(screenshots.views),0) as views_sum
+            ')
+                ->groupBy('screenshots.processed_by', 'users.fullname')
+                ->orderByDesc('views_sum')
+                ->limit(5)
+                ->get();
+
+            // Trends
             $screenshotsByDay = Screenshots::query()
                 ->whereIn('advert_id', $advertIds)
                 ->whereBetween('created_at', [$start, $end])
                 ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
-                ->groupBy('date')
-                ->orderBy('date')
+                ->groupBy('date')->orderBy('date')
                 ->get();
 
             $viewsByDay = Screenshots::query()
                 ->whereIn('advert_id', $advertIds)
                 ->whereBetween('created_at', [$start, $end])
                 ->selectRaw('DATE(created_at) as date, COALESCE(SUM(views),0) as views')
-                ->groupBy('date')
-                ->orderBy('date')
+                ->groupBy('date')->orderBy('date')
                 ->get();
 
             $paymentsByDay = Invoice::query()
@@ -1070,22 +1119,13 @@ class ProductRepository implements ProductRepositoryInterface
                 ->whereBetween('created_at', [$start, $end])
                 ->where('type', 'Payment')
                 ->selectRaw('DATE(created_at) as date, COALESCE(SUM(amount),0) as amount')
-                ->groupBy('date')
-                ->orderBy('date')
+                ->groupBy('date')->orderBy('date')
                 ->get();
 
-            // 9) Users overview
+            // Users overview (optional)
             $totalUsers = User::count();
             $salesmen = User::leftJoin('roles', 'roles.id', '=', 'users.role_id')
                 ->where('roles.slug', 'salesman')
-                ->count();
-
-            $admins = User::leftJoin('roles', 'roles.id', '=', 'users.role_id')
-                ->where('roles.slug', 'admin')
-                ->count();
-
-            $managers = User::leftJoin('roles', 'roles.id', '=', 'users.role_id')
-                ->where('roles.slug', 'manager')
                 ->count();
 
             return response()->json([
@@ -1100,43 +1140,34 @@ class ProductRepository implements ProductRepositoryInterface
                 'kpis' => [
                     'campaigns_created' => (int) $campaigns->count(),
                     'adverts_created' => (int) $adverts->count(),
-                    'total_capacity' => (int) $totalCapacity,
-                    'slots_used' => (int) $slotsUsed,
-                    'slots_unused' => (int) $slotsUnused,
+                    'active_adverts' => (int) $activeAdverts,
+                    'expired_adverts' => (int) $expiredAdverts,
 
-                    'screenshots_submitted' => (int) ($screenshotsAgg->screenshots_count ?? 0),
-                    'total_views' => (int) ($screenshotsAgg->views_sum ?? 0),
-                    'unique_earners' => (int) ($screenshotsAgg->unique_earners ?? 0),
+                    'total_capacity' => (int) $totalCapacity,
+                    'total_capital_invested' => (float) $totalInvested,
+
+                    'screenshots_submitted' => (int) ($screensAgg->screenshots_count ?? 0),
+                    'total_views' => (int) ($screensAgg->views_sum ?? 0),
+                    'unique_earners' => (int) ($screensAgg->unique_earners ?? 0),
 
                     'rewards_earned' => (float) $rewardsEarned,
                     'payments_done' => (float) $paymentsDone,
                     'pending_balance_latest' => (float) $pendingBalanceLatest,
                 ],
-                'status_breakdown' => [
-                    'adverts' => [
-                        'completed' => (int) $completedCount,
-                        'ongoing' => (int) $ongoingCount,
-                        'inactive_or_expired' => max(0, (int) $adverts->count() - ((int)$completedCount + (int)$ongoingCount)),
-                    ],
-                    'campaigns' => [
-                        'active' => (int) Campaign::where('valid_until', '>=', $now)->count(),
-                        'expired' => (int) Campaign::where('valid_until', '<', $now)->count(),
-                    ],
+                'top_lists' => [
+                    'campaigns_by_views' => $topCampaigns,
+                    'adverts_by_views' => $topAdverts,
+                    'earners_by_views' => $topEarners,
                 ],
                 'trends' => [
                     'screenshots_by_day' => $screenshotsByDay,
                     'views_by_day' => $viewsByDay,
                     'payments_by_day' => $paymentsByDay,
                 ],
-                'top_lists' => [
-                    'campaigns_by_completion' => $topCampaigns,
-                ],
                 'system_overview' => [
                     'users' => [
                         'total' => (int) $totalUsers,
                         'salesmen' => (int) $salesmen,
-                        'admins' => (int) $admins,
-                        'managers' => (int) $managers,
                     ],
                 ],
             ]);
@@ -1170,6 +1201,7 @@ class ProductRepository implements ProductRepositoryInterface
 
         return [$start, $now->copy()];
     }
+
 
     public function getCampaignReports(Request $request)
     {
