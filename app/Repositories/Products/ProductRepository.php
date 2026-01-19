@@ -929,18 +929,18 @@ class ProductRepository implements ProductRepositoryInterface
             $now = Carbon::now('Africa/Nairobi');
             [$start, $end] = $this->resolveTimeRange($timeQuery, $now);
 
-            // Campaigns created in range
-            $campaigns = Campaign::query()
-                ->whereBetween('created_at', [$start, $end])
-                ->get();
+            $advertIds = Screenshots::query()
+                ->whereBetween('screenshots.created_at', [$start, $end])
+                ->distinct()
+                ->pluck('screenshots.advert_id');
 
-            $campaignIds = $campaigns->pluck('id');
-
-            // Adverts for those campaigns (or if you want ALL adverts regardless of campaign created date,
-            // remove whereIn(campaign_id, $campaignIds) and instead use created_at range on advert_images)
             $adverts = AdvertImages::query()
-                ->whereIn('campaign_id', $campaignIds)
+                ->whereIn('id', $advertIds)
                 ->get();
+
+            $campaignIds = $adverts->pluck('campaign_id')->unique();
+            $campaigns = Campaign::whereIn('id', $campaignIds)->get();
+
 
             $advertIds = $adverts->pluck('id');
 
