@@ -8,21 +8,17 @@ use Illuminate\Support\Facades\URL;
 
 class AdminFraudController extends Controller
 {
-
-
+    /**
+     * Build a unique hash for a fraud group (campaign + advert + pattern).
+     */
     private function fraudHash($campaignId, $advertId, $patternKey): string
     {
         return sha1($campaignId . '|' . $advertId . '|' . $patternKey);
     }
 
-    private function isReviewed(string $patternHash): bool
-    {
-        return DB::table('fraud_reviews')
-            ->where('pattern_hash', $patternHash)
-            ->exists();
-    }
-
-
+    /**
+     * Prefetch reviewed hashes for a campaign (so reviewed groups never appear again).
+     */
     private function reviewedHashesForCampaign($campaignId): array
     {
         return DB::table('fraud_reviews')
@@ -31,25 +27,30 @@ class AdminFraudController extends Controller
             ->toArray();
     }
 
-
+    /**
+     * GET /v1/admin/fraud/campaign/{campaignId}?min_views=10
+     * Returns UNREVIEWED fraud candidates for one campaign.
+     * ✅ FULLY UPDATED: now includes campaign_id inside each fraud group.
+     * ✅ Shows names (fullname) in details.
+     */
     public function getFraudForCampaign(Request $request, $campaignId)
     {
         try {
             $minViews = (int) $request->query('min_views', 10);
 
-            // 1) Get adverts for campaign
+            // adverts under this campaign
             $advertIds = DB::table('advert_images')
                 ->where('campaign_id', $campaignId)
                 ->pluck('id');
 
             if ($advertIds->isEmpty()) {
                 return response()->json([
-                    'campaign_id' => $campaignId,
+                    'campaign_id' => (string) $campaignId,
                     'fraud_groups' => [],
                 ]);
             }
 
-            // 2) Fetch screenshots for those adverts
+            // screenshots for these adverts
             $screenshots = DB::table('screenshots')
                 ->whereIn('advert_id', $advertIds)
                 ->where('views', '>', $minViews)
@@ -57,63 +58,68 @@ class AdminFraudController extends Controller
 
             if ($screenshots->isEmpty()) {
                 return response()->json([
-                    'campaign_id' => $campaignId,
+                    'campaign_id' => (string) $campaignId,
                     'fraud_groups' => [],
                 ]);
             }
 
-            // 3) Prefetch names
+            // Prefetch user names once
             $userIds = $screenshots->pluck('processed_by')->unique()->values();
             $usersMap = DB::table('users')
                 ->whereIn('id', $userIds)
                 ->pluck('fullname', 'id'); // [id => fullname]
 
-            // 4) Prefetch reviewed hashes for this campaign
+            // Prefetch reviewed hashes once (fast filtering)
             $reviewed = array_flip($this->reviewedHashesForCampaign($campaignId));
 
             $fraudGroups = [];
 
-            // 5) For each advert, group by pattern views_timestamp
             foreach ($advertIds as $advertId) {
                 $shotsForAdvert = $screenshots->where('advert_id', $advertId)->values();
                 if ($shotsForAdvert->isEmpty()) continue;
 
+                // Group by views + timestamp
                 $patterns = [];
 
                 foreach ($shotsForAdvert as $s) {
                     $patternKey = "{$s->views}_{$s->timestamp}";
+
                     $patterns[$patternKey][] = [
-                        'user_id' => $s->processed_by,
+                        'user_id' => (string) $s->processed_by,
                         'name' => $usersMap[$s->processed_by] ?? null,
                         'views' => (int) $s->views,
-                        'timestamp' => $s->timestamp,
-                        'number' => $s->number,
+                        'timestamp' => (string) $s->timestamp,
+                        'number' => isset($s->number) ? (int) $s->number : null,
                         'url' => URL::to('storage/' . $s->screenshot),
                     ];
                 }
 
+                // Create fraud groups for patterns shared by 2+ users
                 foreach ($patterns as $patternKey => $grouped) {
                     $uniqueUsers = collect($grouped)->pluck('user_id')->unique()->values();
 
-                    // suspicious only if >= 2 different users
-                    if ($uniqueUsers->count() < 2) continue;
+                    if ($uniqueUsers->count() < 2) {
+                        continue;
+                    }
 
-                    // exclude reviewed
+                    // Skip already-reviewed groups
                     $hash = $this->fraudHash($campaignId, $advertId, $patternKey);
-                    if (isset($reviewed[$hash])) continue;
+                    if (isset($reviewed[$hash])) {
+                        continue;
+                    }
 
                     $fraudGroups[] = [
-                        'campaign_id' => $campaignId,
-                        'advert_id' => $advertId,
-                        'matching_views_timestamp' => $patternKey,
+                        'campaign_id' => (string) $campaignId,          // ✅ ADDED HERE
+                        'advert_id' => (string) $advertId,
+                        'matching_views_timestamp' => (string) $patternKey,
                         'users' => $uniqueUsers,
-                        'details' => $grouped, // contains urls for preview
+                        'details' => $grouped,
                     ];
                 }
             }
 
             return response()->json([
-                'campaign_id' => $campaignId,
+                'campaign_id' => (string) $campaignId,
                 'fraud_groups' => $fraudGroups,
             ]);
         } catch (\Throwable $th) {
@@ -124,15 +130,19 @@ class AdminFraudController extends Controller
         }
     }
 
-    /* =========================================================
-       STEP 3B) GET fraud candidates for ALL campaigns (UNREVIEWED)
-       Endpoint: GET /api/admin/fraud/campaigns?min_views=10&only_with_fraud=1
-       ========================================================= */
+    /**
+     * GET /v1/admin/fraud/campaigns?min_views=10&only_with_fraud=true
+     * Returns UNREVIEWED fraud candidates for ALL campaigns.
+     * ✅ Automatically includes campaign_id in each fraud group because getFraudForCampaign does.
+     */
     public function getFraudForAllCampaigns(Request $request)
     {
         try {
             $minViews = (int) $request->query('min_views', 10);
-            $onlyWithFraud = filter_var($request->query('only_with_fraud', true), FILTER_VALIDATE_BOOLEAN);
+            $onlyWithFraud = filter_var(
+                $request->query('only_with_fraud', true),
+                FILTER_VALIDATE_BOOLEAN
+            );
 
             $campaigns = DB::table('campaigns')
                 ->select('id', 'name', 'created_at')
@@ -142,7 +152,7 @@ class AdminFraudController extends Controller
             $out = [];
 
             foreach ($campaigns as $c) {
-                // Reuse the logic by calling getFraudForCampaign() directly
+                // Reuse logic by calling getFraudForCampaign() directly
                 $fakeReq = new Request(['min_views' => $minViews]);
 
                 $data = $this->getFraudForCampaign($fakeReq, $c->id)->getData(true);
@@ -153,7 +163,7 @@ class AdminFraudController extends Controller
                 }
 
                 $out[] = [
-                    'campaign_id' => $c->id,
+                    'campaign_id' => (string) $c->id,
                     'campaign_name' => $c->name ?? null,
                     'fraud_groups_count' => count($fraudGroups),
                     'fraud_groups' => $fraudGroups,
@@ -172,12 +182,21 @@ class AdminFraudController extends Controller
         }
     }
 
-    /* =========================================================
-       STEP 3C) POST admin review (CONFIRMED/REJECTED)
-       Endpoint: POST /api/admin/fraud/review
-       Body must include fraud_payload (the whole group)
-       After this, that group will NEVER appear again.
-       ========================================================= */
+    /**
+     * POST /v1/admin/fraud/review
+     * Body:
+     * {
+     *   "campaign_id": "...",
+     *   "advert_id": "...",
+     *   "pattern_key": "...",
+     *   "status": "CONFIRMED" | "REJECTED",
+     *   "fraud_payload": { ... full fraud group json ... },
+     *   "notes": "optional",
+     *   "reviewed_by": "optional admin uuid"
+     * }
+     *
+     * Stores review decision in fraud_reviews so it never appears again.
+     */
     public function reviewFraudGroup(Request $request)
     {
         try {
@@ -191,7 +210,11 @@ class AdminFraudController extends Controller
                 'reviewed_by' => 'nullable|string',
             ]);
 
-            $hash = $this->fraudHash($data['campaign_id'], $data['advert_id'], $data['pattern_key']);
+            $hash = $this->fraudHash(
+                $data['campaign_id'],
+                $data['advert_id'],
+                $data['pattern_key']
+            );
 
             DB::table('fraud_reviews')->updateOrInsert(
                 ['pattern_hash' => $hash],
@@ -212,7 +235,7 @@ class AdminFraudController extends Controller
 
             return response()->json([
                 'ok' => true,
-                'message' => 'Review saved. This group will not appear again in fraud endpoints.',
+                'message' => 'Review saved. This group will not appear again.',
                 'pattern_hash' => $hash,
             ]);
         } catch (\Throwable $th) {
@@ -223,14 +246,14 @@ class AdminFraudController extends Controller
         }
     }
 
-    /* =========================================================
-       STEP 3D) OPTIONAL: list review history
-       Endpoint: GET /api/admin/fraud/reviews?status=CONFIRMED|REJECTED
-       ========================================================= */
+    /**
+     * Optional: GET /v1/admin/fraud/reviews?status=CONFIRMED|REJECTED
+     * Returns history of reviewed items.
+     */
     public function listReviews(Request $request)
     {
         try {
-            $status = $request->query('status');
+            $status = $request->query('status'); // optional
             $perPage = (int) $request->query('per_page', 50);
 
             $q = DB::table('fraud_reviews')
@@ -242,6 +265,7 @@ class AdminFraudController extends Controller
 
             $rows = $q->paginate($perPage);
 
+            // decode payload (optional convenience)
             $rows->getCollection()->transform(function ($r) {
                 $r->fraud_payload = json_decode($r->fraud_payload, true);
                 return $r;
