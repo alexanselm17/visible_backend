@@ -188,21 +188,8 @@ class AdminFraudController extends Controller
         }
     }
 
-    /**
-     * POST /v1/admin/fraud/review
-     * Body:
-     * {
-     *   "campaign_id": "...",
-     *   "advert_id": "...",
-     *   "pattern_key": "...",
-     *   "status": "CONFIRMED" | "REJECTED",
-     *   "fraud_payload": { ... full fraud group json ... },
-     *   "notes": "optional",
-     *   "reviewed_by": "optional admin uuid"
-     * }
-     *
-     * Stores review decision in fraud_reviews so it never appears again.
-     */
+
+
     public function reviewFraudGroup(Request $request)
     {
         try {
@@ -252,10 +239,7 @@ class AdminFraudController extends Controller
         }
     }
 
-    /**
-     * Optional: GET /v1/admin/fraud/reviews?status=CONFIRMED|REJECTED
-     * Returns history of reviewed items.
-     */
+
     public function listReviews(Request $request)
     {
         try {
@@ -278,6 +262,159 @@ class AdminFraudController extends Controller
             });
 
             return response()->json($rows);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getGuiltyFraudUsers(Request $request)
+    {
+        try {
+            $campaignId = $request->query('campaign_id'); // optional filter
+            $limitReviews = (int) $request->query('limit_reviews', 500); // safety limit
+
+            // 1) Get confirmed fraud reviews
+            $q = DB::table('fraud_reviews')
+                ->select('campaign_id', 'advert_id', 'pattern_key', 'fraud_payload', 'reviewed_at')
+                ->where('status', 'CONFIRMED')
+                ->orderByDesc('reviewed_at')
+                ->limit($limitReviews);
+
+            if ($campaignId) {
+                $q->where('campaign_id', $campaignId);
+            }
+
+            $reviews = $q->get();
+
+            if ($reviews->isEmpty()) {
+                return response()->json([
+                    'guilty_users_count' => 0,
+                    'guilty_users' => [],
+                ]);
+            }
+
+            // 2) Prefetch campaign names + advert names (1 query each)
+            $campaignIds = $reviews->pluck('campaign_id')->unique()->values();
+            $advertIds = $reviews->pluck('advert_id')->unique()->values();
+
+            $campaignMap = DB::table('campaigns')
+                ->whereIn('id', $campaignIds)
+                ->pluck('name', 'id'); // [id => name]
+
+            $advertMap = DB::table('advert_images')
+                ->whereIn('id', $advertIds)
+                ->pluck('name', 'id'); // CHANGE 'name' if needed
+
+            // 3) Aggregate per-user
+            $users = []; // user_id => data
+
+            foreach ($reviews as $r) {
+                $payload = json_decode($r->fraud_payload, true);
+                if (!is_array($payload)) continue;
+
+                $details = $payload['details'] ?? [];
+                if (!is_array($details)) continue;
+
+                $cid = (string) $r->campaign_id;
+                $aid = (string) $r->advert_id;
+
+                $campaignName = $campaignMap[$cid] ?? null;
+                $advertName = $advertMap[$aid] ?? ($payload['advert_name'] ?? null);
+
+                // Count group once per unique user in this review
+                $uniqueUserIds = collect($details)->pluck('user_id')->unique()->values();
+
+                foreach ($uniqueUserIds as $uid) {
+                    $uid = (string) $uid;
+
+                    // Find a name from details for this user
+                    $firstMatch = collect($details)->firstWhere('user_id', $uid);
+                    $userName = is_array($firstMatch) ? ($firstMatch['name'] ?? null) : null;
+
+                    if (!isset($users[$uid])) {
+                        $users[$uid] = [
+                            'user_id' => $uid,
+                            'name' => $userName,
+                            'confirmed_groups_count' => 0,
+                            'campaigns' => [], // [{campaign_id, campaign_name, count}]
+                            'adverts' => [],   // [{advert_id, advert_name, count}]
+                            'last_confirmed_at' => $r->reviewed_at,
+                            'sample_evidence' => [], // up to 5 urls
+                        ];
+                    }
+
+                    if (!$users[$uid]['name'] && $userName) {
+                        $users[$uid]['name'] = $userName;
+                    }
+
+                    // Increase group count
+                    $users[$uid]['confirmed_groups_count']++;
+
+                    // last_confirmed_at
+                    if ($r->reviewed_at && (!$users[$uid]['last_confirmed_at'] || $r->reviewed_at > $users[$uid]['last_confirmed_at'])) {
+                        $users[$uid]['last_confirmed_at'] = $r->reviewed_at;
+                    }
+
+                    // Track campaigns with counts
+                    if ($cid) {
+                        if (!isset($users[$uid]['campaigns'][$cid])) {
+                            $users[$uid]['campaigns'][$cid] = [
+                                'campaign_id' => $cid,
+                                'campaign_name' => $campaignName,
+                                'count' => 0,
+                            ];
+                        }
+                        $users[$uid]['campaigns'][$cid]['count']++;
+                    }
+
+                    // Track adverts with counts
+                    if ($aid) {
+                        if (!isset($users[$uid]['adverts'][$aid])) {
+                            $users[$uid]['adverts'][$aid] = [
+                                'advert_id' => $aid,
+                                'advert_name' => $advertName,
+                                'count' => 0,
+                            ];
+                        }
+                        $users[$uid]['adverts'][$aid]['count']++;
+                    }
+                }
+
+                // Add a few evidence urls per user (limit)
+                foreach ($details as $d) {
+                    $uid = isset($d['user_id']) ? (string) $d['user_id'] : null;
+                    $url = $d['url'] ?? null;
+                    if (!$uid || !$url || !isset($users[$uid])) continue;
+
+                    if (count($users[$uid]['sample_evidence']) < 5 && !in_array($url, $users[$uid]['sample_evidence'], true)) {
+                        $users[$uid]['sample_evidence'][] = $url;
+                    }
+                }
+            }
+
+            // 4) Convert campaign/adverts maps into arrays + sort (most frequent first)
+            $usersList = array_values($users);
+
+            foreach ($usersList as &$u) {
+                $u['campaigns'] = array_values($u['campaigns']);
+                usort($u['campaigns'], fn($a, $b) => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
+
+                $u['adverts'] = array_values($u['adverts']);
+                usort($u['adverts'], fn($a, $b) => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
+            }
+            unset($u);
+
+            // Sort guilty users by most confirmed groups
+            usort($usersList, fn($a, $b) => ($b['confirmed_groups_count'] ?? 0) <=> ($a['confirmed_groups_count'] ?? 0));
+
+            return response()->json([
+                'campaign_filter' => $campaignId,
+                'guilty_users_count' => count($usersList),
+                'guilty_users' => $usersList,
+            ]);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
