@@ -43,6 +43,11 @@ class AdminFraudController extends Controller
                 ->where('campaign_id', $campaignId)
                 ->pluck('id');
 
+            $advertsMap = DB::table('advert_images')
+                ->whereIn('id', $advertIds)
+                ->pluck('name', 'id');
+
+
             if ($advertIds->isEmpty()) {
                 return response()->json([
                     'campaign_id' => (string) $campaignId,
@@ -67,7 +72,7 @@ class AdminFraudController extends Controller
             $userIds = $screenshots->pluck('processed_by')->unique()->values();
             $usersMap = DB::table('users')
                 ->whereIn('id', $userIds)
-                ->pluck('fullname', 'id'); // [id => fullname]
+                ->pluck('fullname', 'id');
 
             // Prefetch reviewed hashes once (fast filtering)
             $reviewed = array_flip($this->reviewedHashesForCampaign($campaignId));
