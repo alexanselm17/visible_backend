@@ -432,6 +432,7 @@ class AdminFraudController extends Controller
                 'action' => 'required|in:DEACTIVATE,WARN',
                 'user_ids' => 'required|array|min:1',
                 'user_ids.*' => 'required|string|size:36',
+                'reported_by' => 'string|size:36',
 
             ]);
 
@@ -478,6 +479,18 @@ class AdminFraudController extends Controller
 
                     $t =  $defaultDeactTitle;
                     $m =  $defaultDeactMessage;
+                    $reportedBy = $data['reported_by'] ?? null;
+
+
+                    \App\Models\UserFraud::create([
+                        'user_id' => $user->id,
+                        'reason' => 'Confirmed fraud activity',
+                        'details' => 'Actioned via bulk fraud operation by admin.',
+                        'reported_by' => $reportedBy,
+                        'flagged_at' => now(),
+                    ]);
+
+
 
                     $this->sendUserNotification(
                         user: $user,
