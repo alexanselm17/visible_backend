@@ -630,11 +630,6 @@ class ProductRepository implements ProductRepositoryInterface
     }
 
 
-
-
-
-
-
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {
