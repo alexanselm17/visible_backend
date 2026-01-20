@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomersController;
 use App\Http\Controllers\ProductController;
@@ -96,7 +97,6 @@ Route::group(['prefix' => 'v1'], function () {
 
 
 
-
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
         //User Routes
         Route::group(['prefix' => 'user'], function () {
@@ -129,15 +129,6 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/search', [ProductController::class, 'searchProducts']);
         });
 
-
-
-
-
-
-
-
-
-
         Route::group(['prefix' => 'customers'], function () {
             Route::get('/{petrolStationId}', [CustomersController::class, 'fetchCustomers']);
             Route::get('/{petrolStationId}/search', [CustomersController::class, 'searchCustomers']);
@@ -151,6 +142,18 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
             Route::delete('/delete', [NotificationController::class, 'deleteNotification']);
             Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
+        });
+
+
+        Route::prefix('admin/fraud')->group(function () {
+            Route::get('/campaign/{campaignId}', [AdminFraudController::class, 'getFraudForCampaign']);
+            Route::get('/campaigns', [AdminFraudController::class, 'getFraudForAllCampaigns']);
+
+            // Review actions
+            Route::post('/review', [AdminFraudController::class, 'reviewFraudGroup']);
+
+            // Optional history
+            Route::get('/reviews', [AdminFraudController::class, 'listReviews']);
         });
     });
 });
