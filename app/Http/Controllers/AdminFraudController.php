@@ -109,8 +109,9 @@ class AdminFraudController extends Controller
                     }
 
                     $fraudGroups[] = [
-                        'campaign_id' => (string) $campaignId,          // ✅ ADDED HERE
+                        'campaign_id' => (string) $campaignId,
                         'advert_id' => (string) $advertId,
+                        'advert_name' => $advertsMap[$advertId] ?? null,
                         'matching_views_timestamp' => (string) $patternKey,
                         'users' => $uniqueUsers,
                         'details' => $grouped,
