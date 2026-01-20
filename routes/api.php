@@ -152,7 +152,7 @@ Route::group(['prefix' => 'v1'], function () {
             // Review actions
             Route::post('/review', [AdminFraudController::class, 'reviewFraudGroup']);
             Route::get('/guilty-users', [AdminFraudController::class, 'getGuiltyFraudUsers']);
-
+            Route::post('/bulk-action', [AdminFraudController::class, 'bulkFraudAction']);
 
             // Optional history
             Route::get('/reviews', [AdminFraudController::class, 'listReviews']);

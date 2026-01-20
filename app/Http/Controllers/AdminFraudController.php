@@ -422,4 +422,155 @@ class AdminFraudController extends Controller
             ], 500);
         }
     }
+
+
+    public function bulkFraudAction(Request $request)
+    {
+        try {
+
+            $data = $request->validate([
+                'action' => 'required|in:DEACTIVATE,WARN',
+                'user_ids' => 'required|array|min:1',
+                'user_ids.*' => 'required|string|size:36',
+
+            ]);
+
+            $action = $data['action'];
+            $userIds = array_values(array_unique($data['user_ids']));
+            $sendPush = true;
+
+            // Fetch users once
+            $users = \App\Models\User::whereIn('id', $userIds)->get()->keyBy('id');
+
+            $foundIds = $users->keys()->all();
+            $missingIds = array_values(array_diff($userIds, $foundIds));
+
+            // Prepare defaults
+            $defaultWarnTitle = "Fraud Warning ⚠️";
+            $defaultWarnMessage = "Your account has been flagged for suspicious activity. Further violations may lead to suspension.";
+
+            $defaultDeactTitle = "Account Deactivated 🚫";
+            $defaultDeactMessage = "Your account has been deactivated due to confirmed fraud activity. Contact support if you believe this is an error.";
+
+            $title = trim((string)($data['title'] ?? ''));
+            $message = trim((string)($data['message'] ?? ''));
+            $reason = $data['reason'] ?? null;
+
+            $results = [
+                'processed' => [],
+                'missing' => $missingIds,
+            ];
+
+            $firebase = null;
+            if ($sendPush) {
+                $firebase = new \App\Services\FirebaseService();
+            }
+
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            foreach ($users as $user) {
+                if ($action === 'DEACTIVATE') {
+
+                    // Update user
+                    $user->is_active = 0;
+                    $user->save();
+                    $user->tokens()->delete();
+
+                    $t =  $defaultDeactTitle;
+                    $m =  $defaultDeactMessage;
+
+                    $this->sendUserNotification(
+                        user: $user,
+                        title: $t,
+                        message: $m,
+                        type: 'error',
+                        data: [
+                            'action' => 'fraud_deactivate',
+                            'reason' => $reason,
+                        ],
+                        sendPush: $sendPush,
+                        firebase: $firebase
+                    );
+
+                    $results['processed'][] = [
+                        'user_id' => $user->id,
+                        'name' => $user->fullname,
+                        'status' => 'DEACTIVATED',
+                        'notified' => true,
+                    ];
+                }
+
+                if ($action === 'WARN') {
+                    $t = $defaultWarnTitle;
+                    $m =  $defaultWarnMessage;
+
+                    $this->sendUserNotification(
+                        user: $user,
+                        title: $t,
+                        message: $m,
+                        type: 'warning',
+                        data: [
+                            'action' => 'fraud_warning',
+                            'reason' => $reason,
+                        ],
+                        sendPush: $sendPush,
+                        firebase: $firebase
+                    );
+
+                    $results['processed'][] = [
+                        'user_id' => $user->id,
+                        'name' => $user->fullname,
+                        'status' => 'WARNED',
+                        'notified' => true,
+                    ];
+                }
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json([
+                'ok' => true,
+                'action' => $action,
+                'requested_count' => count($userIds),
+                'found_count' => count($foundIds),
+                'missing_count' => count($missingIds),
+                'results' => $results,
+            ]);
+        } catch (\Throwable $th) {
+            \Illuminate\Support\Facades\DB::rollBack();
+
+            return response()->json([
+                'message' => 'An error occurred.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+
+
+    private function sendUserNotification(
+        \App\Models\User $user,
+        string $title,
+        string $message,
+        string $type,
+        array $data,
+        bool $sendPush,
+        ?\App\Services\FirebaseService $firebase
+    ): void {
+        try {
+            if ($sendPush && !empty($user->fcm_token) && $firebase) {
+                $firebase->sendToDevice($user->fcm_token, $title, $message);
+            }
+
+            \App\Models\Notification::create([
+                'user_id' => $user->id,
+                'title' => $title,
+                'message' => $message,
+                'type' => $type,
+                'data' => $data,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to notify user {$user->id}: " . $e->getMessage());
+        }
+    }
 }
