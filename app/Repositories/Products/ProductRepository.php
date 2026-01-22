@@ -465,7 +465,7 @@ class ProductRepository implements ProductRepositoryInterface
     {
         DB::beginTransaction();
         try {
-            // 1. Validation & Setup
+
             $request->validate([
                 'screenshot' => 'required|image|mimes:jpeg,png,jpg|max:3072',
                 'user_id' => 'required|exists:users,id',
@@ -478,152 +478,242 @@ class ProductRepository implements ProductRepositoryInterface
 
             $advert = AdvertImages::where('id', $advert_id)->first();
 
-            if (!$campaign || !$advert) {
+            if (!$campaign) {
                 DB::rollBack();
-                return response()->json(['ok' => false, 'message' => "Campaign/Advert not found"], 404);
-            }
-
-            // 2. Capacity & Logic Checks
-            $allStarted = Screenshots::where('advert_id', $advert_id)->where('number', 1)->count();
-            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
-                ->where('processed_by', $request->user_id)->latest()->first();
-
-            if (is_null($previousScreenshot) && $allStarted >= $advert->capacity) {
-                DB::rollBack();
-                return response()->json(['ok' => false, 'message' => "This campaign has reached full capacity. Thank you for your interest."], 400);
-            }
-
-            // 18-Hour Rule
-            if ($previousScreenshot !== null) {
-                $previousTime = Carbon::parse($previousScreenshot->created_at)->timezone('Africa/Nairobi');
-                if ($previousTime > Carbon::now('Africa/Nairobi')->subHours(18)) {
-                    DB::rollBack();
-                    return response()->json(['ok' => false, 'message' => "Wait 18 hours since last submission."], 400);
-                }
-                if ($previousScreenshot->number == 2) {
-                    DB::rollBack();
-                    return response()->json(['ok' => false, 'message' => "Already Completed this task"], 400);
-                }
-            }
-
-            // 3. Save Screenshot Locally
-            $file = $request->file('screenshot');
-            $filename = time() . '_' . preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
-            $file->move(public_path('storage/screenshots'), $filename);
-            $screenshotPath = public_path("storage/screenshots/{$filename}");
-            $advertPath = public_path('storage/' . $advert->image_path);
-
-            // =========================================================
-            //  PYTHON SERVICE CALL
-            // =========================================================
-            $ocrUrl = 'http://46.202.155.75:5000/verify';
-
-            try {
-                $response = Http::timeout(120)
-                    ->attach('original', file_get_contents($advertPath), basename($advertPath))
-                    ->attach('screenshot', file_get_contents($screenshotPath), basename($screenshotPath))
-                    ->post($ocrUrl);
-                $ocrResult = $response->json();
-            } catch (\Exception $e) {
-                @unlink($screenshotPath);
-                Log::error("OCR Service Failure: " . $e->getMessage());
-                return response()->json([
-                    'message' => '❌ Verification Service Error',
-                    'debug_error' => $e->getMessage()
-                ], 500);
-            }
-
-            // Extract Key Data for Logic
-            $pythonStatus = $ocrResult['status'] ?? 'fail';
-            $detectedViews = (int)($ocrResult['metadata']['views'] ?? 0);
-            $detectedTime = $ocrResult['metadata']['timestamp'] ?? 'N/A';
-            $verdictTitle = $ocrResult['verdict_title'] ?? 'Unknown Error';
-            $verdictMsg = $ocrResult['message'] ?? 'No message provided';
-
-            // =========================================================
-            //  VERIFICATION FAILURE HANDLING
-            // =========================================================
-            if ($pythonStatus !== 'success') {
-                @unlink($screenshotPath);
-                DB::rollBack();
-
-                // Return failure response including FULL Python details
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => "Verification failed: Please ensure you uploaded the correct screenshot and try again.",
-                    'reason' => $verdictMsg,
-                    'verification_details' => $ocrResult
-                ], 400);
+                    'message' => "Campaign not found for the given advert ID"
+                ], 404);
             }
 
-            // =========================================================
-            //  BUSINESS LOGIC (Views progression)
-            // =========================================================
-            if ($previousScreenshot != null) {
-                if ($previousScreenshot->views >= $detectedViews) {
+            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $request->user_id)
+                ->latest()
+                ->first();
+
+            $allStarted = Screenshots::where('advert_id', $advert_id)
+                ->where('number', 1)
+                ->count();
+
+            if (is_null($previousScreenshot)) {
+                if ($allStarted >=  $advert->capacity) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Views mismatch: New views ($detectedViews) must be higher than previous ({$previousScreenshot->views}).",
-                        'verification_details' => $ocrResult
+                        'message' => "Capacity already attained"
                     ], 400);
                 }
             }
 
-            // =========================================================
-            //  SUCCESS & REWARDS
-            // =========================================================
+
+
+
+
+            $advert = AdvertImages::find($advert_id);
+            if (!$advert) {
+                return response()->json(['message' => '❌ Advert not found.'], 404);
+            }
+
+            $advertPath = public_path('storage/' . $advert->image_path);
+            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $request->user_id)
+                ->latest()
+                ->first();
+
+            //let's ensure that the first screenshot and second have a differences of 18 hours 
+            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $request->user_id)
+                ->latest()
+                ->first();
+
+            if ($previousScreenshot !== null) {
+                // Convert the previous time to Nairobi timezone
+                $previousTime = Carbon::parse($previousScreenshot->created_at)->timezone('Africa/Nairobi');
+
+                // Get current time minus 18 hours
+                $eighteenHoursAgo = Carbon::now('Africa/Nairobi')->subHours(18);
+
+                if ($previousTime > $eighteenHoursAgo) {
+                    DB::rollBack();
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "You can only process this after 18 hours since your last submission."
+                    ], 400);
+                }
+            }
+            if ($previousScreenshot != null) {
+                if ($previousScreenshot->number == 2) {
+                    DB::rollBack();
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "Already Completed this task"
+                    ], 400);
+                }
+            }
+
+            // Save the screenshot to local storage
+            $file = $request->file('screenshot');
+            $originalName = $file->getClientOriginalName();
+            $sanitizedName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalName);
+            $filename = time() . '_' . $sanitizedName;
+            $file->move(public_path('storage/screenshots'), $filename);
+
+            $screenshotPath = public_path("storage/screenshots/{$filename}");
+
+            // Encode images to base64
+            $advertBase64 = base64_encode(file_get_contents($advertPath));
+            $screenshotBase64 = base64_encode(file_get_contents($screenshotPath));
+
+            // Prepare OpenAI request
+            $apiKey = "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";
+            // Get from .env file for security
+            $prompt = "
+            You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
+            
+            Instructions:
+            1. Confirm the screenshot is from WhatsApp and clearly displays 'My status' and a visible timestamp (e.g., 'Just now', 'Yesterday', '10:24pm', or '9 minutes ago').
+            2. Confirm that the media shown in the screenshot (either a static image or a thumbnail/frame from a video) matches the original media provided.
+               - If the original is a video, compare the screenshot to the provided video thumbnail or a representative frame.
+               - Ensure layout, colors, and content alignment are consistent.
+            3. Extract the number of views from the screenshot if it is clearly visible.
+            4. Extract the timestamp shown below 'My status'.
+            
+            Respond only in this valid JSON format:
+            
+            {
+              \"status\": \"✅ Verified: The media was successfully posted.\" OR \"❌ Not Verified\",
+              \"reason\": \"[If not verified, explain why. If verified, return null]\",
+              \"views\": \"[Exact number of views like '91', or 'Not visible']\",
+              \"timestamp\": \"[e.g., 'Just now', 'Today, 1:06 PM', or '43 minutes ago']\"
+            }
+            
+            Do not include any other text before or after the JSON.
+            ";
+
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            ['type' => 'text', 'text' => $prompt],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $advertBase64]],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $screenshotBase64]],
+                        ]
+                    ]
+                ],
+                'max_tokens' => 300,
+            ]);
+
+
+            $output = $response->json('choices.0.message.content') ?? '❌ Not Verified';
+
+
+            // Remove markdown formatting like ```json ... ``` if present
+            $output = trim($output);
+            $output = preg_replace('/^```json|```$/i', '', $output);
+            $output = trim($output);
+
+            // Decode cleaned JSON
+            $json = json_decode($output, true);
+
+            // Handle invalid or unexpected response
+            if (!$json || !isset($json['status'])) {
+                @unlink($screenshotPath);
+                return response()->json([
+                    'message' => '❌ Not Verified',
+                    'reason' => 'Invalid format from the verification model...',
+                    'raw' => $output
+                ], 400);
+            }
+
+            // If verification failed
+            if (str_starts_with($json['status'], '❌')) {
+                @unlink($screenshotPath);
+                return response()->json([
+                    'message' => $json['status'],
+                    'reason' => $json['reason'] ?? 'No reason provided',
+                    'views' => $json['views'] ?? 'Not visible'
+                ], 400);
+            }
+
+
             $number = $previousScreenshot ? $previousScreenshot->number + 1 : 1;
+
+            //let's ensure that views is progressive
+            if ($previousScreenshot != null) {
+                $lastViews = $previousScreenshot->views;
+                if ($lastViews >= $json['views']) {
+                    DB::rollBack();
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => "This screenshot has already been uploaded or not valid"
+                    ], 400);
+                }
+            }
+
+
 
             $screenshot = new Screenshots();
             $screenshot->screenshot = 'screenshots/' . $filename;
             $screenshot->advert_id = $advert_id;
-            $screenshot->views = $detectedViews;
-            $screenshot->timestamp = $detectedTime;
+            $screenshot->views = $json['views'] ?? 0;
+            $screenshot->timestamp = $json['timestamp'] ?? null;
             $screenshot->processed_by = $request->user_id;
             $screenshot->number = $number;
             $screenshot->save();
-
-            $userMessage = "Screenshot verified successfully as number $number with $detectedViews views.";
-
+            $message = $json['status'] . ' | Views: ' . ($json['views'] ?? 'Not visible');
             if ($number == 2) {
-                if ($detectedViews < 50) {
+                if ($json['views'] < 50) {
                     DB::rollBack();
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Minimum threshold (50 views) not attained. Current: $detectedViews",
-                        'verification_details' => $ocrResult
+                        'message' => "Minimum threshold not attained"
                     ], 400);
                 }
+                //we now proceed to reward the users
+                $advert = AdvertImages::where('id', $advert_id)->first();
+                // $campaign = Campaign::where('id', $advert->campaign_id)->first();
                 $reward = $advert->reward;
+
+
                 $customerLastInvoice = Invoice::where('processed_by', $request->user_id)->latest()->first();
-                Invoice::create([
+                $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
+
+
+                $invoice = Invoice::create([
                     "type" => "Reward",
                     "amount" =>  $reward,
                     "processed_by" => $request->user_id,
-                    "customer_balance" => ($customerLastInvoice ? $customerLastInvoice->customer_balance : 0) + $reward,
+                    "customer_balance" => $customerBalance + $reward,
                     "posted_by" => $request->user_id,
                     'advert_id' => $advert_id
                 ]);
-
-                $userMessage = "Task Completed and rewarded Successfully";
+                $message = "Task Completed and rewarded Successfuly";
             }
 
+            // Return final success response
             DB::commit();
             return response()->json([
-                'ok' => true,
-                'message' => $userMessage,
-                'views' => $detectedViews,
-                'path' => 'screenshots/' . $filename,
-                'verification_details' => $ocrResult
+                'message' => $message,
+                'views' => $json['views'] ?? 'Not visible',
+                'path' => 'screenshots/' . $filename
             ]);
         } catch (\Throwable $th) {
             DB::rollBack();
+            Log::error("Error verifying image: " . $th->getMessage());
             return response()->json([
-                'message' => 'An system error occurred.',
+                'message' => 'An error occurred.',
                 'error' => $th->getMessage()
             ], 500);
         }
