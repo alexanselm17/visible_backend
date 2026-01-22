@@ -724,20 +724,21 @@ class AuthRepository implements AuthRepositoryInterface
 
 
 
-    use Illuminate\Support\Facades\Log;
-    use App\Models\User;
 
     public function getAllUsers()
     {
         try {
             $perPage = 100;
 
+            // 1) Fetch users page
             $users = User::with(['role', 'latestFraudFlag'])
                 ->orderBy('created_at', 'desc')
                 ->paginate($perPage);
 
             $pageUsers = $users->getCollection();
 
+            // 2) Find referrers for users on this page:
+            // referal_code (on me) = referrer's my_code
             $referrerCodes = $pageUsers
                 ->pluck('referal_code')
                 ->filter(fn($c) => !empty($c))
@@ -749,10 +750,10 @@ class AuthRepository implements AuthRepositoryInterface
                 $referrersByMyCode = User::whereIn('my_code', $referrerCodes)
                     ->select('id', 'fullname', 'my_code', 'phone', 'email', 'created_at')
                     ->get()
-                    ->keyBy('my_code'); 
+                    ->keyBy('my_code'); // key = my_code
             }
 
-            
+            // 3) referrals_count: how many people used my_code as their referal_code
             $myCodes = $pageUsers
                 ->pluck('my_code')
                 ->filter(fn($c) => !empty($c))
@@ -764,14 +765,16 @@ class AuthRepository implements AuthRepositoryInterface
                 $referralsCountByMyCode = User::whereIn('referal_code', $myCodes)
                     ->selectRaw('referal_code, COUNT(*) as total')
                     ->groupBy('referal_code')
-                    ->pluck('total', 'referal_code'); 
+                    ->pluck('total', 'referal_code'); // [my_code => count]
+            }
 
+            // 4) Transform output
             $users->setCollection(
                 $pageUsers->map(function ($u) use ($referrersByMyCode, $referralsCountByMyCode) {
-                    $refCode = $u->referal_code;            
+                    $refCode = $u->referal_code; // code that referred me
                     $referrer = $refCode ? $referrersByMyCode->get($refCode) : null;
 
-                    $myCode = $u->my_code;                    
+                    $myCode = $u->my_code; // code I refer others with
                     $referralsCount = $myCode ? (int) ($referralsCountByMyCode[$myCode] ?? 0) : 0;
 
                     return [
@@ -789,10 +792,12 @@ class AuthRepository implements AuthRepositoryInterface
                         'role' => $u->role?->name,
                         'slug' => $u->role?->slug,
 
-                        'referal_code' => $u->referal_code,
-                        'my_code' => $u->my_code,
-                        'referrals_count' => $referralsCount,
+                        // Referral fields
+                        'referal_code' => $u->referal_code,   // referrer's my_code
+                        'my_code' => $u->my_code,             // my referral code
+                        'referrals_count' => $referralsCount, // how many I referred
 
+                        // ✅ The user that referred me
                         'referred_by' => $referrer ? [
                             'id' => $referrer->id,
                             'fullname' => $referrer->fullname,
@@ -802,6 +807,7 @@ class AuthRepository implements AuthRepositoryInterface
                             'created_at' => optional($referrer->created_at)->toDateTimeString(),
                         ] : null,
 
+                        // Fraud info (as you already return)
                         'is_banned' => (bool) $u->latestFraudFlag,
                         'fraud' => $u->latestFraudFlag ? [
                             'reason' => $u->latestFraudFlag->reason,
@@ -813,23 +819,27 @@ class AuthRepository implements AuthRepositoryInterface
                 })
             );
 
-            return response()->json([
+            return [
                 'ok' => true,
                 'status' => 'success',
                 'message' => 'Users retrieved successfully',
                 'users' => $users,
-            ]);
+            ];
         } catch (\Throwable $th) {
             Log::debug('Get User Error: ' . $th->getMessage());
 
-            return response()->json([
+            return [
                 'ok' => false,
                 'status' => 'error',
                 'message' => 'Failed to fetch users.',
                 'error' => $th->getMessage(),
-            ], 500);
+            ];
         }
     }
+
+
+
+
 
 
     public function getAllUsersWithoutRole()
