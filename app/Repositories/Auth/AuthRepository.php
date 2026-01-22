@@ -271,6 +271,16 @@ class AuthRepository implements AuthRepositoryInterface
             $tokenCreatedAt = now();
             //let
 
+            $fraudStats = \Illuminate\Support\Facades\DB::table('fraud_reviews')
+                ->where('status', 'CONFIRMED')
+                ->where(function ($q) use ($user) {
+                    $q->whereRaw("JSON_SEARCH(fraud_payload, 'one', ?) IS NOT NULL", [$user->id]);
+                })
+                ->selectRaw('COUNT(*) as total, MAX(reviewed_at) as last_confirmed_at')
+                ->first();
+
+            $isConfirmedFraud = ($fraudStats && (int)$fraudStats->total > 0);
+
             $responseData = [
                 'id' => $user->id,
                 'fullname' => $user->fullname,
@@ -291,6 +301,10 @@ class AuthRepository implements AuthRepositoryInterface
                 'deleted_at' => $user->deleted_at,
 
                 'my_code' => $user->my_code,
+                'fraud_status' => $isConfirmedFraud ? 'APPROVED' : 'SUSPICIOUS',
+                'fraud_confirmed_count' => (int) ($fraudStats->total ?? 0),
+                'last_fraud_at' => $fraudStats->last_confirmed_at,
+
 
 
 
