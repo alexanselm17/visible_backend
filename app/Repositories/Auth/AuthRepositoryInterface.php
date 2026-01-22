@@ -17,8 +17,9 @@ interface AuthRepositoryInterface
     public function getAllUsers();
     public function getAllUsersWithoutRole();
     public function deleteUser(Request $request);
-    public function accountActivationCard(Request $request );
+    public function accountActivationCard(Request $request);
     public function searchUser(Request $request);
+    public function getUserProfileById(Request $request, $userId);
     public function updateProfile(UpdateProfileRequest $request);
 
     public function assignPermissionsToUser(Request $request);
@@ -28,7 +29,7 @@ interface AuthRepositoryInterface
 
     public function getCountiesWithSubCounties(Request $request);
 
- 
+
     public function activateAllInactiveAcounts(Request $request);
-     public function getAllUserReferred(Request $request,$userId);
+    public function getAllUserReferred(Request $request, $userId);
 }

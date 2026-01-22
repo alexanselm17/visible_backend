@@ -301,7 +301,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'deleted_at' => $user->deleted_at,
 
                 'my_code' => $user->my_code,
-                'fraud_status' => $isConfirmedFraud ? 'APPROVED' : 'SUSPICIOUS',
+                'fraud_status' => $isConfirmedFraud ? 'SUSPICIOUS' : 'APPROVED',
                 'fraud_confirmed_count' => (int) ($fraudStats->total ?? 0),
                 'last_fraud_at' => $fraudStats->last_confirmed_at,
 
@@ -346,6 +346,110 @@ class AuthRepository implements AuthRepositoryInterface
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+
+
+    public function getUserProfileById(Request $request, string $userId)
+    {
+        try {
+            // Optional: allow only admin/dev/manager to fetch other users
+            // $actor = auth()->user();
+            // if (!$actor || !$actor->hasRole(['admin', 'dev', 'manager'])) {
+            //     // If you want to allow a normal user to fetch ONLY self:
+            //     if ($actor?->id !== $userId) {
+            //         return response()->json([
+            //             'ok' => false,
+            //             'status' => 'failed',
+            //             'message' => 'Forbidden.',
+            //         ], 403);
+            //     }
+            // }
+
+            $user = User::where('id', $userId)
+                ->with(['county', 'subCounty', 'role'])
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'error',
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            // ===============================
+            // FRAUD STATUS CHECK (CONFIRMED)
+            // ===============================
+            $fraudStats = DB::table('fraud_reviews')
+                ->where('status', 'CONFIRMED')
+                ->whereRaw("JSON_SEARCH(fraud_payload, 'one', ?) IS NOT NULL", [$user->id])
+                ->selectRaw('COUNT(*) as total, MAX(reviewed_at) as last_confirmed_at')
+                ->first();
+
+            $isConfirmedFraud = ($fraudStats && (int) $fraudStats->total > 0);
+
+            // Build the same response structure as sign-in
+            $responseData = [
+                'id' => $user->id,
+                'fullname' => $user->fullname,
+                'username' => $user->username,
+                'phone' => $user->phone,
+                'email' => $user->email,
+                'is_active' => $user->is_active,
+                'role_id' => $user->role_id,
+                'is_verified' => $user->is_verified,
+                'is_logged_in' => $user->is_logged_in,
+                'card_number' => $user->card_number,
+                'occupation' => $user->occupation,
+                'location' => $user->location,
+                'gender' => $user->gender,
+                'email_verified_at' => $user->email_verified_at,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+                'deleted_at' => $user->deleted_at,
+                'my_code' => $user->my_code,
+
+                'fraud_status' => $isConfirmedFraud ? 'SUSPICIOUS' : 'APPROVED',
+                'fraud_confirmed_count' => (int) ($fraudStats->total ?? 0),
+                'last_fraud_at' => $fraudStats->last_confirmed_at,
+
+                'role' => [
+                    'id' => $user->role?->id,
+                    'name' => $user->role?->name,
+                    'slug' => $user->role?->slug,
+                ],
+
+                'county' => $user->county ? [
+                    'id' => $user->county->id,
+                    'name' => $user->county->name,
+                    'capital' => $user->county->capital,
+                    'code' => $user->county->code ?? null,
+                ] : null,
+
+                'sub_county' => $user->subCounty ? [
+                    'id' => $user->subCounty->id,
+                    'name' => $user->subCounty->name,
+                    'county_id' => $user->subCounty->county_id,
+                ] : null,
+            ];
+
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'message' => 'User profile fetched successfully.',
+                'data' => $responseData,
+            ]);
+        } catch (\Throwable $th) {
+            Log::error('getUserProfileById Error: ' . $th->getMessage());
+
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'An error occurred. Please try again.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
 
 
 

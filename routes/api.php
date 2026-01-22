@@ -16,11 +16,9 @@ Route::group(['prefix' => 'v1'], function () {
     //Auth Routes
     Route::group(['prefix' => 'auth'], function () {
         Route::post('/fcm-token', [NotificationController::class, 'updateFcmToken']);
-        //Admin and manager only
         Route::post('/signup', [AuthController::class, 'signup']);
         Route::get('/location', [AuthController::class, 'getCountiesWithSubCounties']);
         Route::post('/all_account_activation', [AuthController::class, 'activateAllInactiveAcounts']);
-
         Route::post('/signin', [AuthController::class, 'signin']);
         Route::put('/logout', [AuthController::class, 'signOut']);
     });
@@ -28,8 +26,6 @@ Route::group(['prefix' => 'v1'], function () {
 
     Route::get('/download/advert/{path}', function ($path) {
         $fullPath = public_path("storage/" . $path);
-
-
         if (!file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
@@ -100,9 +96,8 @@ Route::group(['prefix' => 'v1'], function () {
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
         //User Routes
         Route::group(['prefix' => 'user'], function () {
-
-            //Admin and manager only
             Route::get('/activate', [AuthController::class, 'activateCard']);
+            Route::get('/profile/{userId}', [AuthController::class, 'getUserProfileById']);
             Route::put('/deactivate', [AuthController::class, 'accountActivationCard']);
             Route::put('/assign_role', [AuthController::class, 'assignRole']);
             Route::put('/unassign_role', [AuthController::class, 'unAssignRole']);
