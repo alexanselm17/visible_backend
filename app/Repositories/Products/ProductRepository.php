@@ -502,7 +502,7 @@ class ProductRepository implements ProductRepositoryInterface
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Capacity already attained"
+                        'message' => "This campaign has reached full capacity. Thank you for your interest."
                     ], 400);
                 }
             }
@@ -585,7 +585,7 @@ class ProductRepository implements ProductRepositoryInterface
             Respond only in this valid JSON format:
             
             {
-              \"status\": \"✅ Verified: The media was successfully posted.\" OR \"❌ Not Verified\",
+              \"status\": \"Screenshot Successfully Verified.\" OR \"Screenshot Not Verified.Please confirm your screenshot and try again\",
               \"reason\": \"[If not verified, explain why. If verified, return null]\",
               \"views\": \"[Exact number of views like '91', or 'Not visible']\",
               \"timestamp\": \"[e.g., 'Just now', 'Today, 1:06 PM', or '43 minutes ago']\"
