@@ -349,7 +349,7 @@ class AuthRepository implements AuthRepositoryInterface
 
 
 
-    public function getUserProfileById(Request $request, string $userId)
+    public function getUserProfileById(Request $request, $userId)
     {
         try {
             // Optional: allow only admin/dev/manager to fetch other users
