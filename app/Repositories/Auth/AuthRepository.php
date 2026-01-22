@@ -301,7 +301,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'deleted_at' => $user->deleted_at,
 
                 'my_code' => $user->my_code,
-                'fraud_status' => $isConfirmedFraud ? 'APPROVED' : 'SUSPICIOUS',
+                'fraud_status' => $isConfirmedFraud ? 'SUSPICIOUS' : 'APPROVED',
                 'fraud_confirmed_count' => (int) ($fraudStats->total ?? 0),
                 'last_fraud_at' => $fraudStats->last_confirmed_at,
 
