@@ -352,18 +352,7 @@ class AuthRepository implements AuthRepositoryInterface
     public function getUserProfileById(Request $request, $userId)
     {
         try {
-            // Optional: allow only admin/dev/manager to fetch other users
-            // $actor = auth()->user();
-            // if (!$actor || !$actor->hasRole(['admin', 'dev', 'manager'])) {
-            //     // If you want to allow a normal user to fetch ONLY self:
-            //     if ($actor?->id !== $userId) {
-            //         return response()->json([
-            //             'ok' => false,
-            //             'status' => 'failed',
-            //             'message' => 'Forbidden.',
-            //         ], 403);
-            //     }
-            // }
+
 
             $user = User::where('id', $userId)
                 ->with(['county', 'subCounty', 'role'])
@@ -735,6 +724,9 @@ class AuthRepository implements AuthRepositoryInterface
 
 
 
+    use Illuminate\Support\Facades\Log;
+    use App\Models\User;
+
     public function getAllUsers()
     {
         try {
@@ -744,30 +736,82 @@ class AuthRepository implements AuthRepositoryInterface
                 ->orderBy('created_at', 'desc')
                 ->paginate($perPage);
 
-            $users->getCollection()->transform(function ($u) {
-                return [
-                    'id' => $u->id,
-                    'fullname' => $u->fullname,
-                    'username' => $u->username,
-                    'email' => $u->email,
-                    'phone' => $u->phone,
-                    'is_active' => $u->is_active,
-                    'created_at' => $u->created_at,
-                    'updated_at' => $u->updated_at,
-                    'deleted_at' => $u->deleted_at,
-                    'role_id' => $u->role?->id,
-                    'role' => $u->role?->name,
-                    'slug' => $u->role?->slug,
+            $pageUsers = $users->getCollection();
 
-                    'is_banned' => (bool) $u->latestFraudFlag,
-                    'fraud' => $u->latestFraudFlag ? [
-                        'reason' => $u->latestFraudFlag->reason,
-                        'details' => $u->latestFraudFlag->details,
-                        'reported_by' => $u->latestFraudFlag->reported_by,
-                        'flagged_at' => optional($u->latestFraudFlag->flagged_at)->toDateTimeString(),
-                    ] : null,
-                ];
-            });
+            $referrerCodes = $pageUsers
+                ->pluck('referal_code')
+                ->filter(fn($c) => !empty($c))
+                ->unique()
+                ->values();
+
+            $referrersByMyCode = collect();
+            if ($referrerCodes->isNotEmpty()) {
+                $referrersByMyCode = User::whereIn('my_code', $referrerCodes)
+                    ->select('id', 'fullname', 'my_code', 'phone', 'email', 'created_at')
+                    ->get()
+                    ->keyBy('my_code'); 
+            }
+
+            
+            $myCodes = $pageUsers
+                ->pluck('my_code')
+                ->filter(fn($c) => !empty($c))
+                ->unique()
+                ->values();
+
+            $referralsCountByMyCode = collect();
+            if ($myCodes->isNotEmpty()) {
+                $referralsCountByMyCode = User::whereIn('referal_code', $myCodes)
+                    ->selectRaw('referal_code, COUNT(*) as total')
+                    ->groupBy('referal_code')
+                    ->pluck('total', 'referal_code'); 
+
+            $users->setCollection(
+                $pageUsers->map(function ($u) use ($referrersByMyCode, $referralsCountByMyCode) {
+                    $refCode = $u->referal_code;            
+                    $referrer = $refCode ? $referrersByMyCode->get($refCode) : null;
+
+                    $myCode = $u->my_code;                    
+                    $referralsCount = $myCode ? (int) ($referralsCountByMyCode[$myCode] ?? 0) : 0;
+
+                    return [
+                        'id' => $u->id,
+                        'fullname' => $u->fullname,
+                        'username' => $u->username,
+                        'email' => $u->email,
+                        'phone' => $u->phone,
+                        'is_active' => $u->is_active,
+                        'created_at' => $u->created_at,
+                        'updated_at' => $u->updated_at,
+                        'deleted_at' => $u->deleted_at,
+
+                        'role_id' => $u->role?->id,
+                        'role' => $u->role?->name,
+                        'slug' => $u->role?->slug,
+
+                        'referal_code' => $u->referal_code,
+                        'my_code' => $u->my_code,
+                        'referrals_count' => $referralsCount,
+
+                        'referred_by' => $referrer ? [
+                            'id' => $referrer->id,
+                            'fullname' => $referrer->fullname,
+                            'my_code' => $referrer->my_code,
+                            'phone' => $referrer->phone,
+                            'email' => $referrer->email,
+                            'created_at' => optional($referrer->created_at)->toDateTimeString(),
+                        ] : null,
+
+                        'is_banned' => (bool) $u->latestFraudFlag,
+                        'fraud' => $u->latestFraudFlag ? [
+                            'reason' => $u->latestFraudFlag->reason,
+                            'details' => $u->latestFraudFlag->details,
+                            'reported_by' => $u->latestFraudFlag->reported_by,
+                            'flagged_at' => optional($u->latestFraudFlag->flagged_at)->toDateTimeString(),
+                        ] : null,
+                    ];
+                })
+            );
 
             return response()->json([
                 'ok' => true,
@@ -777,14 +821,15 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         } catch (\Throwable $th) {
             Log::debug('Get User Error: ' . $th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
-                'message' => $th->getMessage(),
+                'message' => 'Failed to fetch users.',
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
-
 
 
     public function getAllUsersWithoutRole()
