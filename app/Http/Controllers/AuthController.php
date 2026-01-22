@@ -33,9 +33,9 @@ class AuthController extends Controller
   {
     return $this->authRepository->signUpUser($request);
   }
-    public function getAllUserReferred(Request $request,$userId)
+  public function getAllUserReferred(Request $request, $userId)
   {
-    return $this->authRepository->getAllUserReferred($request,$userId);
+    return $this->authRepository->getAllUserReferred($request, $userId);
   }
 
   public function signOut(Request $request)
@@ -88,6 +88,12 @@ class AuthController extends Controller
     return $this->authRepository->AccountActivationCard($request);
   }
 
+  public function getUserProfileById(Request $request, $userId)
+  {
+    return $this->authRepository->getUserProfileById($request, $userId);
+  }
+
+
   public function searchUser(Request $request)
   {
     return $this->authRepository->searchUser($request);
@@ -108,7 +114,7 @@ class AuthController extends Controller
   {
     return $this->authRepository->getUserPermissions($userId);
   }
-   public function transferUser(Request $request)
+  public function transferUser(Request $request)
   {
     return $this->authRepository->transferUser($request);
   }
