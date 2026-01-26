@@ -4,17 +4,16 @@ namespace App\Exports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Maatwebsite\Excel\Concerns\WithHeadings;
 use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class GenericExport extends DefaultValueBinder implements
-    FromCollection, WithHeadings, WithColumnFormatting, ShouldAutoSize, WithCustomValueBinder
+class GenericExport extends DefaultValueBinder implements FromCollection, ShouldAutoSize, WithColumnFormatting, WithCustomValueBinder, WithHeadings
 {
     protected Collection $data;
 
@@ -28,8 +27,10 @@ class GenericExport extends DefaultValueBinder implements
     {
         if ($cell->getColumn() === 'B') {
             $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+
             return true;
         }
+
         return parent::bindValue($cell, $value);
     }
 
@@ -43,10 +44,11 @@ class GenericExport extends DefaultValueBinder implements
                 // add + if it should be there and isn’t already
                 if ($phone[0] !== '+') {
                     // adjust this rule to your needs
-                    $phone = '+' . $phone;
+                    $phone = '+'.$phone;
                 }
                 $row[1] = $phone;
             }
+
             return $row;
         });
     }

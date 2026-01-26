@@ -5,35 +5,30 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\AdvertImagesResource\Pages;
 use App\Filament\Resources\AdvertImagesResource\RelationManagers;
 use App\Models\AdvertImages;
-use App\Models\Campaign;
 use App\Models\Counties;
 use App\Models\SubCounty;
+use Carbon\Carbon;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Support\Enums\FontWeight;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Support\Colors\Color;
+use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use Carbon\Carbon;
-
+use Filament\Resources\Resource;
+use Filament\Support\Enums\FontWeight;
+use Filament\Tables;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class AdvertImagesResource extends Resource
 {
@@ -187,14 +182,13 @@ class AdvertImagesResource extends Resource
                                 Select::make('sub_county_id')
                                     ->label('Sub County')
                                     ->options(
-                                        fn(Get $get): array =>
-                                        $get('county_id')
+                                        fn (Get $get): array => $get('county_id')
                                             ? SubCounty::where('county_id', $get('county_id'))->pluck('name', 'id')->toArray()
                                             : []
                                     )
                                     ->searchable()
                                     ->placeholder('Select Sub County')
-                                    ->disabled(fn(Get $get): bool => !$get('county_id')),
+                                    ->disabled(fn (Get $get): bool => ! $get('county_id')),
 
                                 Select::make('gender')
                                     ->label('Gender')
@@ -266,6 +260,7 @@ class AdvertImagesResource extends Resource
                     ->columns(2),
             ]);
     }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -277,7 +272,7 @@ class AdvertImagesResource extends Resource
                         $path = $record->image_path;
 
                         return $path
-                            ? asset('storage/' . $path)
+                            ? asset('storage/'.$path)
                             : asset('storage/products/default-product.png');
                     })
                     ->action(
@@ -288,10 +283,9 @@ class AdvertImagesResource extends Resource
                             ->modalSubmitAction(false)
                             ->modalCancelAction(false)
                             ->modalContent(
-                                fn($record) =>
-                                view('filament.components.image-preview', [
+                                fn ($record) => view('filament.components.image-preview', [
                                     'url' => $record->image_path
-                                        ? asset('storage/' . $record->image_path)
+                                        ? asset('storage/'.$record->image_path)
                                         : asset('storage/products/default-product.png'),
                                 ])
                             )
@@ -303,6 +297,7 @@ class AdvertImagesResource extends Resource
                     ->limit(30)
                     ->tooltip(function (TextColumn $column): ?string {
                         $state = $column->getState();
+
                         return strlen($state) > 30 ? $state : null;
                     }),
 
@@ -317,7 +312,7 @@ class AdvertImagesResource extends Resource
                     ->searchable()
                     ->badge()
                     ->color('info')
-                    ->formatStateUsing(fn($state) => ucfirst($state)),
+                    ->formatStateUsing(fn ($state) => ucfirst($state)),
 
                 TextColumn::make('capital_invested')
                     ->money('KSH')
@@ -334,20 +329,25 @@ class AdvertImagesResource extends Resource
                 TextColumn::make('valid_until')
                     ->date()
                     ->sortable()
-                    ->color(fn($state) => now()->gt($state) ? 'danger' : 'success')
+                    ->color(fn ($state) => now()->gt($state) ? 'danger' : 'success')
                     ->badge(),
 
                 TextColumn::make('target_audience')
                     ->label('Locations')
                     ->formatStateUsing(function ($state) {
-                        if (!$state) return 'N/A';
+                        if (! $state) {
+                            return 'N/A';
+                        }
 
                         $locations = is_string($state) ? json_decode($state, true) : $state;
-                        if (!is_array($locations)) return 'N/A';
+                        if (! is_array($locations)) {
+                            return 'N/A';
+                        }
 
                         return collect($locations)->map(function ($location) {
                             $county = Counties::find($location['county_id'])?->name ?? 'Unknown';
                             $subCounty = SubCounty::find($location['sub_county_id'])?->name ?? 'Unknown';
+
                             return "{$county} - {$subCounty}";
                         })->join(', ');
                     })
@@ -407,23 +407,23 @@ class AdvertImagesResource extends Resource
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['value'],
-                            fn(Builder $query, $countyId): Builder => $query->whereJsonContains('target_audience', [
-                                ['county_id' => $countyId]
+                            fn (Builder $query, $countyId): Builder => $query->whereJsonContains('target_audience', [
+                                ['county_id' => $countyId],
                             ])
                         );
                     })
                     ->searchable(),
 
                 Tables\Filters\Filter::make('expired')
-                    ->query(fn(Builder $query): Builder => $query->where('valid_until', '<', now()))
+                    ->query(fn (Builder $query): Builder => $query->where('valid_until', '<', now()))
                     ->label('Expired Ads'),
 
                 Tables\Filters\Filter::make('high_capacity')
-                    ->query(fn(Builder $query): Builder => $query->where('capacity', '>=', 100))
+                    ->query(fn (Builder $query): Builder => $query->where('capacity', '>=', 100))
                     ->label('High Capacity (≥100)'),
 
                 Tables\Filters\Filter::make('high_investment')
-                    ->query(fn(Builder $query): Builder => $query->where('capital_invested', '>=', 10000))
+                    ->query(fn (Builder $query): Builder => $query->where('capital_invested', '>=', 10000))
                     ->label('High Investment (≥10K)'),
             ])
             ->actions([
@@ -433,14 +433,13 @@ class AdvertImagesResource extends Resource
                 Action::make('view_screenshots')
                     ->icon('heroicon-o-camera')
                     ->color('info')
-                    ->url(fn($record) => route('filament.admin.resources.screenshots.index', [
+                    ->url(fn ($record) => route('filament.admin.resources.screenshots.index', [
                         'tableFilters' => [
                             'advert_id' => ['value' => $record->id],
                         ],
                     ]))
-                    ->visible(fn($record) => $record->screenshots_count > 0),
-        
-       
+                    ->visible(fn ($record) => $record->screenshots_count > 0),
+
             ])
             ->defaultSort('created_at', 'desc')
             ->striped()

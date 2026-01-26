@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Resources\UserResource;
-use Filament\Resources\Pages\ListRecords;
 use App\Models\User;
 use Filament\Resources\Components\Tab;
+use Filament\Resources\Pages\ListRecords;
 
 class ListUsers extends ListRecords
 {
@@ -25,7 +25,7 @@ class ListUsers extends ListRecords
             'active' => Tab::make()
                 ->label('Active')
                 ->icon('heroicon-o-check-circle')
-                ->modifyQueryUsing(fn($query) => $query->where('is_active', true))
+                ->modifyQueryUsing(fn ($query) => $query->where('is_active', true))
                 ->badge(User::where('is_active', true)->count())
                 ->extraAttributes([
                     'style' => 'margin-right: 18px;',
@@ -34,7 +34,7 @@ class ListUsers extends ListRecords
             'inactive' => Tab::make()
                 ->label('Inactive')
                 ->icon('heroicon-o-x-circle')
-                ->modifyQueryUsing(fn($query) => $query->where('is_active', false))
+                ->modifyQueryUsing(fn ($query) => $query->where('is_active', false))
                 ->badge(User::where('is_active', false)->count())
                 ->extraAttributes([
                     'style' => 'margin-right: 18px;',

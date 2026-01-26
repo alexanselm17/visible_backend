@@ -4,34 +4,28 @@ namespace App\Repositories\Auth;
 
 use App\Http\Controllers\NotificationController;
 use App\Http\Requests\UpdateProfileRequest;
-use App\Models\AppVersion;
+use App\Models\Counties;
+use App\Models\Invoice;
 use App\Models\Permission;
 use App\Models\RolesModel;
-use Symfony\Component\HttpFoundation\Response;
-use App\Models\Invoice;
 use App\Models\User;
-use App\Models\Counties;
-use App\Repositories\Auth\AuthRepositoryInterface;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 
 class AuthRepository implements AuthRepositoryInterface
 {
-
-
     public function getAllUserReferred(Request $request, $userId)
     {
         try {
             // Clamp per_page between 1 and 100
             $perPage = (int) $request->query('per_page', 15);
             $perPage = max(1, min(100, $perPage));
-            $page    = (int) $request->query('page', 1);
+            $page = (int) $request->query('page', 1);
 
             // 1) Find the user (UUID or int — works with findOrFail)
             $user = User::findOrFail($userId);
@@ -42,18 +36,18 @@ class AuthRepository implements AuthRepositoryInterface
             // 3) If user has no my_code, return an empty paginator
             if (empty($code)) {
                 $empty = new LengthAwarePaginator([], 0, $perPage, $page, [
-                    'path'  => $request->url(),
+                    'path' => $request->url(),
                     'query' => $request->query(),
                 ]);
 
                 return response()->json([
-                    'ok'      => true,
-                    'status'  => 'success',
+                    'ok' => true,
+                    'status' => 'success',
                     'message' => 'User has no referral code; no referrals found.',
-                    'user'    => [
-                        'id'       => $user->id,
+                    'user' => [
+                        'id' => $user->id,
                         'fullname' => $user->fullname,
-                        'my_code'  => $code,
+                        'my_code' => $code,
                     ],
                     'referrals' => $empty,
                 ]);
@@ -66,44 +60,40 @@ class AuthRepository implements AuthRepositoryInterface
                 ->appends($request->query());
 
             return response()->json([
-                'ok'      => true,
-                'status'  => 'success',
+                'ok' => true,
+                'status' => 'success',
                 'message' => 'Referrals fetched successfully.',
-                'user'    => [
-                    'id'       => $user->id,
+                'user' => [
+                    'id' => $user->id,
                     'fullname' => $user->fullname,
-                    'my_code'  => $code,
+                    'my_code' => $code,
                 ],
                 'referrals' => $referrals,
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([
-                'ok'      => false,
-                'status'  => 'error',
+                'ok' => false,
+                'status' => 'error',
                 'message' => 'User not found.',
             ], 404);
         } catch (\Throwable $th) {
             Log::error('getAllUserReferred failed', [
                 'userId' => $userId,
-                'error'  => $th->getMessage(),
+                'error' => $th->getMessage(),
             ]);
 
             return response()->json([
-                'ok'      => false,
-                'status'  => 'error',
+                'ok' => false,
+                'status' => 'error',
                 'message' => 'Failed to fetch referrals.',
             ], 500);
         }
     }
 
-
     public function signUpUser(Request $request)
     {
         try {
             DB::beginTransaction();
-
-
-
 
             // Helper to generate unique code
             $generateUniqueCode = function (string $table, string $column = 'code', int $length = 10): string {
@@ -123,46 +113,45 @@ class AuthRepository implements AuthRepositoryInterface
             $role = RolesModel::where('name', '=', 'Customer Champion')->first();
             $usersCount = User::count();
 
-            $referalCode = $usersCount == 0 ?  $myCode : $request['code'];
+            $referalCode = $usersCount == 0 ? $myCode : $request['code'];
             // dd(  $referalCode);
             $userCode = User::where('my_code', $referalCode)->first();
 
-
-
-            if ($usersCount > 0 && !$userCode) {
+            if ($usersCount > 0 && ! $userCode) {
                 DB::rollBack();
+
                 return response()->json([
                     'ok' => false,
                     'status' => 'error',
-                    'message' => "Invalid referral code"
+                    'message' => 'Invalid referral code',
                 ], 400);
             }
 
             $user = User::create([
-                "fullname" => $request['fullname'],
-                "username" => $request['username'],
-                "email" => $request['email'],
-                "password" => $request["password"],
-                "phone" => $request['phone'],
-                "county_id" => $request['county'],
-                "subcounty_id" => $request['sub_county'],
-                "role_id" => $role->id,
-                "occupation" => $request['occupation'],
-                "location" => $request['location'],
-                "gender" => $request['gender'],
-                "town" => $request['town'],
-                "estate" => $request['estate'],
-                "county" => $request['county'],
-                "fcm_token" => $request['fcm_token'],
-                "is_active" => false,
-                "referal_code" => $usersCount == 0 ? $myCode : $referalCode,
-                "my_code" => $usersCount == 0 ? $referalCode :  $myCode,
+                'fullname' => $request['fullname'],
+                'username' => $request['username'],
+                'email' => $request['email'],
+                'password' => $request['password'],
+                'phone' => $request['phone'],
+                'county_id' => $request['county'],
+                'subcounty_id' => $request['sub_county'],
+                'role_id' => $role->id,
+                'occupation' => $request['occupation'],
+                'location' => $request['location'],
+                'gender' => $request['gender'],
+                'town' => $request['town'],
+                'estate' => $request['estate'],
+                'county' => $request['county'],
+                'fcm_token' => $request['fcm_token'],
+                'is_active' => false,
+                'referal_code' => $usersCount == 0 ? $myCode : $referalCode,
+                'my_code' => $usersCount == 0 ? $referalCode : $myCode,
             ]);
             /*
         // Handle referral reward
         if ($userCode) {
-            
-            
+
+
             $whoReferedMe = $userCode;
 
             $customerLastInvoice = Invoice::where('processed_by', $whoReferedMe->id)->latest()->first();
@@ -176,13 +165,13 @@ class AuthRepository implements AuthRepositoryInterface
                 "customer_balance" => $customerBalance + $rewardCoin,
                 "posted_by" => $user->id,
             ]);
-            
-           
+
+
         }
          */
 
             // Notify admins
-            $notificationController = new NotificationController();
+            $notificationController = new NotificationController;
             $notificationRequest = new Request(['new_user_id' => $user->id]);
             $notificationController->notifyAdminsNewAccount($notificationRequest);
 
@@ -191,22 +180,19 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => "Account created successfully"
+                'message' => 'Account created successfully',
             ]);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::debug('Sign Up Error: ' . $th->getMessage());
+            Log::debug('Sign Up Error: '.$th->getMessage());
 
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
-                'message' => $th->getMessage()
+                'message' => $th->getMessage(),
             ]);
         }
     }
-
-
-
 
     public function signInUser(Request $request)
     {
@@ -224,52 +210,48 @@ class AuthRepository implements AuthRepositoryInterface
                     ->orWhere('phone', $request->username);
             })->with(['county', 'subCounty'])
                 ->first();
-            if (!$user || !Hash::check($request->password, $user->password)) {
+            if (! $user || ! Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'warning',
-                    'message' => "Invalid login Credetials.",
+                    'message' => 'Invalid login Credetials.',
                 ], Response::HTTP_UNAUTHORIZED);
             }
 
-            if (!$user->is_active) {
+            if (! $user->is_active) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => "Account not yet Activated",
+                    'message' => 'Account not yet Activated',
                 ], Response::HTTP_UNAUTHORIZED);
             }
             $role = RolesModel::find($user->role_id);
-            if ($role->slug != "admin") {
+            if ($role->slug != 'admin') {
                 if ($user->is_logged_in == 1) {
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Already Logged in",
+                        'message' => 'Already Logged in',
                     ], Response::HTTP_UNAUTHORIZED);
                 }
             }
 
-
-
-
-            if (!$role) {
+            if (! $role) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => "You have no role yet.",
+                    'message' => 'You have no role yet.',
                 ], Response::HTTP_UNAUTHORIZED);
             }
 
-            //let's update the login status 
+            // let's update the login status
             $user->is_logged_in = 1;
             $user->save();
 
-
             // Token with petrol_id stored as ability
-            $token = $user->createToken('api-token-v' . $request->app_version)->plainTextToken;
+            $token = $user->createToken('api-token-v'.$request->app_version)->plainTextToken;
             $tokenCreatedAt = now();
-            //let
+            // let
 
             $fraudStats = \Illuminate\Support\Facades\DB::table('fraud_reviews')
                 ->where('status', 'CONFIRMED')
@@ -279,7 +261,7 @@ class AuthRepository implements AuthRepositoryInterface
                 ->selectRaw('COUNT(*) as total, MAX(reviewed_at) as last_confirmed_at')
                 ->first();
 
-            $isConfirmedFraud = ($fraudStats && (int)$fraudStats->total > 0);
+            $isConfirmedFraud = ($fraudStats && (int) $fraudStats->total > 0);
 
             $responseData = [
                 'id' => $user->id,
@@ -305,15 +287,11 @@ class AuthRepository implements AuthRepositoryInterface
                 'fraud_confirmed_count' => (int) ($fraudStats->total ?? 0),
                 'last_fraud_at' => $fraudStats->last_confirmed_at,
 
-
-
-
                 'role' => [
                     'id' => $user->role?->id,
                     'name' => $user->role?->name,
-                    'slug' => $user->role?->slug
+                    'slug' => $user->role?->slug,
                 ],
-
 
                 'county' => $user->county ? [
                     'id' => $user->county->id,
@@ -332,33 +310,31 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => "Successfully logged in.",
+                'message' => 'Successfully logged in.',
                 'data' => $responseData,
                 'token' => $token,
-                'token_created_at' => $tokenCreatedAt
+                'token_created_at' => $tokenCreatedAt,
             ]);
         } catch (\Throwable $th) {
-            Log::error('Sign In Error: ' . $th->getMessage());
+            Log::error('Sign In Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
-                'message' => "An error occurred. Please try again.",
+                'message' => 'An error occurred. Please try again.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
-
 
     public function getUserProfileById(Request $request, $userId)
     {
         try {
 
-
             $user = User::where('id', $userId)
                 ->with(['county', 'subCounty', 'role'])
                 ->first();
 
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'error',
@@ -429,7 +405,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'data' => $responseData,
             ]);
         } catch (\Throwable $th) {
-            Log::error('getUserProfileById Error: ' . $th->getMessage());
+            Log::error('getUserProfileById Error: '.$th->getMessage());
 
             return response()->json([
                 'ok' => false,
@@ -438,9 +414,6 @@ class AuthRepository implements AuthRepositoryInterface
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
-
-
 
     public function signOut(Request $request)
     {
@@ -452,11 +425,11 @@ class AuthRepository implements AuthRepositoryInterface
             $user = User::find($userId);
 
             // Check if the user exists
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => 'User not found.'
+                    'message' => 'User not found.',
                 ], Response::HTTP_NOT_FOUND);
             }
 
@@ -468,11 +441,11 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => 'Successfully logged out.'
+                'message' => 'Successfully logged out.',
             ]);
         } catch (\Throwable $th) {
             // Log the error and return a failure response
-            Log::error('Sign Out Error: ' . $th->getMessage());
+            Log::error('Sign Out Error: '.$th->getMessage());
 
             return response()->json([
                 'ok' => false,
@@ -481,8 +454,6 @@ class AuthRepository implements AuthRepositoryInterface
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
-
 
     public function restorePassword(Request $request)
     {
@@ -493,22 +464,25 @@ class AuthRepository implements AuthRepositoryInterface
                 ->where('email', $request['email'])
                 ->first();
             if ($user != null) {
-                //proceed with updating the user data
+                // proceed with updating the user data
                 $user->password = $request['password'];
                 $user->save();
+
                 return response()->json([
                     'ok' => true,
                     'status' => 'success',
-                    'message' => "Password reset successfully ",
+                    'message' => 'Password reset successfully ',
                 ]);
             }
+
             return response()->json([
                 'ok' => false,
                 'status' => 'failed',
-                'message' => "No user with that data",
+                'message' => 'No user with that data',
             ], 404);
         } catch (\Throwable $th) {
-            Log::debug('Reset Password Error: ' . $th->getMessage());
+            Log::debug('Reset Password Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -522,13 +496,15 @@ class AuthRepository implements AuthRepositoryInterface
         try {
             $roles = RolesModel::where('slug', '!=', 'dev')
                 ->get();
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
                 'roles' => $roles,
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Get Roles Error: ' . $th->getMessage());
+            Log::debug('Get Roles Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -544,13 +520,15 @@ class AuthRepository implements AuthRepositoryInterface
 
             $user->role_id = $request['role_id'];
             $user->save();
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'mesage' => "User assigned role successfully",
+                'mesage' => 'User assigned role successfully',
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Assign Roles Error: ' . $th->getMessage());
+            Log::debug('Assign Roles Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -566,7 +544,7 @@ class AuthRepository implements AuthRepositoryInterface
             $user = User::findOrFail($request->user_id);
 
             // Ensure that 'permissions' is an array in the request
-            if (!is_array($request->permissions) || empty($request->permissions)) {
+            if (! is_array($request->permissions) || empty($request->permissions)) {
                 return response()->json(['error' => 'Invalid permissions input'], 404);
             }
 
@@ -583,15 +561,15 @@ class AuthRepository implements AuthRepositoryInterface
             // Attach new permissions
             $user->permissions()->sync($permissions);
 
-
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
                 'message' => 'Permissions updated successfully',
-                'assigned_permissions' => $request->permissions
+                'assigned_permissions' => $request->permissions,
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Assign Roles Error: ' . $th->getMessage());
+            Log::debug('Assign Roles Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -644,13 +622,15 @@ class AuthRepository implements AuthRepositoryInterface
             $user = User::where('id', $request['user_id'])->first();
             $user->role_id = null;
             $user->save();
+
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => "User role unassigned successfully",
+                'message' => 'User role unassigned successfully',
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Unassign Roles Error: ' . $th->getMessage());
+            Log::debug('Unassign Roles Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -658,12 +638,13 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
+
     public function searchUser(Request $request)
     {
         try {
             // Validate the incoming request to ensure that the search query is provided
             $request->validate([
-                'query' => 'required|string|max:255'
+                'query' => 'required|string|max:255',
             ]);
 
             // Extract the search query from the request
@@ -701,7 +682,7 @@ class AuthRepository implements AuthRepositoryInterface
                 return response()->json([
                     'ok' => false,
                     'status' => 'not_found',
-                    'message' => 'No users found.'
+                    'message' => 'No users found.',
                 ]);
             }
 
@@ -713,7 +694,8 @@ class AuthRepository implements AuthRepositoryInterface
                 'users' => $users,
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Get User Error: ' . $th->getMessage());
+            Log::debug('Get User Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -721,9 +703,6 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
-
-
-
 
     public function getAllUsers()
     {
@@ -741,7 +720,7 @@ class AuthRepository implements AuthRepositoryInterface
             // referal_code (on me) = referrer's my_code
             $referrerCodes = $pageUsers
                 ->pluck('referal_code')
-                ->filter(fn($c) => !empty($c))
+                ->filter(fn ($c) => ! empty($c))
                 ->unique()
                 ->values();
 
@@ -756,7 +735,7 @@ class AuthRepository implements AuthRepositoryInterface
             // 3) referrals_count: how many people used my_code as their referal_code
             $myCodes = $pageUsers
                 ->pluck('my_code')
-                ->filter(fn($c) => !empty($c))
+                ->filter(fn ($c) => ! empty($c))
                 ->unique()
                 ->values();
 
@@ -826,7 +805,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'users' => $users,
             ];
         } catch (\Throwable $th) {
-            Log::debug('Get User Error: ' . $th->getMessage());
+            Log::debug('Get User Error: '.$th->getMessage());
 
             return [
                 'ok' => false,
@@ -836,11 +815,6 @@ class AuthRepository implements AuthRepositoryInterface
             ];
         }
     }
-
-
-
-
-
 
     public function getAllUsersWithoutRole()
     {
@@ -858,7 +832,8 @@ class AuthRepository implements AuthRepositoryInterface
                 'users' => $users,
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Get User Error: ' . $th->getMessage());
+            Log::debug('Get User Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -866,7 +841,6 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
-
 
     public function deleteUser(Request $request)
     {
@@ -877,10 +851,11 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => "Account deleted sucessfully",
+                'message' => 'Account deleted sucessfully',
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Delete User Error: ' . $th->getMessage());
+            Log::debug('Delete User Error: '.$th->getMessage());
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
@@ -888,6 +863,7 @@ class AuthRepository implements AuthRepositoryInterface
             ]);
         }
     }
+
     public function accountActivationCard(Request $request)
     {
         try {
@@ -899,10 +875,9 @@ class AuthRepository implements AuthRepositoryInterface
                 'reported_by' => 'required_if:is_fraud,true|exists:users,id',
             ]);
 
-
             $user = User::find($request->input('user_id'));
 
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'error',
@@ -912,7 +887,7 @@ class AuthRepository implements AuthRepositoryInterface
 
             // Toggle login status (if requested)
             if ($request->has('login_status')) {
-                $user->is_logged_in = !$user->is_logged_in;
+                $user->is_logged_in = ! $user->is_logged_in;
                 $user->save();
 
                 return response()->json([
@@ -925,7 +900,7 @@ class AuthRepository implements AuthRepositoryInterface
             $previousStatus = (bool) $user->is_active;
 
             // Toggle active status
-            $user->is_active = !$user->is_active;
+            $user->is_active = ! $user->is_active;
             $user->save();
 
             // If we are DEACTIVATING now...
@@ -936,7 +911,7 @@ class AuthRepository implements AuthRepositoryInterface
                 if ($isFraud) {
                     // Require a reason if fraud is true
                     $reason = $request->input('fraud_reason');
-                    if (!$reason) {
+                    if (! $reason) {
                         return response()->json([
                             'ok' => false,
                             'status' => 'error',
@@ -952,7 +927,7 @@ class AuthRepository implements AuthRepositoryInterface
                         'flagged_at' => now(),
                     ]);
 
-                    $notificationController = new NotificationController();
+                    $notificationController = new NotificationController;
                     $notificationRequest = new Request([
                         'user_id' => $user->id,
                         'send_push' => true,
@@ -971,7 +946,7 @@ class AuthRepository implements AuthRepositoryInterface
             }
 
             if ($previousStatus === false && $user->is_active === true) {
-                $notificationController = new NotificationController();
+                $notificationController = new NotificationController;
                 $notificationRequest = new Request([
                     'user_id' => $user->id,
                     'send_push' => true,
@@ -991,7 +966,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'message' => $user->is_active ? 'Account activated successfully.' : 'Account deactivated successfully.',
             ]);
         } catch (\Throwable $th) {
-            Log::debug('Account Activation Error: ' . $th->getMessage());
+            Log::debug('Account Activation Error: '.$th->getMessage());
 
             return response()->json([
                 'ok' => false,
@@ -1000,8 +975,6 @@ class AuthRepository implements AuthRepositoryInterface
             ], 500);
         }
     }
-
-
 
     public function updateProfile(UpdateProfileRequest $request)
     {
@@ -1018,19 +991,19 @@ class AuthRepository implements AuthRepositoryInterface
             // Return a success response
             return response()->json([
                 'message' => 'User profile updated successfully.',
-                'user' => $user
+                'user' => $user,
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             // Handle user not found
             return response()->json([
                 'message' => 'User not found.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 404);
         } catch (\Throwable $th) {
             // Handle other errors
             return response()->json([
                 'message' => 'An error occurred while updating the profile.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -1041,20 +1014,20 @@ class AuthRepository implements AuthRepositoryInterface
             $user = User::find($request->input('user_id'));
             $stationId = $request->input('to_petrol_id');
 
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'error',
-                    'message' => 'User not found.'
+                    'message' => 'User not found.',
                 ], 404);
             }
 
             $petrolStation = PetrolStation::find($stationId);
-            if (!$petrolStation) {
+            if (! $petrolStation) {
                 return response()->json([
                     'ok' => false,
                     'status' => 'error',
-                    'message' => 'Target petrol station not found.'
+                    'message' => 'Target petrol station not found.',
                 ], 404);
             }
 
@@ -1064,7 +1037,7 @@ class AuthRepository implements AuthRepositoryInterface
                 'ok' => true,
                 'status' => 'success',
                 'user' => $user,
-                'message' => "User transferred successfully"
+                'message' => 'User transferred successfully',
             ]);
         } catch (\Throwable $th) {
             Log::error('Transfer Error:', [
@@ -1075,11 +1048,10 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
-                'message' => 'An unexpected error occurred. Please try again later.'
+                'message' => 'An unexpected error occurred. Please try again later.',
             ], 500);
         }
     }
-
 
     public function getCountiesWithSubCounties(Request $request)
     {
@@ -1087,14 +1059,14 @@ class AuthRepository implements AuthRepositoryInterface
             $name = $request->query('name');
 
             $counties = Counties::with('subCounties')
-                ->where('name', 'like', '%' . $name . '%')
+                ->where('name', 'like', '%'.$name.'%')
                 ->limit(5)
                 ->get();
 
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'data' => $counties
+                'data' => $counties,
             ]);
         } catch (\Throwable $th) {
             Log::error('Location Search error:', [
@@ -1111,19 +1083,18 @@ class AuthRepository implements AuthRepositoryInterface
         }
     }
 
-
     public function activateAllInactiveAcounts(Request $request)
     {
         try {
             $processed_by = $request->input('user_id');
             $user = User::where('id', $processed_by)->with('role')->first();
 
-            if ($user->role->name != "Admin") {
+            if ($user->role->name != 'Admin') {
 
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => "Not Permitted"
+                    'message' => 'Not Permitted',
                 ], 403);
             }
 
@@ -1137,7 +1108,7 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => count($allInactiveAccounts) . ' account(s) activated.'
+                'message' => count($allInactiveAccounts).' account(s) activated.',
             ]);
         } catch (\Throwable $th) {
             Log::error('Activate Accounts Error:', [

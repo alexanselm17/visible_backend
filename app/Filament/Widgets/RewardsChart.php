@@ -31,7 +31,7 @@ class RewardsChart extends BarChartWidget
             $months[] = $month->format('M Y');
 
             $monthData = $monthlyData->firstWhere('month', $month->month);
-            $rewards[] = $monthData ? $monthData->screenshots_count * 10 : 0; 
+            $rewards[] = $monthData ? $monthData->screenshots_count * 10 : 0;
         }
 
         return [

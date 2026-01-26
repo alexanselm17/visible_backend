@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Notification;
+use App\Models\User;
 use App\Services\FirebaseService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Str;
-
+use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
@@ -28,7 +26,7 @@ class NotificationController extends Controller
             'user' => [
                 'id' => $user->id,
                 'fcm_token' => $user->fcm_token,
-            ]
+            ],
         ]);
     }
 
@@ -156,10 +154,10 @@ class NotificationController extends Controller
         // Send push notification if requested and user has FCM token
         if (($request->send_push ?? true) && $user->fcm_token) {
             try {
-                $firebase = new FirebaseService();
+                $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
             }
         }
 
@@ -192,7 +190,7 @@ class NotificationController extends Controller
         }
 
         $users = $userQuery->get();
-        $firebase = new FirebaseService();
+        $firebase = new FirebaseService;
         $notifications = [];
 
         foreach ($users as $user) {
@@ -210,7 +208,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
                 } catch (\Exception $e) {
-                    \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                    \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
                 }
             }
         }
@@ -246,7 +244,7 @@ class NotificationController extends Controller
             ]);
         }
 
-        $firebase = new FirebaseService();
+        $firebase = new FirebaseService;
         $notifications = [];
 
         $title = 'New Account Registration';
@@ -281,7 +279,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($admin->fcm_token, $title, $message);
                 } catch (\Exception $e) {
-                    \Log::error("FCM error for admin [{$admin->id}]: " . $e->getMessage());
+                    \Log::error("FCM error for admin [{$admin->id}]: ".$e->getMessage());
                 }
             }
         }
@@ -331,10 +329,10 @@ class NotificationController extends Controller
         // Send push notification if requested and user has FCM token
         if (($request->send_push ?? true) && $user->fcm_token) {
             try {
-                $firebase = new FirebaseService();
+                $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
             }
         }
 
@@ -406,10 +404,10 @@ class NotificationController extends Controller
 
         if (($request->send_push ?? true) && $user->fcm_token) {
             try {
-                $firebase = new FirebaseService();
+                $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
             }
         }
 

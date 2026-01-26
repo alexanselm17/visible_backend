@@ -2,19 +2,16 @@
 
 namespace App\Filament\Resources\AdvertImagesResource\RelationManagers;
 
-use App\Models\Invoice;
-use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Textarea;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class InvoicesRelationManager extends RelationManager
 {
@@ -89,20 +86,20 @@ class InvoicesRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'pending' => 'warning',
                         'paid' => 'success',
                         'cancelled' => 'danger',
                         'overdue' => 'danger',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn($state) => ucfirst($state)),
+                    ->formatStateUsing(fn ($state) => ucfirst($state)),
 
                 TextColumn::make('due_date')
                     ->label('Due Date')
                     ->date()
                     ->sortable()
-                    ->color(fn($record) => $record->due_date < now() && $record->status !== 'paid' ? 'danger' : null),
+                    ->color(fn ($record) => $record->due_date < now() && $record->status !== 'paid' ? 'danger' : null),
 
                 TextColumn::make('paid_date')
                     ->label('Paid Date')
@@ -129,14 +126,13 @@ class InvoicesRelationManager extends RelationManager
 
                 Tables\Filters\Filter::make('overdue')
                     ->query(
-                        fn(Builder $query): Builder =>
-                        $query->where('due_date', '<', now())
+                        fn (Builder $query): Builder => $query->where('due_date', '<', now())
                             ->where('status', '!=', 'paid')
                     )
                     ->label('Overdue'),
 
                 Tables\Filters\Filter::make('high_amount')
-                    ->query(fn(Builder $query): Builder => $query->where('amount', '>=', 1000))
+                    ->query(fn (Builder $query): Builder => $query->where('amount', '>=', 1000))
                     ->label('High Amount (≥$1000)'),
             ])
             ->headerActions([])
@@ -149,7 +145,7 @@ class InvoicesRelationManager extends RelationManager
                     ->label('Mark as Paid')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->visible(fn($record) => $record->status !== 'paid')
+                    ->visible(fn ($record) => $record->status !== 'paid')
                     ->action(function ($record) {
                         $record->update([
                             'status' => 'paid',

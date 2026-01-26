@@ -25,7 +25,7 @@ class AssignRoleRequest extends FormRequest
     {
         return [
             'user_id' => 'required|exists:App\Models\User,id',
-            'role_id'=>'required|exists:App\Models\RolesModel,id',
+            'role_id' => 'required|exists:App\Models\RolesModel,id',
         ];
     }
 }

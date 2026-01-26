@@ -4,9 +4,9 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class CheckPermission
 {
@@ -14,7 +14,7 @@ class CheckPermission
     {
         $authHeader = $request->header('Authorization');
 
-        if (!$authHeader) {
+        if (! $authHeader) {
             Log::warning('Unauthorized access attempt: No token provided.', [
                 'ip' => $request->ip(),
                 'route' => $request->path(),
@@ -30,7 +30,7 @@ class CheckPermission
         $tokenString = preg_replace('/^Bearer\s+/i', '', $authHeader);
         $token = PersonalAccessToken::findToken($tokenString);
 
-        if (!$token) {
+        if (! $token) {
             Log::warning('Unauthorized access attempt: Invalid or expired token.', [
                 'ip' => $request->ip(),
                 'route' => $request->path(),
@@ -45,7 +45,7 @@ class CheckPermission
 
         $user = $token->tokenable;
 
-        if (!$user) {
+        if (! $user) {
             Log::error('Token does not map to a valid user.', [
                 'ip' => $request->ip(),
                 'route' => $request->path(),
@@ -66,7 +66,7 @@ class CheckPermission
             ->where('slug', $requiredPermission)
             ->exists();
 
-        if (!$hasPermission) {
+        if (! $hasPermission) {
             Log::warning('Forbidden: Missing permission.', [
                 'user_id' => $user->id,
                 'email' => $user->email,

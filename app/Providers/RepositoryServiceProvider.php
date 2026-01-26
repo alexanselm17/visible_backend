@@ -2,17 +2,17 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use App\Repositories\Auth\AuthRepository;
 use App\Repositories\Auth\AuthRepositoryInterface;
-use  App\Repositories\Products\ProductRepository;
-use App\Repositories\Products\ProductRepositoryInterface;
-use App\Repositories\Sales\SalesRepositoryInterface;
-use App\Repositories\Sales\SalesRepository;
-use App\Repositories\Customers\CustomerRepositoryInterface;
 use App\Repositories\Customers\CustomerRepository;
-use App\Repositories\Setup\SetupRepositoryInterface;
+use App\Repositories\Customers\CustomerRepositoryInterface;
+use App\Repositories\Products\ProductRepository;
+use App\Repositories\Products\ProductRepositoryInterface;
+use App\Repositories\Sales\SalesRepository;
+use App\Repositories\Sales\SalesRepositoryInterface;
 use App\Repositories\Setup\SetupRepository;
+use App\Repositories\Setup\SetupRepositoryInterface;
+use Illuminate\Support\ServiceProvider;
 
 class RepositoryServiceProvider extends ServiceProvider
 {

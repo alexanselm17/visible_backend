@@ -2,12 +2,13 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\BarChartWidget;
 use App\Models\AdvertImages;
+use Filament\Widgets\BarChartWidget;
 
 class TopPerformingAdvertsChart extends BarChartWidget
 {
     protected static ?string $heading = 'Top 5 Performing Adverts (By Views)';
+
     protected static ?int $sort = 4;
 
     protected function getData(): array

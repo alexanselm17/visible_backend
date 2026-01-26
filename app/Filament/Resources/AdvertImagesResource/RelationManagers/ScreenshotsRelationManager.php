@@ -2,19 +2,16 @@
 
 namespace App\Filament\Resources\AdvertImagesResource\RelationManagers;
 
-use App\Models\Screenshots;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Form;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Tables;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ScreenshotsRelationManager extends RelationManager
 {
@@ -89,7 +86,7 @@ class ScreenshotsRelationManager extends RelationManager
                     ->preload(),
 
                 Tables\Filters\Filter::make('high_views')
-                    ->query(fn(Builder $query): Builder => $query->where('views', '>=', 100))
+                    ->query(fn (Builder $query): Builder => $query->where('views', '>=', 100))
                     ->label('High Views (≥100)'),
             ])
             ->headerActions([])

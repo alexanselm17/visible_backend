@@ -2,48 +2,29 @@
 
 namespace App\Repositories\Products;
 
-use App\Models\AdvertImages;
-use App\Repositories\Products\ProductRepositoryInterface;
-use App\Models\ProductsModel;
-use App\Models\Drum;
-use App\Models\Pump;
-use App\Models\Banking;
-use App\Models\SysMeta;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use App\Exports\GenericExport;
 use App\Http\Controllers\NotificationController;
-use Illuminate\Support\Facades\Log;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Http\Requests\ProductRequest;
-use App\Http\Requests\UpdateProductRequest;
-use App\Http\Requests\CreateDrumRequest;
-use App\Http\Requests\UpdateDrumRequest;
-use App\Http\Requests\CreatePumpRequest;
-use App\Http\Requests\CreatesStationRequest;
 use App\Http\Requests\ProductAdvertRequest;
 use App\Http\Requests\StartCampaignRequest;
-use App\Http\Requests\UpdatePumpRequest;
+use App\Models\AdvertImages;
+use App\Models\Banking;
 use App\Models\Campaign;
 use App\Models\Invoice;
-use App\Models\PumpLog;
-use App\Models\PumpReading;
 use App\Models\Screenshots;
-use App\Models\Stations;
+use App\Models\SysMeta;
 use App\Models\User;
-use App\Models\Stock;
-use App\Models\Transaction;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use App\Exports\GenericExport;
+use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProductRepository implements ProductRepositoryInterface
 {
-
-
-
     public function updateAdvertProduct(ProductAdvertRequest $request, $advertId)
     {
         try {
@@ -55,9 +36,9 @@ class ProductRepository implements ProductRepositoryInterface
                 $imageFile = $request->file('image');
                 $originalImageName = $imageFile->getClientOriginalName();
                 $sanitizedImageName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalImageName);
-                $imageFilename = time() . '_' . $sanitizedImageName;
+                $imageFilename = time().'_'.$sanitizedImageName;
                 $imageFile->move(public_path('storage/uploads'), $imageFilename);
-                $advert->image_path = 'uploads/' . $imageFilename;
+                $advert->image_path = 'uploads/'.$imageFilename;
             }
 
             // Handle video update (optional)
@@ -65,9 +46,9 @@ class ProductRepository implements ProductRepositoryInterface
                 $videoFile = $request->file('video');
                 $originalVideoName = $videoFile->getClientOriginalName();
                 $sanitizedVideoName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalVideoName);
-                $videoFilename = time() . '_' . $sanitizedVideoName;
+                $videoFilename = time().'_'.$sanitizedVideoName;
                 $videoFile->move(public_path('storage/uploads'), $videoFilename);
-                $advert->video_path = 'uploads/' . $videoFilename;
+                $advert->video_path = 'uploads/'.$videoFilename;
             }
 
             // Update other fields
@@ -86,19 +67,19 @@ class ProductRepository implements ProductRepositoryInterface
 
             return response()->json([
                 'ok' => true,
-                'status' => "Success",
+                'status' => 'Success',
                 'message' => 'Advert updated successfully!',
-                'data' => $advert
+                'data' => $advert,
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'Advert not found.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 404);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
@@ -111,9 +92,8 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Update the campaign with validated input
             $campaign->update([
-                'name' => $request->input('name', $campaign->name)
+                'name' => $request->input('name', $campaign->name),
             ]);
-
 
             return response()->json([
                 'ok' => true,
@@ -133,10 +113,6 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
-
-
-
-
 
     public function startCampaigns(StartCampaignRequest $request)
     {
@@ -160,7 +136,6 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
-
 
     public function getCampaigns(Request $request)
     {
@@ -220,25 +195,20 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-
-
-
-
-
     public function getAdvertProducts(Request $request)
     {
         try {
             $userId = $request->query('user_id');
             $status = $request->query('status');
 
-            if (!$userId || !$status) {
+            if (! $userId || ! $status) {
                 return response()->json([
                     'message' => 'User ID and status are required in the query parameters.',
                 ], 400);
             }
 
             $user = User::with(['county', 'subCounty'])->find($userId);
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'message' => 'User not found.',
                 ], 404);
@@ -289,14 +259,14 @@ class ProductRepository implements ProductRepositoryInterface
                 $adverts->whereDoesntHave('invoices', function ($query) use ($userId) {
                     $query->where('processed_by', $userId);
                 })
-                    ->whereRaw("
+                    ->whereRaw('
                     (
                         SELECT MIN(created_at)
                         FROM screenshots
                         WHERE screenshots.advert_id = advert_images.id
                         AND screenshots.processed_by = ?
                     ) >= ?
-                ", [$userId, $ongoingThreshold])
+                ', [$userId, $ongoingThreshold])
                     ->withCount(['screenshots as user_screenshot_count' => function ($query) use ($userId) {
                         $query->where('processed_by', $userId);
                     }])
@@ -320,16 +290,16 @@ class ProductRepository implements ProductRepositoryInterface
                         $query->where('processed_by', $userId)
                             ->orderBy('created_at', 'asc');
                     },
-                    'campaign:id'
+                    'campaign:id',
                 ])
                 ->paginate(10);
 
             return response()->json([
                 'message' => 'Adverts retrieved successfully.',
                 'data' => $adverts->through(function ($advert) use ($status) {
-                    $imagePath = 'storage/' . $advert->image_path;
+                    $imagePath = 'storage/'.$advert->image_path;
                     $screenshot = $advert->screenshots->first();
-                    $screenshotPath = $screenshot?->screenshot ? 'storage/' . $screenshot->screenshot : null;
+                    $screenshotPath = $screenshot?->screenshot ? 'storage/'.$screenshot->screenshot : null;
 
                     $screenshotCount = match ($status) {
                         'available' => 0,
@@ -352,7 +322,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'image_url' => asset($imagePath),
                         'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
                         'video_path' => $advert->video_path,
-                        'video_url' => $advert->video_path ? asset('storage/' . $advert->video_path) : null,
+                        'video_url' => $advert->video_path ? asset('storage/'.$advert->video_path) : null,
                         'video_download_url' => $advert->video_path ? route('download.advert.image', ['path' => $advert->video_path]) : null,
                         'user_screenshot' => $screenshot?->screenshot,
                         'screenshot_url' => $screenshotPath ? asset($screenshotPath) : null,
@@ -378,20 +348,16 @@ class ProductRepository implements ProductRepositoryInterface
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
-
-
-
-
 
     public function uploadAdvertProducts(ProductAdvertRequest $request, $campaignId)
     {
         try {
             // Check if image file exists
-            if (!$request->hasFile('image')) {
+            if (! $request->hasFile('image')) {
                 return response()->json(['message' => 'No image uploaded.'], 400);
             }
 
@@ -399,7 +365,7 @@ class ProductRepository implements ProductRepositoryInterface
             $imageFile = $request->file('image');
             $originalImageName = $imageFile->getClientOriginalName();
             $sanitizedImageName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalImageName);
-            $imageFilename = time() . '_' . $sanitizedImageName;
+            $imageFilename = time().'_'.$sanitizedImageName;
             $imageFile->move(public_path('storage/uploads'), $imageFilename);
 
             // Prepare the optional video
@@ -408,17 +374,17 @@ class ProductRepository implements ProductRepositoryInterface
                 $videoFile = $request->file('video');
                 $originalVideoName = $videoFile->getClientOriginalName();
                 $sanitizedVideoName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalVideoName);
-                $videoFilename = time() . '_' . $sanitizedVideoName;
+                $videoFilename = time().'_'.$sanitizedVideoName;
                 $videoFile->move(public_path('storage/uploads'), $videoFilename);
-                $videoPath = 'uploads/' . $videoFilename;
+                $videoPath = 'uploads/'.$videoFilename;
             }
 
             // Get campaign
             $campaign = Campaign::findOrFail($campaignId);
 
             // Save to DB
-            $advert = new AdvertImages();
-            $advert->image_path = 'uploads/' . $imageFilename;
+            $advert = new AdvertImages;
+            $advert->image_path = 'uploads/'.$imageFilename;
             $advert->video_path = $videoPath;
             $advert->category = $request->category;
             $advert->name = $request->name;
@@ -436,7 +402,7 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->save();
 
             // Notify users
-            $title = "📢 New Product posted!";
+            $title = '📢 New Product posted!';
             $body = "🔥 {$advert->name} is now live. Post it to on your  WhatsApp Status and earn ksh.{$advert->reward}";
             $request->merge([
                 'title' => $title,
@@ -446,20 +412,19 @@ class ProductRepository implements ProductRepositoryInterface
             ]);
 
             app(NotificationController::class)->notifyAllUsers($request);
+
             return response()->json([
                 'ok' => true,
-                'status' => "Success",
+                'status' => 'Success',
                 'message' => 'Advert uploaded successfully!',
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
-
-
 
     public function uploadScreenShotPlusCompare(Request $request, $advert_id)
     {
@@ -478,12 +443,13 @@ class ProductRepository implements ProductRepositoryInterface
 
             $advert = AdvertImages::where('id', $advert_id)->first();
 
-            if (!$campaign) {
+            if (! $campaign) {
                 DB::rollBack();
+
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => "Campaign not found for the given advert ID"
+                    'message' => 'Campaign not found for the given advert ID',
                 ], 404);
             }
 
@@ -497,32 +463,29 @@ class ProductRepository implements ProductRepositoryInterface
                 ->count();
 
             if (is_null($previousScreenshot)) {
-                if ($allStarted >=  $advert->capacity) {
+                if ($allStarted >= $advert->capacity) {
                     DB::rollBack();
+
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "This campaign has reached full capacity. Thank you for your interest."
+                        'message' => 'This campaign has reached full capacity. Thank you for your interest.',
                     ], 400);
                 }
             }
 
-
-
-
-
             $advert = AdvertImages::find($advert_id);
-            if (!$advert) {
+            if (! $advert) {
                 return response()->json(['message' => '❌ Advert not found.'], 404);
             }
 
-            $advertPath = public_path('storage/' . $advert->image_path);
+            $advertPath = public_path('storage/'.$advert->image_path);
             $previousScreenshot = Screenshots::where('advert_id', $advert_id)
                 ->where('processed_by', $request->user_id)
                 ->latest()
                 ->first();
 
-            //let's ensure that the first screenshot and second have a differences of 18 hours 
+            // let's ensure that the first screenshot and second have a differences of 18 hours
             $previousScreenshot = Screenshots::where('advert_id', $advert_id)
                 ->where('processed_by', $request->user_id)
                 ->latest()
@@ -537,20 +500,22 @@ class ProductRepository implements ProductRepositoryInterface
 
                 if ($previousTime > $eighteenHoursAgo) {
                     DB::rollBack();
+
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "You can only process this after 18 hours since your last submission."
+                        'message' => 'You can only process this after 18 hours since your last submission.',
                     ], 400);
                 }
             }
             if ($previousScreenshot != null) {
                 if ($previousScreenshot->number == 2) {
                     DB::rollBack();
+
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Already Completed this task"
+                        'message' => 'Already Completed this task',
                     ], 400);
                 }
             }
@@ -559,7 +524,7 @@ class ProductRepository implements ProductRepositoryInterface
             $file = $request->file('screenshot');
             $originalName = $file->getClientOriginalName();
             $sanitizedName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalName);
-            $filename = time() . '_' . $sanitizedName;
+            $filename = time().'_'.$sanitizedName;
             $file->move(public_path('storage/screenshots'), $filename);
 
             $screenshotPath = public_path("storage/screenshots/{$filename}");
@@ -569,7 +534,7 @@ class ProductRepository implements ProductRepositoryInterface
             $screenshotBase64 = base64_encode(file_get_contents($screenshotPath));
 
             // Prepare OpenAI request
-            $apiKey = "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";
+            $apiKey = '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';
             // Get from .env file for security
             $prompt = "
             You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
@@ -594,9 +559,8 @@ class ProductRepository implements ProductRepositoryInterface
             Do not include any other text before or after the JSON.
             ";
 
-
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
+                'Authorization' => 'Bearer '.$apiKey,
                 'Content-Type' => 'application/json',
             ])->post('https://api.openai.com/v1/chat/completions', [
                 'model' => 'gpt-4o',
@@ -605,17 +569,15 @@ class ProductRepository implements ProductRepositoryInterface
                         'role' => 'user',
                         'content' => [
                             ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $advertBase64]],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $screenshotBase64]],
-                        ]
-                    ]
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,'.$advertBase64]],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,'.$screenshotBase64]],
+                        ],
+                    ],
                 ],
                 'max_tokens' => 300,
             ]);
 
-
             $output = $response->json('choices.0.message.content') ?? '❌ Not Verified';
-
 
             // Remove markdown formatting like ```json ... ``` if present
             $output = trim($output);
@@ -626,99 +588,99 @@ class ProductRepository implements ProductRepositoryInterface
             $json = json_decode($output, true);
 
             // Handle invalid or unexpected response
-            if (!$json || !isset($json['status'])) {
+            if (! $json || ! isset($json['status'])) {
                 @unlink($screenshotPath);
+
                 return response()->json([
                     'message' => '❌ Not Verified',
                     'reason' => 'Invalid format from the verification model...',
-                    'raw' => $output
+                    'raw' => $output,
                 ], 400);
             }
 
             // If verification failed
             if (str_starts_with($json['status'], '❌')) {
                 @unlink($screenshotPath);
+
                 return response()->json([
                     'message' => $json['status'],
                     'reason' => $json['reason'] ?? 'No reason provided',
-                    'views' => $json['views'] ?? 'Not visible'
+                    'views' => $json['views'] ?? 'Not visible',
                 ], 400);
             }
 
-
             $number = $previousScreenshot ? $previousScreenshot->number + 1 : 1;
 
-            //let's ensure that views is progressive
+            // let's ensure that views is progressive
             if ($previousScreenshot != null) {
                 $lastViews = $previousScreenshot->views;
                 if ($lastViews >= $json['views']) {
                     DB::rollBack();
+
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "This screenshot has already been uploaded or not valid"
+                        'message' => 'This screenshot has already been uploaded or not valid',
                     ], 400);
                 }
             }
 
-
-
-            $screenshot = new Screenshots();
-            $screenshot->screenshot = 'screenshots/' . $filename;
+            $screenshot = new Screenshots;
+            $screenshot->screenshot = 'screenshots/'.$filename;
             $screenshot->advert_id = $advert_id;
             $screenshot->views = $json['views'] ?? 0;
             $screenshot->timestamp = $json['timestamp'] ?? null;
             $screenshot->processed_by = $request->user_id;
             $screenshot->number = $number;
             $screenshot->save();
-            $message = $json['status'] . ' | Views: ' . ($json['views'] ?? 'Not visible');
+            $message = $json['status'].' | Views: '.($json['views'] ?? 'Not visible');
             if ($number == 2) {
                 if ($json['views'] < 50) {
                     DB::rollBack();
+
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => "Minimum threshold not attained"
+                        'message' => 'Minimum threshold not attained',
                     ], 400);
                 }
-                //we now proceed to reward the users
+                // we now proceed to reward the users
                 $advert = AdvertImages::where('id', $advert_id)->first();
                 // $campaign = Campaign::where('id', $advert->campaign_id)->first();
                 $reward = $advert->reward;
 
-
                 $customerLastInvoice = Invoice::where('processed_by', $request->user_id)->latest()->first();
                 $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
 
-
                 $invoice = Invoice::create([
-                    "type" => "Reward",
-                    "amount" =>  $reward,
-                    "processed_by" => $request->user_id,
-                    "customer_balance" => $customerBalance + $reward,
-                    "posted_by" => $request->user_id,
-                    'advert_id' => $advert_id
+                    'type' => 'Reward',
+                    'amount' => $reward,
+                    'processed_by' => $request->user_id,
+                    'customer_balance' => $customerBalance + $reward,
+                    'posted_by' => $request->user_id,
+                    'advert_id' => $advert_id,
                 ]);
-                $message = "Task Completed and rewarded Successfuly";
+                $message = 'Task Completed and rewarded Successfuly';
             }
 
             // Return final success response
             DB::commit();
+
             return response()->json([
                 'message' => $message,
                 'views' => $json['views'] ?? 'Not visible',
-                'path' => 'screenshots/' . $filename
+                'path' => 'screenshots/'.$filename,
             ]);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error("Error verifying image: " . $th->getMessage());
+            Log::error('Error verifying image: '.$th->getMessage());
+
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
-
 
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
@@ -749,7 +711,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'views' => $screenshot->views,
                         'timestamp' => $screenshot->timestamp,
                         'number' => $screenshot->number,
-                        'url' => URL::to('storage/' . $screenshot->screenshot),
+                        'url' => URL::to('storage/'.$screenshot->screenshot),
                     ];
                 }
 
@@ -780,8 +742,6 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-
-
     public function getAdvertCampaigns(Request $request, $campaignId)
     {
         try {
@@ -792,8 +752,8 @@ class ProductRepository implements ProductRepositoryInterface
             return response()->json([
                 'success' => true,
                 'data' => $adverts->through(function ($advert) {
-                    $imagePath = 'storage/' . $advert->image_path;
-                    $videoPath = 'storage/' . $advert->video_path;
+                    $imagePath = 'storage/'.$advert->image_path;
+                    $videoPath = 'storage/'.$advert->video_path;
 
                     return [
                         'id' => $advert->id,
@@ -828,10 +788,11 @@ class ProductRepository implements ProductRepositoryInterface
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching adverts',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
+
     public function getDashboardData(Request $request, $userId)
     {
         try {
@@ -860,7 +821,6 @@ class ProductRepository implements ProductRepositoryInterface
                         ->orWhere('type', 'Referal');
                 })
                 ->get();
-
 
             $todayRewardTotal = $todayRewards->sum('amount');
             $todayRewardCount = $todayRewards->count();
@@ -909,19 +869,18 @@ class ProductRepository implements ProductRepositoryInterface
             $adverts->whereDoesntHave('invoices', function ($query) use ($userId) {
                 $query->where('processed_by', $userId);
             })
-                ->whereRaw("
+                ->whereRaw('
             (
                 SELECT MIN(created_at)
                 FROM screenshots
                 WHERE screenshots.advert_id = advert_images.id
                 AND screenshots.processed_by = ?
             ) >= ?
-        ", [$userId, $ongoingThreshold])
+        ', [$userId, $ongoingThreshold])
                 ->withCount(['screenshots as user_screenshot_count' => function ($query) use ($userId) {
                     $query->where('processed_by', $userId);
                 }])
                 ->having('user_screenshot_count', '<', 2);
-
 
             $adverts = $adverts
                 ->with([
@@ -933,17 +892,14 @@ class ProductRepository implements ProductRepositoryInterface
                 ])
                 ->paginate(10);
 
-
             $ongoingData = [
                 'message' => 'Adverts retrieved successfully.',
                 'data' => $adverts->through(function ($advert) {
-                    $imagePath = 'storage/' . $advert->image_path;
+                    $imagePath = 'storage/'.$advert->image_path;
                     $screenshot = $advert->screenshots->first();
-                    $screenshotPath = $screenshot?->screenshot ? 'storage/' . $screenshot->screenshot : null;
+                    $screenshotPath = $screenshot?->screenshot ? 'storage/'.$screenshot->screenshot : null;
 
                     $screenshotCount = $advert->user_screenshot_count ?? 0;
-
-
 
                     return [
                         'id' => $advert->id,
@@ -991,7 +947,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'achievements' => $achievements,
                     'recent_rewards' => $recentRewards,
                     'ongoing' => $ongoingData,
-                ]
+                ],
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1001,11 +957,6 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
-
-
-
-
-
 
     public function getAdminDashboardData(Request $request)
     {
@@ -1107,8 +1058,8 @@ class ProductRepository implements ProductRepositoryInterface
             }
 
             // Active/Expired adverts (by advert_images.valid_until)
-            $activeAdvertsCount = $adverts->filter(fn($a) => Carbon::parse($a->valid_until)->gte($now))->count();
-            $expiredAdvertsCount = $adverts->filter(fn($a) => Carbon::parse($a->valid_until)->lt($now))->count();
+            $activeAdvertsCount = $adverts->filter(fn ($a) => Carbon::parse($a->valid_until)->gte($now))->count();
+            $expiredAdvertsCount = $adverts->filter(fn ($a) => Carbon::parse($a->valid_until)->lt($now))->count();
 
             // Capacity + invested (adverts store these already)
             $totalCapacity = (int) $adverts->sum('capacity');
@@ -1200,9 +1151,9 @@ class ProductRepository implements ProductRepositoryInterface
             // Combine campaign stats
             $campaignStats = Campaign::query()
                 ->whereIn('campaigns.id', $campaignIds)
-                ->leftJoinSub($advertsAgg, 'a', fn($j) => $j->on('a.campaign_id', '=', 'campaigns.id'))
-                ->leftJoinSub($screensAggByCampaign, 's', fn($j) => $j->on('s.campaign_id', '=', 'campaigns.id'))
-                ->leftJoinSub($invoicesAggByCampaign, 'i', fn($j) => $j->on('i.campaign_id', '=', 'campaigns.id'))
+                ->leftJoinSub($advertsAgg, 'a', fn ($j) => $j->on('a.campaign_id', '=', 'campaigns.id'))
+                ->leftJoinSub($screensAggByCampaign, 's', fn ($j) => $j->on('s.campaign_id', '=', 'campaigns.id'))
+                ->leftJoinSub($invoicesAggByCampaign, 'i', fn ($j) => $j->on('i.campaign_id', '=', 'campaigns.id'))
                 ->selectRaw('
                 campaigns.id,
                 campaigns.name,
@@ -1239,7 +1190,7 @@ class ProductRepository implements ProductRepositoryInterface
              * We show active adverts even if they had no activity in range? You asked active adverts stats,
              * so we base this list on "adverts involved in range" AND still active.
              */
-            $campaignNameById = $campaigns->keyBy('id')->map(fn($c) => $c->name);
+            $campaignNameById = $campaigns->keyBy('id')->map(fn ($c) => $c->name);
 
             $activeAdvertsStats = AdvertImages::query()
                 ->whereIn('advert_images.id', $advertIds)
@@ -1288,6 +1239,7 @@ class ProductRepository implements ProductRepositoryInterface
                     $row->is_full = $expected > 0 ? ($uploaded >= $expected) : false;
 
                     $row->campaign_name = $campaignNameById[$row->campaign_id] ?? null;
+
                     return $row;
                 });
 
@@ -1330,6 +1282,7 @@ class ProductRepository implements ProductRepositoryInterface
                     $row->is_full = $expected > 0 ? ($uploaded >= $expected) : false;
 
                     $row->campaign_name = $campaignNameById[$row->campaign_id] ?? null;
+
                     return $row;
                 });
 
@@ -1458,8 +1411,6 @@ class ProductRepository implements ProductRepositoryInterface
         return [$start, $now->copy()];
     }
 
-
-
     public function getCampaignReports(Request $request)
     {
         try {
@@ -1485,10 +1436,14 @@ class ProductRepository implements ProductRepositoryInterface
                 foreach ($userScreenshots as $screenshots) {
                     $firstScreenshot = $screenshots->where('number', 1)->first();
                     $lastScreenshot = $screenshots->where('number', 2)->first();
-                    if (!$firstScreenshot) continue;
+                    if (! $firstScreenshot) {
+                        continue;
+                    }
 
                     $user = $firstScreenshot->user;
-                    if (!$user || !$user->id) continue;
+                    if (! $user || ! $user->id) {
+                        continue;
+                    }
 
                     $userId = $user->id;
                     $hasInvoice = $advert->invoices->where('processed_by', $userId)->isNotEmpty();
@@ -1497,14 +1452,12 @@ class ProductRepository implements ProductRepositoryInterface
                     $firstScreenshotTime = Carbon::parse($firstScreenshot->created_at, 'Africa/Nairobi');
                     $ongoingEnd = $firstScreenshotTime->copy()->addDay();
                     $isNowBetween = $now->between($firstScreenshotTime, $ongoingEnd, true);
-                    $isOngoing = $screenshotCount < 2 && !$hasInvoice && $isNowBetween;
-
-
+                    $isOngoing = $screenshotCount < 2 && ! $hasInvoice && $isNowBetween;
 
                     // Categorize
                     if ($hasInvoice) {
 
-                        $views =  $lastScreenshot->views;
+                        $views = $lastScreenshot->views;
                         $totalViewsAllUsers += $views;
                         $completedUsers[] = [
                             'full_name' => $user->fullname,
@@ -1559,7 +1512,6 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
-
 
     public function getCampaignTimelyReports(Request $request)
     {
@@ -1629,10 +1581,14 @@ class ProductRepository implements ProductRepositoryInterface
                     foreach ($userScreenshots as $screenshots) {
                         $firstScreenshot = $screenshots->where('number', 1)->first();
                         $lastScreenshot = $screenshots->where('number', 2)->first();
-                        if (!$firstScreenshot) continue;
+                        if (! $firstScreenshot) {
+                            continue;
+                        }
 
                         $user = $firstScreenshot->user;
-                        if (!$user || !$user->id) continue;
+                        if (! $user || ! $user->id) {
+                            continue;
+                        }
 
                         $userId = $user->id;
                         $hasInvoice = $advert->invoices->where('processed_by', $userId)->isNotEmpty();
@@ -1641,7 +1597,7 @@ class ProductRepository implements ProductRepositoryInterface
                         $firstScreenshotTime = Carbon::parse($firstScreenshot->created_at, 'Africa/Nairobi');
                         $ongoingEnd = $firstScreenshotTime->copy()->addDay();
                         $isNowBetween = $now->between($firstScreenshotTime, $ongoingEnd, true);
-                        $isOngoing = $screenshotCount < 2 && !$hasInvoice && $isNowBetween;
+                        $isOngoing = $screenshotCount < 2 && ! $hasInvoice && $isNowBetween;
 
                         if ($hasInvoice) {
                             $views = $lastScreenshot->views ?? 0;
@@ -1716,7 +1672,7 @@ class ProductRepository implements ProductRepositoryInterface
                 'summary' => $summary,
                 'startDate' => $from,
                 'upto' => $to,
-                'campaigns' => $campaigns
+                'campaigns' => $campaigns,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1727,8 +1683,6 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-
-
     public function getCampaignTimelyPersionalReports(Request $request)
     {
         try {
@@ -1736,7 +1690,7 @@ class ProductRepository implements ProductRepositoryInterface
             $to = $request->query('to_date');
             $processedBy = $request->query('processed_by');
 
-            if (!$processedBy) {
+            if (! $processedBy) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Missing processed_by user ID.',
@@ -1808,8 +1762,6 @@ class ProductRepository implements ProductRepositoryInterface
                     ->where('type', 'Payment')
                     ->sum('amount');
 
-
-
                 foreach ($campaign->adverts as $advert) {
                     // ✅ Filter invoices for this user
                     $userInvoices = $advert->invoices->where('processed_by', $processedBy);
@@ -1832,14 +1784,20 @@ class ProductRepository implements ProductRepositoryInterface
                     }
 
                     $screenshots = $advert->screenshots->where('processed_by', $processedBy);
-                    if ($screenshots->isEmpty()) continue;
+                    if ($screenshots->isEmpty()) {
+                        continue;
+                    }
 
                     $firstScreenshot = $screenshots->where('number', 1)->first();
                     $lastScreenshot = $screenshots->where('number', 2)->first();
-                    if (!$firstScreenshot) continue;
+                    if (! $firstScreenshot) {
+                        continue;
+                    }
 
                     $user = $firstScreenshot->user;
-                    if (!$user || $user->id != $processedBy) continue;
+                    if (! $user || $user->id != $processedBy) {
+                        continue;
+                    }
 
                     $hasInvoice = $userInvoices->isNotEmpty();
                     $screenshotCount = $screenshots->count();
@@ -1847,7 +1805,7 @@ class ProductRepository implements ProductRepositoryInterface
                     $firstScreenshotTime = Carbon::parse($firstScreenshot->created_at, 'Africa/Nairobi');
                     $ongoingEnd = $firstScreenshotTime->copy()->addDay();
                     $isNowBetween = $now->between($firstScreenshotTime, $ongoingEnd, true);
-                    $isOngoing = $screenshotCount < 2 && !$hasInvoice && $isNowBetween;
+                    $isOngoing = $screenshotCount < 2 && ! $hasInvoice && $isNowBetween;
 
                     if ($hasInvoice) {
                         $views = $lastScreenshot->views ?? 0;
@@ -1915,6 +1873,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'invoices_summary' => $invoiceSummary,
                 ];
             }
+
             return view('reports.individual_report', [
                 'campaignReports' => $campaignReports,
                 'summary' => $summary,
@@ -1924,7 +1883,7 @@ class ProductRepository implements ProductRepositoryInterface
                 'total_reward' => $totalRewards ?? 0.00,
                 'total_payment' => $totalPayment ?? 0.00,
                 'invoicingActivity' => $invoicingActivity ?? [],
-                'accountBalance' => $latestRecord->customer_balance ?? 0.00
+                'accountBalance' => $latestRecord->customer_balance ?? 0.00,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -1935,7 +1894,6 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-
     public function getCampaignTimelyPersional(Request $request)
     {
         try {
@@ -1944,7 +1902,7 @@ class ProductRepository implements ProductRepositoryInterface
             $to = $request->query('to_date');
             $status = $request->query('status');
 
-            if (!$userId || !$status) {
+            if (! $userId || ! $status) {
                 return response()->json([
                     'message' => 'User ID and status are required in the query parameters.',
                 ], 400);
@@ -1952,7 +1910,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             $adverts = AdvertImages::query()
                 ->whereDate('created_at', '>=', $from)
-                ->whereDate('created_at', '<=', $to);;
+                ->whereDate('created_at', '<=', $to);
 
             if ($status === 'available') {
                 $adverts->whereDoesntHave('screenshots', function ($query) use ($userId) {
@@ -1968,14 +1926,14 @@ class ProductRepository implements ProductRepositoryInterface
                 $adverts->whereDoesntHave('invoices', function ($query) use ($userId) {
                     $query->where('processed_by', $userId);
                 })
-                    ->whereRaw("
+                    ->whereRaw('
                 (
                     SELECT MIN(created_at)
                     FROM screenshots
                     WHERE screenshots.advert_id = advert_images.id
                     AND screenshots.processed_by = ?
                 ) >= ?
-            ", [$userId, $ongoingThreshold])
+            ', [$userId, $ongoingThreshold])
                     ->withCount(['screenshots as user_screenshot_count' => function ($query) use ($userId) {
                         $query->where('processed_by', $userId);
                     }])
@@ -1996,18 +1954,18 @@ class ProductRepository implements ProductRepositoryInterface
                     ->withCount([
                         'screenshots as user_screenshot_count' => function ($query) use ($userId) {
                             $query->where('processed_by', $userId);
-                        }
+                        },
                     ])
                     ->having('user_screenshot_count', '<', 2)
                     ->with([
                         'screenshots' => function ($query) use ($userId) {
                             $query->where('processed_by', $userId)->orderBy('created_at', 'asc');
                         },
-                        'campaign'
+                        'campaign',
                     ])
                     ->paginate(10);
             }
-            if ($status == "account_activity") {
+            if ($status == 'account_activity') {
                 $invoicingActivity = Invoice::where('invoices.processed_by', $userId)
                     ->whereBetween('invoices.created_at', [$from, $to])
                     ->leftJoin('users', 'invoices.processed_by', '=', 'users.id')
@@ -2023,14 +1981,13 @@ class ProductRepository implements ProductRepositoryInterface
                         'campaigns.name as campaign_name'
                     )
                     ->get();
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Successfuly retrived a/c activity',
-                    'activity' =>      $invoicingActivity,
-                ],);
+                    'activity' => $invoicingActivity,
+                ], );
             }
-
-
 
             if ($status === 'completed') {
                 $adverts->whereHas('invoices', function ($query) use ($userId) {
@@ -2049,16 +2006,16 @@ class ProductRepository implements ProductRepositoryInterface
                         $query->where('processed_by', $userId)
                             ->orderBy('created_at', 'asc');
                     },
-                    'campaign:id,valid_until'
+                    'campaign:id,valid_until',
                 ])
                 ->paginate(10);
 
             return response()->json([
                 'message' => 'Adverts retrieved successfully.',
                 'data' => $adverts->through(function ($advert) use ($status) {
-                    $imagePath = 'storage/' . $advert->image_path;
+                    $imagePath = 'storage/'.$advert->image_path;
                     $screenshot = $advert->screenshots->first();
-                    $screenshotPath = $screenshot?->screenshot ? 'storage/' . $screenshot->screenshot : null;
+                    $screenshotPath = $screenshot?->screenshot ? 'storage/'.$screenshot->screenshot : null;
 
                     $screenshotCount = match ($status) {
                         'available' => 0,
@@ -2079,7 +2036,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'image_url' => asset($imagePath),
                         'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
                         'video_path' => $advert->video_path,
-                        'video_url' => $advert->video_path ? asset('storage/' . $advert->video_path) : null,
+                        'video_url' => $advert->video_path ? asset('storage/'.$advert->video_path) : null,
                         'video_download_url' => $advert->video_path ? route('download.advert.image', ['path' => $advert->video_path]) : null,
                         'user_screenshot' => $screenshot?->screenshot,
                         'screenshot_url' => $screenshotPath ? asset($screenshotPath) : null,
@@ -2104,13 +2061,10 @@ class ProductRepository implements ProductRepositoryInterface
         } catch (\Throwable $th) {
             return response()->json([
                 'message' => 'An error occurred.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 500);
         }
     }
-
-
-
 
     public function getExcellFileForPayment(Request $request)
     {
@@ -2136,7 +2090,6 @@ class ProductRepository implements ProductRepositoryInterface
                 ->where('invoices.customer_balance', '>', '0')
                 ->get();
 
-
             $data = $latestInvoices->map(function ($invoice) {
                 return [
                     $invoice->fullname,
@@ -2148,7 +2101,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             return Excel::download(
                 new GenericExport($data),
-                'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx'
+                'payment_as_at_'.now()->format('Y-m-d_H-i-s').'.xlsx'
             );
         } catch (\Throwable $th) {
             return response()->json([
@@ -2159,15 +2112,11 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-
-
-
-
     public function uploadPaymentExcell(Request $request)
     {
         try {
             $request->validate([
-                'file' => 'required|file|mimes:xlsx,xls'
+                'file' => 'required|file|mimes:xlsx,xls',
             ]);
 
             $spreadsheet = IOFactory::load($request->file('file'));
@@ -2176,23 +2125,27 @@ class ProductRepository implements ProductRepositoryInterface
 
             $data = [];
             foreach ($rows as $index => $row) {
-                if (strtolower($row[2]) == 'payee name' || empty($row[11])) continue;
+                if (strtolower($row[2]) == 'payee name' || empty($row[11])) {
+                    continue;
+                }
                 // dd($row);
                 $data[] = [
                     'payee_name' => $row[2],
                     'phone' => $row[4],
-                    'amount' => (float)$row[8],
+                    'amount' => (float) $row[8],
                     'transaction_receipt' => $row[11],
                     'transaction_status' => $row[12],
                 ];
             }
-            //dd($data);
+            // dd($data);
 
             DB::beginTransaction();
 
             foreach ($data as $payment) {
                 $user = User::where('phone', $payment['phone'])->first();
-                if (!$user) continue; // Skip if user not found
+                if (! $user) {
+                    continue;
+                } // Skip if user not found
 
                 $method = SysMeta::where('meta_shortcode', 'mpesa')->first();
                 $latestInvoice = Invoice::where('processed_by', $user->id)->latest()->first();
@@ -2211,12 +2164,12 @@ class ProductRepository implements ProductRepositoryInterface
                 ]);
 
                 Invoice::create([
-                    "type" => "Payment",
-                    "amount" => $payment['amount'],
-                    "processed_by" => $user->id,
-                    "customer_balance" => $newBalance,
-                    "posted_by" => $user->id,
-                    "banking" => $newBanking->id
+                    'type' => 'Payment',
+                    'amount' => $payment['amount'],
+                    'processed_by' => $user->id,
+                    'customer_balance' => $newBalance,
+                    'posted_by' => $user->id,
+                    'banking' => $newBanking->id,
                 ]);
             }
 
@@ -2229,11 +2182,12 @@ class ProductRepository implements ProductRepositoryInterface
             ]);
         } catch (\Throwable $th) {
             DB::rollBack();
+
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
                 'message' => 'Failed to process the Excel file.',
-                'error' => $th->getMessage()
+                'error' => $th->getMessage(),
             ], 400);
         }
     }

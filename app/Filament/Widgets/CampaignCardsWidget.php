@@ -2,15 +2,14 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Campaign;
 use App\Models\AdvertImages;
+use App\Models\Campaign;
+use App\Models\Invoice;
 use App\Models\Screenshots;
 use App\Models\User;
-use App\Models\Invoice;
+use Carbon\Carbon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Filament\Widgets\StatsOverviewWidget\Card;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CampaignCardsWidget extends StatsOverviewWidget
@@ -46,10 +45,10 @@ class CampaignCardsWidget extends StatsOverviewWidget
             'adverts.screenshots',
             'adverts.invoices' => function ($q) use ($start, $end) {
                 $q->whereBetween('created_at', [$start, $end]);
-            }
+            },
         ])
-        ->whereBetween('created_at', [$start, $end])
-        ->get();
+            ->whereBetween('created_at', [$start, $end])
+            ->get();
 
         // Collect campaign IDs
         $campaignIds = $campaigns->pluck('id');
@@ -59,7 +58,7 @@ class CampaignCardsWidget extends StatsOverviewWidget
 
         // Calculate reward assigned
         $campaigns->each(function ($campaign) use (&$rewardAssigned) {
-            $comp = $campaign->adverts->filter(fn($ad) => $ad->invoices->isNotEmpty())->count();
+            $comp = $campaign->adverts->filter(fn ($ad) => $ad->invoices->isNotEmpty())->count();
             $compReward = $comp * ($campaign->reward ?? 0);
             $rewardAssigned += $compReward;
         });
@@ -95,7 +94,7 @@ class CampaignCardsWidget extends StatsOverviewWidget
                 ->color('danger'),
 
             Stat::make('Total Campaigns', $totalCampaigns)
-                ->description($activeCampaigns . ' currently active')
+                ->description($activeCampaigns.' currently active')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->chart([7, 2, 10, 3, 15, 4, 17])
                 ->color('success'),
@@ -130,19 +129,19 @@ class CampaignCardsWidget extends StatsOverviewWidget
                 ->color('success'),
 
             // New payment-related statistics
-            Stat::make('Rewards Assigned', 'KSh ' . number_format($rewardAssigned, 2))
+            Stat::make('Rewards Assigned', 'KSh '.number_format($rewardAssigned, 2))
                 ->icon('heroicon-o-gift')
                 ->description('Total rewards allocated')
                 ->descriptionIcon('heroicon-m-star')
                 ->color('warning'),
 
-            Stat::make('Payments Done', 'KSh ' . number_format($paymentDone, 2))
+            Stat::make('Payments Done', 'KSh '.number_format($paymentDone, 2))
                 ->icon('heroicon-o-banknotes')
                 ->description('Completed payments today')
                 ->descriptionIcon('heroicon-m-check-circle')
                 ->color('success'),
 
-            Stat::make('Pending Payments', 'KSh ' . number_format($totalBalance, 2))
+            Stat::make('Pending Payments', 'KSh '.number_format($totalBalance, 2))
                 ->icon('heroicon-o-clock')
                 ->description('Outstanding balances')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')

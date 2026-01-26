@@ -2,18 +2,17 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\Session;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class SessionService
 {
     /**
      * Track user login and create/update session
      */
-    public function trackLogin(User $user, string $sessionId = null): void
+    public function trackLogin(User $user, ?string $sessionId = null): void
     {
         $sessionId = $sessionId ?? session()->getId();
 
@@ -35,7 +34,7 @@ class SessionService
     /**
      * Track user logout and clean up session
      */
-    public function trackLogout(User $user, string $sessionId = null): void
+    public function trackLogout(User $user, ?string $sessionId = null): void
     {
         $sessionId = $sessionId ?? session()->getId();
 
@@ -46,7 +45,7 @@ class SessionService
         $hasOtherSessions = $this->hasActiveSessions($user, $sessionId);
 
         // Update login status only if no other sessions exist
-        if (!$hasOtherSessions) {
+        if (! $hasOtherSessions) {
             $user->update(['is_logged_in' => false]);
         }
 
@@ -88,7 +87,7 @@ class SessionService
         $hasOtherSessions = $this->hasActiveSessions($user, $sessionId);
 
         // Update login status if no other sessions exist
-        if (!$hasOtherSessions) {
+        if (! $hasOtherSessions) {
             $user->update(['is_logged_in' => false]);
         }
 
@@ -112,6 +111,7 @@ class SessionService
             ->map(function ($session) {
                 $session->last_activity = Carbon::createFromTimestamp($session->last_activity);
                 $session->browser_info = $this->parseBrowserInfo($session->user_agent);
+
                 return $session;
             });
     }
@@ -160,7 +160,7 @@ class SessionService
     /**
      * Check if user has active sessions excluding a specific session
      */
-    protected function hasActiveSessions(User $user, string $excludeSessionId = null): bool
+    protected function hasActiveSessions(User $user, ?string $excludeSessionId = null): bool
     {
         $query = DB::table('sessions')
             ->where('user_id', $user->id)
@@ -178,7 +178,7 @@ class SessionService
      */
     protected function parseBrowserInfo(?string $userAgent): array
     {
-        if (!$userAgent) {
+        if (! $userAgent) {
             return ['browser' => 'Unknown', 'platform' => 'Unknown'];
         }
 
@@ -187,26 +187,26 @@ class SessionService
 
         // Browser detection
         if (preg_match('/Chrome\/(\d+)/i', $userAgent, $matches)) {
-            $browser = 'Chrome ' . $matches[1];
+            $browser = 'Chrome '.$matches[1];
         } elseif (preg_match('/Firefox\/(\d+)/i', $userAgent, $matches)) {
-            $browser = 'Firefox ' . $matches[1];
+            $browser = 'Firefox '.$matches[1];
         } elseif (preg_match('/Safari\/(\d+)/i', $userAgent, $matches)) {
             $browser = 'Safari';
         } elseif (preg_match('/Edge\/(\d+)/i', $userAgent, $matches)) {
-            $browser = 'Edge ' . $matches[1];
+            $browser = 'Edge '.$matches[1];
         }
 
         // Platform detection
         if (preg_match('/Windows NT (\d+\.\d+)/i', $userAgent, $matches)) {
-            $platform = 'Windows ' . $matches[1];
+            $platform = 'Windows '.$matches[1];
         } elseif (preg_match('/Mac OS X (\d+[._]\d+)/i', $userAgent, $matches)) {
-            $platform = 'macOS ' . str_replace('_', '.', $matches[1]);
+            $platform = 'macOS '.str_replace('_', '.', $matches[1]);
         } elseif (preg_match('/Linux/i', $userAgent)) {
             $platform = 'Linux';
         } elseif (preg_match('/Android (\d+)/i', $userAgent, $matches)) {
-            $platform = 'Android ' . $matches[1];
+            $platform = 'Android '.$matches[1];
         } elseif (preg_match('/iPhone OS (\d+[._]\d+)/i', $userAgent, $matches)) {
-            $platform = 'iOS ' . str_replace('_', '.', $matches[1]);
+            $platform = 'iOS '.str_replace('_', '.', $matches[1]);
         }
 
         return [
@@ -219,7 +219,7 @@ class SessionService
     /**
      * Log session activity (optional - you can implement your own logging)
      */
-    protected function logActivity(User $user, string $action, string $sessionId = null): void
+    protected function logActivity(User $user, string $action, ?string $sessionId = null): void
     {
         // You can implement activity logging here
         // For example, create an ActivityLog model or use Laravel's built-in logging

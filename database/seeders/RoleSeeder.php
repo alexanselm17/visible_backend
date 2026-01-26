@@ -39,6 +39,9 @@ class RoleSeeder extends Seeder
             'slug' => 'salesman',
         ]);
 
-      
+        RolesModel::create([
+            'name' => 'Campaign Owner',
+            'slug' => 'campaign_owner',
+        ]);
     }
 }

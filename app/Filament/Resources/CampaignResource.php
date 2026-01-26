@@ -5,14 +5,14 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CampaignResource\Pages;
 use App\Models\Campaign;
 use Filament\Forms;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Support\Enums\FontWeight;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Tables;
 use Filament\Tables\Columns\BadgeColumn;
-use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class CampaignResource extends Resource
 {
@@ -54,7 +54,7 @@ class CampaignResource extends Resource
                 TextColumn::make('adverts_count')
                     ->label('Total Adverts')
                     ->badge()
-                    ->color(fn($state) => $state > 0 ? 'success' : 'gray')
+                    ->color(fn ($state) => $state > 0 ? 'success' : 'gray')
                     ->counts('adverts')
                     ->sortable(),
 
@@ -70,23 +70,23 @@ class CampaignResource extends Resource
                     ->label('Screenshots')
                     ->badge()
                     ->color('warning')
-                    ->getStateUsing(fn($record) => $record->total_screenshots ?? 0),
+                    ->getStateUsing(fn ($record) => $record->total_screenshots ?? 0),
 
                 TextColumn::make('total_views')
                     ->label('Total Views')
                     ->badge()
                     ->color('purple')
-                    ->getStateUsing(fn($record) => number_format($record->total_views ?? 0)),
+                    ->getStateUsing(fn ($record) => number_format($record->total_views ?? 0)),
 
                 TextColumn::make('total_rewards_distributed')
                     ->label('Rewards Paid')
                     ->money('KSH')
                     ->color('success')
-                    ->getStateUsing(fn($record) => $record->total_rewards_distributed ?? 0),
+                    ->getStateUsing(fn ($record) => $record->total_rewards_distributed ?? 0),
 
                 BadgeColumn::make('is_active')
                     ->label('Status')
-                    ->getStateUsing(fn($record) => $record->is_active ? 'Active' : 'Expired')
+                    ->getStateUsing(fn ($record) => $record->is_active ? 'Active' : 'Expired')
                     ->colors([
                         'success' => 'Active',
                         'danger' => 'Expired',
@@ -139,7 +139,7 @@ class CampaignResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->striped()
             ->paginated([10, 25, 50])
-            ->recordUrl(fn($record) => Pages\ViewCampaign::getUrl([$record->id]));
+            ->recordUrl(fn ($record) => Pages\ViewCampaign::getUrl([$record->id]));
     }
 
     public static function getRelations(): array

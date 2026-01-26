@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\AdvertImages;
 use App\Models\Screenshots;
 use App\Models\User;
-use App\Models\AdvertImages;
 use App\Services\FirebaseService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -54,7 +54,7 @@ class CleanupExpiredCampaigns extends Command
                         ->where('data->action', 'campaign_expired')
                         ->exists();
 
-                    if (!$existingNotification) {
+                    if (! $existingNotification) {
                         $this->sendFinalExpirationNotification($user, $advert, $totalScreenshots);
                         $notificationsSent++;
                     }
@@ -63,6 +63,7 @@ class CleanupExpiredCampaigns extends Command
         }
 
         $this->info("Cleanup completed. Sent {$notificationsSent} expiration notifications.");
+
         return 0;
     }
 
@@ -72,12 +73,12 @@ class CleanupExpiredCampaigns extends Command
     private function sendFinalExpirationNotification(User $user, AdvertImages $advert, int $completedCount): void
     {
         try {
-            $title = "Campaign Expired 😔";
+            $title = 'Campaign Expired 😔';
             $message = "The 24-hour window for '{$advert->name}' has expired. You completed {$completedCount} out of 5 screenshots.";
 
             // Send push notification if user has FCM token
             if ($user->fcm_token) {
-                $firebase = new FirebaseService();
+                $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             }
 
@@ -92,13 +93,13 @@ class CleanupExpiredCampaigns extends Command
                     'advert_name' => $advert->name,
                     'screenshots_uploaded' => $completedCount,
                     'screenshots_required' => 5,
-                    'action' => 'campaign_expired'
+                    'action' => 'campaign_expired',
                 ],
             ]);
 
             Log::info("Sent final expiration notification to user {$user->id} for advert {$advert->id}");
         } catch (\Exception $e) {
-            Log::error("Failed to send final expiration notification to user {$user->id}: " . $e->getMessage());
+            Log::error("Failed to send final expiration notification to user {$user->id}: ".$e->getMessage());
         }
     }
 }

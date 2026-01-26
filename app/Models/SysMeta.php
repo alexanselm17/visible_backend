@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+
 class SysMeta extends Model
 {
     use HasFactory;
@@ -18,9 +19,10 @@ class SysMeta extends Model
 
     protected $hidden = ['created_at', 'updated_at'];
 
-    public $incrementing = false;  
-    protected $keyType = 'string';  
-  
+    public $incrementing = false;
+
+    protected $keyType = 'string';
+
     protected static function booted()
     {
         static::creating(function ($sysMeta) {
@@ -35,6 +37,7 @@ class SysMeta extends Model
     {
         return $this->hasMany(Banking::class, 'deposit_method');
     }
+
     public function petrolStation()
     {
         return $this->belongsTo(PetrolStation::class, 'petrol_id');

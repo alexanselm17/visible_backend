@@ -3,12 +3,12 @@
 namespace App\Filament\Resources\CampaignResource\Pages;
 
 use App\Filament\Resources\CampaignResource;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Carbon;
 use App\Http\Controllers\ProductController;
 use App\Repositories\Products\ProductRepositoryInterface;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\EditRecord;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class EditCampaign extends EditRecord
 {
@@ -21,7 +21,7 @@ class EditCampaign extends EditRecord
                 ? Carbon::parse("{$data['valid_until_date']} {$data['valid_until_time']}")->toDateTimeString()
                 : null;
 
-            $request = new Request();
+            $request = new Request;
             $request->merge([
                 'name' => $data['name'],
                 'capital_invested' => $data['capital_invested'],
@@ -48,6 +48,7 @@ class EditCampaign extends EditRecord
             }
 
             $record->refresh();
+
             return $record;
         } catch (\Throwable $e) {
             Notification::make()
@@ -59,6 +60,7 @@ class EditCampaign extends EditRecord
             return $record;
         }
     }
+
     protected function mutateFormDataBeforeFill(array $data): array
     {
         if (isset($data['valid_until'])) {
@@ -69,7 +71,6 @@ class EditCampaign extends EditRecord
 
         return $data;
     }
-
 
     protected function mutateFormDataBeforeSave(array $data): array
     {

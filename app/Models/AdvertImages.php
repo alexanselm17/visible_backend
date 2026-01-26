@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class AdvertImages extends Model
 {
-    protected $table = "advert_images";
+    protected $table = 'advert_images';
 
     protected $fillable = [
         'image_path',
@@ -21,10 +21,11 @@ class AdvertImages extends Model
         'capital_invested',
         'valid_until',
         'capacity',
-        'target_audience'
+        'target_audience',
     ];
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $casts = [
@@ -54,8 +55,7 @@ class AdvertImages extends Model
     {
         return $this->hasMany(Screenshots::class, 'advert_id');
     }
-  
-    
+
     public function invoices()
     {
         return $this->hasMany(Invoice::class, 'advert_id');

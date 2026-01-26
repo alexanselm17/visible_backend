@@ -27,7 +27,7 @@ class RestorePassword extends FormRequest
             'password' => 'required|confirmed',
             'username' => 'required',
             'phone' => 'required',
-            'email'=>'required',
+            'email' => 'required',
 
         ];
     }

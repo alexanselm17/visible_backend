@@ -2,13 +2,13 @@
 
 namespace App\Observers;
 
-use App\Models\Screenshots;
+use App\Jobs\SendIncompleteScreenshotNotification;
 use App\Models\AdvertImages;
+use App\Models\Notification;
+use App\Models\Screenshots;
 use App\Models\User;
 use App\Services\FirebaseService;
-use App\Jobs\SendIncompleteScreenshotNotification;
 use Illuminate\Support\Facades\Log;
-use App\Models\Notification;
 
 class ScreenshotObserver
 {
@@ -32,9 +32,9 @@ class ScreenshotObserver
     {
         // Get the advert and user
         $advert = $screenshot->advert ?? AdvertImages::find($screenshot->advert_id);
-        $user   = $screenshot->user ?? User::find($screenshot->processed_by);
+        $user = $screenshot->user ?? User::find($screenshot->processed_by);
 
-        if (!$advert || !$user) {
+        if (! $advert || ! $user) {
             return;
         }
 
@@ -56,7 +56,7 @@ class ScreenshotObserver
                 ->where('data->advert_id', $advert->id)
                 ->exists();
 
-            if (!$alreadySent) {
+            if (! $alreadySent) {
                 $this->sendCompletionNotification($user, $advert);
             }
         }
@@ -91,12 +91,12 @@ class ScreenshotObserver
     private function sendCompletionNotification(User $user, AdvertImages $advert): void
     {
         try {
-            $firebase = new FirebaseService();
+            $firebase = new FirebaseService;
 
-            $title = "Campaign Completed! 🎉";
+            $title = 'Campaign Completed! 🎉';
             $message = "Congratulations! You've successfully uploaded all screenshots for '{$advert->name}'. Your reward is being processed.";
 
-            if (!empty($user->fcm_token)) {
+            if (! empty($user->fcm_token)) {
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             }
 
@@ -116,7 +116,7 @@ class ScreenshotObserver
 
             Log::info("Sent completion notification to user {$user->id} for advert {$advert->id}");
         } catch (\Throwable $e) {
-            Log::error("Failed to send completion notification to user {$user->id}: " . $e->getMessage());
+            Log::error("Failed to send completion notification to user {$user->id}: ".$e->getMessage());
         }
     }
 }

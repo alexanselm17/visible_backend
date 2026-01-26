@@ -2,12 +2,13 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\LineChartWidget;
 use App\Models\Screenshots;
+use Filament\Widgets\LineChartWidget;
 
 class ScreenshotsSubmissionChart extends LineChartWidget
 {
     protected static ?string $heading = 'Screenshots Submissions (Last 7 Days)';
+
     protected static ?int $sort = 2;
 
     protected function getData(): array
@@ -18,10 +19,10 @@ class ScreenshotsSubmissionChart extends LineChartWidget
         foreach (range(6, 0) as $i) {
             $date = now()->subDays($i);
             $labels[] = $date->format('M d');
-            
+
             $dailySubmissions = Screenshots::whereDate('created_at', $date)
                 ->count();
-            
+
             $submissions[] = $dailySubmissions;
         }
 

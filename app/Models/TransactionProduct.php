@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+
 class TransactionProduct extends Model
 {
     use HasFactory;
@@ -27,11 +27,10 @@ class TransactionProduct extends Model
         'price',
         'quantity',
         'total',
-        'discount'
+        'discount',
     ];
 
-
-     protected $casts = [
+    protected $casts = [
         'price' => 'decimal:2',  // Ensure buying_price is cast to decimal with 2 decimal places
         'quantity' => 'decimal:2',
         'total' => 'decimal:2', // Ensure selling_price is cast to decimal with 2 decimal places
@@ -52,5 +51,4 @@ class TransactionProduct extends Model
     {
         return $this->belongsTo(ProductsModel::class, 'product_id');
     }
-
 }

@@ -2,13 +2,13 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\BarChartWidget;
-use App\Models\User;
 use App\Models\Screenshots;
+use Filament\Widgets\BarChartWidget;
 
 class UserEngagementChart extends BarChartWidget
 {
     protected static ?string $heading = 'Top 10 Most Active Users (Screenshots Submitted)';
+
     protected static ?int $sort = 7;
 
     protected function getData(): array

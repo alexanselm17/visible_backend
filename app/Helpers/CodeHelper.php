@@ -1,9 +1,9 @@
 <?php
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
-if (!function_exists('generateUniqueCode')) {
+if (! function_exists('generateUniqueCode')) {
     function generateUniqueCode(string $table, string $column = 'code', int $length = 10): string
     {
         do {

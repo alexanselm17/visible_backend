@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+
 class TransactionDetail extends Model
 {
     use HasFactory;
@@ -21,18 +21,18 @@ class TransactionDetail extends Model
      *
      * @var array<int, string>
      */
-
     protected $fillable = [
         'transaction_type',
         'transaction_id',
         'processed_by',
         'gross_total',
 
-        "approval_status",
-        'approved_by'
+        'approval_status',
+        'approved_by',
 
     ];
-      protected $casts = [
+
+    protected $casts = [
         'gross_total' => 'decimal:2',
     ];
 
@@ -51,8 +51,6 @@ class TransactionDetail extends Model
     {
         return $this->belongsTo(User::class, 'processed_by');
     }
-
-
 
     /**
      * Get the transaction product.
