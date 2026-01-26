@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        // 1. Ensure owner_id is nullable temporarily
         Schema::table('campaigns', function (Blueprint $table) {
             $table->uuid('owner_id')->nullable()->change();
         });
