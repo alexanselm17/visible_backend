@@ -54,15 +54,6 @@ Route::group(['prefix' => 'v1'], function () {
 
 
 
-    Route::group(['prefix' => 'setup'], function () {
-
-        Route::post('/company', [SetupController::class, 'registerCompany']);
-
-        Route::put('/company/{id}', [SetupController::class, 'updateCompany']);
-        Route::post('/company/petrol_station/{companyId}', [SetupController::class, 'registerPetrolStation']);
-        Route::put('/company/petrol_station/{petrolStationId}', [SetupController::class, 'updatePetrolStation']);
-        Route::get('/company/petrol_station/{companyId}', [SetupController::class, 'getPetrolStation']);
-    });
 
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
         Route::group(['prefix' => 'campaign'], function () {
@@ -124,10 +115,6 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/search', [ProductController::class, 'searchProducts']);
         });
 
-        Route::group(['prefix' => 'customers'], function () {
-            Route::get('/{petrolStationId}', [CustomersController::class, 'fetchCustomers']);
-            Route::get('/{petrolStationId}/search', [CustomersController::class, 'searchCustomers']);
-        });
 
 
 
