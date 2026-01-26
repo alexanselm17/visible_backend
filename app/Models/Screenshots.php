@@ -12,10 +12,11 @@ class Screenshots extends Model
         'advert_id',
         'processed_by',
         'views',
-        'timestamp'
+        'timestamp',
     ];
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected static function boot()

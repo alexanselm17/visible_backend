@@ -7,8 +7,6 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class NotificationsRelationManager extends RelationManager
 {
@@ -61,13 +59,13 @@ class NotificationsRelationManager extends RelationManager
                     ->falseIcon('heroicon-o-envelope')
                     ->trueColor('success')
                     ->falseColor('warning')
-                    ->tooltip(fn(bool $state): string => $state ? 'Read' : 'Unread'),
+                    ->tooltip(fn (bool $state): string => $state ? 'Read' : 'Unread'),
 
                 Tables\Columns\TextColumn::make('title')
                     ->label('Title')
                     ->searchable()
                     ->sortable()
-                    ->weight(fn($record) => $record->is_read ? 'normal' : 'bold'),
+                    ->weight(fn ($record) => $record->is_read ? 'normal' : 'bold'),
 
                 Tables\Columns\TextColumn::make('message')
                     ->label('Message')
@@ -77,6 +75,7 @@ class NotificationsRelationManager extends RelationManager
                         if (strlen($state) <= 50) {
                             return null;
                         }
+
                         return $state;
                     }),
 
@@ -122,15 +121,15 @@ class NotificationsRelationManager extends RelationManager
                     ->label('Mark as Read')
                     ->icon('heroicon-m-envelope-open')
                     ->color('success')
-                    ->action(fn($record) => $record->update(['is_read' => true]))
-                    ->visible(fn($record) => !$record->is_read),
+                    ->action(fn ($record) => $record->update(['is_read' => true]))
+                    ->visible(fn ($record) => ! $record->is_read),
 
                 Tables\Actions\Action::make('mark_as_unread')
                     ->label('Mark as Unread')
                     ->icon('heroicon-m-envelope')
                     ->color('warning')
-                    ->action(fn($record) => $record->update(['is_read' => false]))
-                    ->visible(fn($record) => $record->is_read),
+                    ->action(fn ($record) => $record->update(['is_read' => false]))
+                    ->visible(fn ($record) => $record->is_read),
 
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -142,13 +141,13 @@ class NotificationsRelationManager extends RelationManager
                         ->label('Mark as Read')
                         ->icon('heroicon-m-envelope-open')
                         ->color('success')
-                        ->action(fn($records) => $records->each->update(['is_read' => true])),
+                        ->action(fn ($records) => $records->each->update(['is_read' => true])),
 
                     Tables\Actions\BulkAction::make('mark_as_unread')
                         ->label('Mark as Unread')
                         ->icon('heroicon-m-envelope')
                         ->color('warning')
-                        ->action(fn($records) => $records->each->update(['is_read' => false])),
+                        ->action(fn ($records) => $records->each->update(['is_read' => false])),
 
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),

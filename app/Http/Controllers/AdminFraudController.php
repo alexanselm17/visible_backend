@@ -13,7 +13,7 @@ class AdminFraudController extends Controller
      */
     private function fraudHash($campaignId, $advertId, $patternKey): string
     {
-        return sha1($campaignId . '|' . $advertId . '|' . $patternKey);
+        return sha1($campaignId.'|'.$advertId.'|'.$patternKey);
     }
 
     /**
@@ -46,7 +46,6 @@ class AdminFraudController extends Controller
             $advertsMap = DB::table('advert_images')
                 ->whereIn('id', $advertIds)
                 ->pluck('name', 'id');
-
 
             if ($advertIds->isEmpty()) {
                 return response()->json([
@@ -81,7 +80,9 @@ class AdminFraudController extends Controller
 
             foreach ($advertIds as $advertId) {
                 $shotsForAdvert = $screenshots->where('advert_id', $advertId)->values();
-                if ($shotsForAdvert->isEmpty()) continue;
+                if ($shotsForAdvert->isEmpty()) {
+                    continue;
+                }
 
                 // Group by views + timestamp
                 $patterns = [];
@@ -95,7 +96,7 @@ class AdminFraudController extends Controller
                         'views' => (int) $s->views,
                         'timestamp' => (string) $s->timestamp,
                         'number' => isset($s->number) ? (int) $s->number : null,
-                        'url' => URL::to('storage/' . $s->screenshot),
+                        'url' => URL::to('storage/'.$s->screenshot),
                     ];
                 }
 
@@ -188,8 +189,6 @@ class AdminFraudController extends Controller
         }
     }
 
-
-
     public function reviewFraudGroup(Request $request)
     {
         try {
@@ -239,7 +238,6 @@ class AdminFraudController extends Controller
         }
     }
 
-
     public function listReviews(Request $request)
     {
         try {
@@ -258,6 +256,7 @@ class AdminFraudController extends Controller
             // decode payload (optional convenience)
             $rows->getCollection()->transform(function ($r) {
                 $r->fraud_payload = json_decode($r->fraud_payload, true);
+
                 return $r;
             });
 
@@ -313,10 +312,14 @@ class AdminFraudController extends Controller
 
             foreach ($reviews as $r) {
                 $payload = json_decode($r->fraud_payload, true);
-                if (!is_array($payload)) continue;
+                if (! is_array($payload)) {
+                    continue;
+                }
 
                 $details = $payload['details'] ?? [];
-                if (!is_array($details)) continue;
+                if (! is_array($details)) {
+                    continue;
+                }
 
                 $cid = (string) $r->campaign_id;
                 $aid = (string) $r->advert_id;
@@ -334,7 +337,7 @@ class AdminFraudController extends Controller
                     $firstMatch = collect($details)->firstWhere('user_id', $uid);
                     $userName = is_array($firstMatch) ? ($firstMatch['name'] ?? null) : null;
 
-                    if (!isset($users[$uid])) {
+                    if (! isset($users[$uid])) {
                         $users[$uid] = [
                             'user_id' => $uid,
                             'name' => $userName,
@@ -346,7 +349,7 @@ class AdminFraudController extends Controller
                         ];
                     }
 
-                    if (!$users[$uid]['name'] && $userName) {
+                    if (! $users[$uid]['name'] && $userName) {
                         $users[$uid]['name'] = $userName;
                     }
 
@@ -354,13 +357,13 @@ class AdminFraudController extends Controller
                     $users[$uid]['confirmed_groups_count']++;
 
                     // last_confirmed_at
-                    if ($r->reviewed_at && (!$users[$uid]['last_confirmed_at'] || $r->reviewed_at > $users[$uid]['last_confirmed_at'])) {
+                    if ($r->reviewed_at && (! $users[$uid]['last_confirmed_at'] || $r->reviewed_at > $users[$uid]['last_confirmed_at'])) {
                         $users[$uid]['last_confirmed_at'] = $r->reviewed_at;
                     }
 
                     // Track campaigns with counts
                     if ($cid) {
-                        if (!isset($users[$uid]['campaigns'][$cid])) {
+                        if (! isset($users[$uid]['campaigns'][$cid])) {
                             $users[$uid]['campaigns'][$cid] = [
                                 'campaign_id' => $cid,
                                 'campaign_name' => $campaignName,
@@ -372,7 +375,7 @@ class AdminFraudController extends Controller
 
                     // Track adverts with counts
                     if ($aid) {
-                        if (!isset($users[$uid]['adverts'][$aid])) {
+                        if (! isset($users[$uid]['adverts'][$aid])) {
                             $users[$uid]['adverts'][$aid] = [
                                 'advert_id' => $aid,
                                 'advert_name' => $advertName,
@@ -387,9 +390,11 @@ class AdminFraudController extends Controller
                 foreach ($details as $d) {
                     $uid = isset($d['user_id']) ? (string) $d['user_id'] : null;
                     $url = $d['url'] ?? null;
-                    if (!$uid || !$url || !isset($users[$uid])) continue;
+                    if (! $uid || ! $url || ! isset($users[$uid])) {
+                        continue;
+                    }
 
-                    if (count($users[$uid]['sample_evidence']) < 5 && !in_array($url, $users[$uid]['sample_evidence'], true)) {
+                    if (count($users[$uid]['sample_evidence']) < 5 && ! in_array($url, $users[$uid]['sample_evidence'], true)) {
                         $users[$uid]['sample_evidence'][] = $url;
                     }
                 }
@@ -400,15 +405,15 @@ class AdminFraudController extends Controller
 
             foreach ($usersList as &$u) {
                 $u['campaigns'] = array_values($u['campaigns']);
-                usort($u['campaigns'], fn($a, $b) => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
+                usort($u['campaigns'], fn ($a, $b) => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
 
                 $u['adverts'] = array_values($u['adverts']);
-                usort($u['adverts'], fn($a, $b) => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
+                usort($u['adverts'], fn ($a, $b) => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
             }
             unset($u);
 
             // Sort guilty users by most confirmed groups
-            usort($usersList, fn($a, $b) => ($b['confirmed_groups_count'] ?? 0) <=> ($a['confirmed_groups_count'] ?? 0));
+            usort($usersList, fn ($a, $b) => ($b['confirmed_groups_count'] ?? 0) <=> ($a['confirmed_groups_count'] ?? 0));
 
             return response()->json([
                 'campaign_filter' => $campaignId,
@@ -422,7 +427,6 @@ class AdminFraudController extends Controller
             ], 500);
         }
     }
-
 
     public function bulkFraudAction(Request $request)
     {
@@ -447,14 +451,14 @@ class AdminFraudController extends Controller
             $missingIds = array_values(array_diff($userIds, $foundIds));
 
             // Prepare defaults
-            $defaultWarnTitle = "Fraud Warning ⚠️";
-            $defaultWarnMessage = "Your account has been flagged for suspicious activity. Further violations may lead to suspension.";
+            $defaultWarnTitle = 'Fraud Warning ⚠️';
+            $defaultWarnMessage = 'Your account has been flagged for suspicious activity. Further violations may lead to suspension.';
 
-            $defaultDeactTitle = "Account Deactivated 🚫";
-            $defaultDeactMessage = "Your account has been deactivated due to confirmed fraud activity. Contact support if you believe this is an error.";
+            $defaultDeactTitle = 'Account Deactivated 🚫';
+            $defaultDeactMessage = 'Your account has been deactivated due to confirmed fraud activity. Contact support if you believe this is an error.';
 
-            $title = trim((string)($data['title'] ?? ''));
-            $message = trim((string)($data['message'] ?? ''));
+            $title = trim((string) ($data['title'] ?? ''));
+            $message = trim((string) ($data['message'] ?? ''));
             $reason = $data['reason'] ?? null;
 
             $results = [
@@ -464,7 +468,7 @@ class AdminFraudController extends Controller
 
             $firebase = null;
             if ($sendPush) {
-                $firebase = new \App\Services\FirebaseService();
+                $firebase = new \App\Services\FirebaseService;
             }
 
             \Illuminate\Support\Facades\DB::beginTransaction();
@@ -477,10 +481,9 @@ class AdminFraudController extends Controller
                     $user->save();
                     $user->tokens()->delete();
 
-                    $t =  $defaultDeactTitle;
-                    $m =  $defaultDeactMessage;
+                    $t = $defaultDeactTitle;
+                    $m = $defaultDeactMessage;
                     $reportedBy = $data['reported_by'] ?? null;
-
 
                     \App\Models\UserFraud::create([
                         'user_id' => $user->id,
@@ -489,8 +492,6 @@ class AdminFraudController extends Controller
                         'reported_by' => $reportedBy,
                         'flagged_at' => now(),
                     ]);
-
-
 
                     $this->sendUserNotification(
                         user: $user,
@@ -515,7 +516,7 @@ class AdminFraudController extends Controller
 
                 if ($action === 'WARN') {
                     $t = $defaultWarnTitle;
-                    $m =  $defaultWarnMessage;
+                    $m = $defaultWarnMessage;
 
                     $this->sendUserNotification(
                         user: $user,
@@ -559,8 +560,6 @@ class AdminFraudController extends Controller
         }
     }
 
-
-
     private function sendUserNotification(
         \App\Models\User $user,
         string $title,
@@ -571,7 +570,7 @@ class AdminFraudController extends Controller
         ?\App\Services\FirebaseService $firebase
     ): void {
         try {
-            if ($sendPush && !empty($user->fcm_token) && $firebase) {
+            if ($sendPush && ! empty($user->fcm_token) && $firebase) {
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             }
 
@@ -583,7 +582,7 @@ class AdminFraudController extends Controller
                 'data' => $data,
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to notify user {$user->id}: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("Failed to notify user {$user->id}: ".$e->getMessage());
         }
     }
 }

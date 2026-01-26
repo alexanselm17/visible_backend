@@ -3,15 +3,15 @@
 namespace App\Filament\Resources\AdvertImagesResource\Pages;
 
 use App\Filament\Resources\AdvertImagesResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Notifications\Notification;
-use Illuminate\Http\UploadedFile;
-use App\Http\Requests\ProductAdvertRequest;
 use App\Http\Controllers\ProductController;
+use App\Http\Requests\ProductAdvertRequest;
 use App\Repositories\Products\ProductRepositoryInterface;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class CreateAdvertImages extends CreateRecord
@@ -29,9 +29,9 @@ class CreateAdvertImages extends CreateRecord
             $data = $this->form->getState();
 
             // ✅ Ensure valid_until is always set
-            if (!empty($data['valid_until_date']) && !empty($data['valid_until_time'])) {
+            if (! empty($data['valid_until_date']) && ! empty($data['valid_until_time'])) {
                 $time = strlen($data['valid_until_time']) === 5
-                    ? $data['valid_until_time'] . ':00'
+                    ? $data['valid_until_time'].':00'
                     : $data['valid_until_time'];
 
                 $data['valid_until'] = now()
@@ -63,7 +63,7 @@ class CreateAdvertImages extends CreateRecord
      */
     private function buildProductAdvertRequest(array $data): ProductAdvertRequest
     {
-        $request = new ProductAdvertRequest();
+        $request = new ProductAdvertRequest;
 
         // Merge non-file fields
         $request->merge([
@@ -91,15 +91,15 @@ class CreateAdvertImages extends CreateRecord
     private function attachMediaFiles(ProductAdvertRequest $request, array $data): void
     {
         // Handle video and thumbnail
-        if (!empty($data['video_path'])) {
+        if (! empty($data['video_path'])) {
             $this->attachFile($request, 'video', $data['video_path']);
 
-            if (!empty($data['thumbnail'])) {
+            if (! empty($data['thumbnail'])) {
                 $this->attachFile($request, 'thumbnail', $data['thumbnail']);
             }
         }
         // Handle image if no video
-        elseif (!empty($data['image_path'])) {
+        elseif (! empty($data['image_path'])) {
             $this->attachFile($request, 'image', $data['image_path']);
         }
     }
@@ -167,7 +167,7 @@ class CreateAdvertImages extends CreateRecord
 
         // Return null if all values are empty
         $hasValues = collect($targetAudience)
-            ->filter(fn($value) => !empty($value))
+            ->filter(fn ($value) => ! empty($value))
             ->isNotEmpty();
 
         return $hasValues ? json_encode($targetAudience) : null;
@@ -183,7 +183,7 @@ class CreateAdvertImages extends CreateRecord
         foreach ($requiredFields as $field) {
             if (empty($data[$field])) {
                 throw ValidationException::withMessages([
-                    $field => "The {$field} field is required."
+                    $field => "The {$field} field is required.",
                 ]);
             }
         }
@@ -235,7 +235,7 @@ class CreateAdvertImages extends CreateRecord
     {
         Log::error('Unexpected error in CreateAdvertImages::create', [
             'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
+            'trace' => $e->getTraceAsString(),
         ]);
 
         Notification::make()

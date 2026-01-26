@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Exports;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 function generateUniqueCode(string $table, string $column = 'code', int $length = 10): string
 {

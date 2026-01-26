@@ -4,33 +4,28 @@ namespace App\Filament\Resources\UserResource\RelationManagers;
 
 use App\Http\Controllers\ProductController;
 use App\Models\Screenshots;
-use App\Http\Controllers\ProductsController;
 use App\Repositories\Products\ProductRepositoryInterface;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\BadgeColumn;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\DeleteAction;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\Grid;
-use Filament\Support\Enums\FontWeight;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class ScreenshotsRelationManager extends RelationManager
 {
@@ -43,8 +38,6 @@ class ScreenshotsRelationManager extends RelationManager
     protected static ?string $pluralModelLabel = 'Screenshots';
 
     protected static ?string $icon = 'heroicon-o-camera';
-
-
 
     public function form(Form $form): Form
     {
@@ -79,7 +72,7 @@ class ScreenshotsRelationManager extends RelationManager
                                     ->helperText('Leave blank for automatic detection during comparison'),
 
                                 Forms\Components\Hidden::make('processed_by')
-                                    ->default(fn() => $this->ownerRecord->id),
+                                    ->default(fn () => $this->ownerRecord->id),
                             ]),
                     ]),
             ]);
@@ -98,7 +91,7 @@ class ScreenshotsRelationManager extends RelationManager
                         $path = $record->screenshot;
 
                         return $path
-                            ? asset('storage/' . $path)
+                            ? asset('storage/'.$path)
                             : asset('storage/products/default-product.png');
                     }),
 
@@ -110,12 +103,13 @@ class ScreenshotsRelationManager extends RelationManager
                     ->limit(30)
                     ->tooltip(function (TextColumn $column): ?string {
                         $state = $column->getState();
+
                         return strlen($state) > 30 ? $state : null;
                     }),
 
                 BadgeColumn::make('views')
                     ->label('Views')
-                    ->color(fn(int $state): string => match (true) {
+                    ->color(fn (int $state): string => match (true) {
                         $state === 0 => 'gray',
                         $state < 10 => 'warning',
                         $state < 50 => 'success',
@@ -126,13 +120,13 @@ class ScreenshotsRelationManager extends RelationManager
                 TextColumn::make('comparison_score')
                     ->label('Match Score')
                     ->badge()
-                    ->color(fn($state): string => match (true) {
+                    ->color(fn ($state): string => match (true) {
                         $state === null => 'gray',
                         $state >= 90 => 'success',
                         $state >= 70 => 'warning',
                         default => 'danger',
                     })
-                    ->formatStateUsing(fn($state) => $state ? $state . '%' : 'N/A')
+                    ->formatStateUsing(fn ($state) => $state ? $state.'%' : 'N/A')
                     ->sortable()
                     ->toggleable(),
 
@@ -156,17 +150,17 @@ class ScreenshotsRelationManager extends RelationManager
 
                 Tables\Filters\Filter::make('views')
                     ->label('Popular Screenshots')
-                    ->query(fn(Builder $query): Builder => $query->where('views', '>', 10))
+                    ->query(fn (Builder $query): Builder => $query->where('views', '>', 10))
                     ->toggle(),
 
                 Tables\Filters\Filter::make('recent')
                     ->label('Recent (Last 7 Days)')
-                    ->query(fn(Builder $query): Builder => $query->where('created_at', '>=', now()->subDays(7)))
+                    ->query(fn (Builder $query): Builder => $query->where('created_at', '>=', now()->subDays(7)))
                     ->toggle(),
 
                 Tables\Filters\Filter::make('high_match')
                     ->label('High Match Score (>80%)')
-                    ->query(fn(Builder $query): Builder => $query->where('comparison_score', '>', 80))
+                    ->query(fn (Builder $query): Builder => $query->where('comparison_score', '>', 80))
                     ->toggle(),
 
                 Tables\Filters\Filter::make('timestamp')
@@ -180,11 +174,11 @@ class ScreenshotsRelationManager extends RelationManager
                         return $query
                             ->when(
                                 $data['from'],
-                                fn(Builder $query, $date): Builder => $query->whereDate('timestamp', '>=', $date),
+                                fn (Builder $query, $date): Builder => $query->whereDate('timestamp', '>=', $date),
                             )
                             ->when(
                                 $data['until'],
-                                fn(Builder $query, $date): Builder => $query->whereDate('timestamp', '<=', $date),
+                                fn (Builder $query, $date): Builder => $query->whereDate('timestamp', '<=', $date),
                             );
                     }),
             ])
@@ -195,23 +189,24 @@ class ScreenshotsRelationManager extends RelationManager
                     ->mutateFormDataUsing(function (array $data): array {
                         // The selected user in the relation manager
                         $data['processed_by'] = $this->ownerRecord->id;
+
                         return $data;
                     })
                     ->using(function (array $data): Screenshots {
                         try {
                             $advert_id = $data['advert_id'] ?? null; // productId in Dart
-                            $user_id   = $this->ownerRecord->id;     // selected user id
+                            $user_id = $this->ownerRecord->id;     // selected user id
 
                             // Create request object
-                            $request = new Request();
+                            $request = new Request;
                             $request->merge([
                                 'user_id' => $user_id,
                             ]);
 
                             // Convert stored file path from FileUpload into UploadedFile
-                            if (!empty($data['screenshot'])) {
+                            if (! empty($data['screenshot'])) {
                                 // File path in public storage
-                                $filePath = storage_path('app/public/' . $data['screenshot']);
+                                $filePath = storage_path('app/public/'.$data['screenshot']);
 
                                 if (file_exists($filePath)) {
                                     $uploadedFile = new UploadedFile(
@@ -225,19 +220,19 @@ class ScreenshotsRelationManager extends RelationManager
                                     // Attach file to request
                                     $request->files->set('screenshot', $uploadedFile);
                                 } else {
-                                    throw new \Exception('Screenshot file not found at ' . $filePath);
+                                    throw new \Exception('Screenshot file not found at '.$filePath);
                                 }
                             }
 
                             // Call your controller method
                             $controller = new ProductController(app(ProductRepositoryInterface::class));
-                            $response   = $controller->uploadScreenShotPlusCompare($request, $advert_id);
+                            $response = $controller->uploadScreenShotPlusCompare($request, $advert_id);
 
                             // Handle JSON response from controller
                             if ($response instanceof \Illuminate\Http\JsonResponse) {
                                 $responseData = $response->getData(true);
 
-                                if (!empty($responseData['success'])) {
+                                if (! empty($responseData['success'])) {
                                     Notification::make()
                                         ->title('Screenshot uploaded and compared successfully!')
                                         ->success()
@@ -261,7 +256,7 @@ class ScreenshotsRelationManager extends RelationManager
                             Notification::make()
                                 ->title('Upload Error')
                                 ->danger()
-                                ->body('Failed to upload and compare screenshot: ' . $e->getMessage())
+                                ->body('Failed to upload and compare screenshot: '.$e->getMessage())
                                 ->send();
 
                             throw $e;
@@ -271,8 +266,6 @@ class ScreenshotsRelationManager extends RelationManager
                     ->after(function () {
                         $this->dispatch('refresh');
                     }),
-
-
 
             ])
             ->actions([
@@ -296,7 +289,7 @@ class ScreenshotsRelationManager extends RelationManager
                                             TextEntry::make('views')
                                                 ->label('Total Views')
                                                 ->badge()
-                                                ->color(fn(int $state): string => match (true) {
+                                                ->color(fn (int $state): string => match (true) {
                                                     $state === 0 => 'gray',
                                                     $state < 10 => 'warning',
                                                     $state < 50 => 'success',
@@ -306,13 +299,13 @@ class ScreenshotsRelationManager extends RelationManager
                                             TextEntry::make('comparison_score')
                                                 ->label('Comparison Match Score')
                                                 ->badge()
-                                                ->color(fn($state): string => match (true) {
+                                                ->color(fn ($state): string => match (true) {
                                                     $state === null => 'gray',
                                                     $state >= 90 => 'success',
                                                     $state >= 70 => 'warning',
                                                     default => 'danger',
                                                 })
-                                                ->formatStateUsing(fn($state) => $state ? $state . '%' : 'Not compared'),
+                                                ->formatStateUsing(fn ($state) => $state ? $state.'%' : 'Not compared'),
 
                                             TextEntry::make('timestamp')
                                                 ->label('Screenshot Timestamp')
@@ -332,6 +325,7 @@ class ScreenshotsRelationManager extends RelationManager
                     EditAction::make()
                         ->mutateFormDataUsing(function (array $data): array {
                             $data['processed_by'] = $this->ownerRecord->id;
+
                             return $data;
                         }),
 
@@ -342,7 +336,7 @@ class ScreenshotsRelationManager extends RelationManager
                         ->action(function (Screenshots $record) {
                             try {
                                 // Create a request with the existing screenshot
-                                $request = new Request();
+                                $request = new Request;
                                 $request->merge([
                                     'screenshot_id' => $record->id,
                                     'processed_by' => $this->ownerRecord->id,
@@ -390,7 +384,7 @@ class ScreenshotsRelationManager extends RelationManager
                             Notification::make()
                                 ->title('Views updated')
                                 ->success()
-                                ->body('Views incremented for ' . $records->count() . ' screenshots')
+                                ->body('Views incremented for '.$records->count().' screenshots')
                                 ->send();
                         })
                         ->requiresConfirmation()
@@ -406,7 +400,7 @@ class ScreenshotsRelationManager extends RelationManager
 
                             $records->each(function ($record) use (&$successCount, &$failCount) {
                                 try {
-                                    $request = new Request();
+                                    $request = new Request;
                                     $request->merge([
                                         'screenshot_id' => $record->id,
                                         'processed_by' => $this->ownerRecord->id,

@@ -3,28 +3,22 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ScreenshotsResource\Pages;
-use App\Filament\Resources\ScreenshotsResource\RelationManagers;
 use App\Models\Screenshots;
-use App\Models\AdvertImages;
-use App\Models\User;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Support\Enums\FontWeight;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Support\Enums\FontWeight;
+use Filament\Tables;
 use Filament\Tables\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Support\Colors\Color;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ScreenshotsResource extends Resource
 {
@@ -49,7 +43,7 @@ class ScreenshotsResource extends Resource
                             ->required()
                             ->searchable()
                             ->preload()
-                            ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} ({$record->campaign->name})")
+                            ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->name} ({$record->campaign->name})")
                             ->helperText('Select the advertisement this screenshot belongs to')
                             ->columnSpan(2),
 
@@ -105,7 +99,7 @@ class ScreenshotsResource extends Resource
                         $path = $record->screenshot;
 
                         return $path
-                            ? asset('storage/' . $path)
+                            ? asset('storage/'.$path)
                             : asset('storage/products/default-product.png');
                     })
                     ->action(
@@ -116,10 +110,9 @@ class ScreenshotsResource extends Resource
                             ->modalSubmitAction(false)
                             ->modalCancelAction(false)
                             ->modalContent(
-                                fn($record) =>
-                                view('filament.components.image-preview', [
+                                fn ($record) => view('filament.components.image-preview', [
                                     'url' => $record->screenshot
-                                        ? asset('storage/' . $record->screenshot)
+                                        ? asset('storage/'.$record->screenshot)
                                         : asset('storage/products/default-product.png'),
                                 ])
                             )
@@ -133,6 +126,7 @@ class ScreenshotsResource extends Resource
                     ->limit(25)
                     ->tooltip(function (TextColumn $column): ?string {
                         $state = $column->getState();
+
                         return strlen($state) > 25 ? $state : null;
                     }),
 
@@ -149,7 +143,7 @@ class ScreenshotsResource extends Resource
                     ->searchable()
                     ->badge()
                     ->color('info')
-                    ->formatStateUsing(fn($state) => ucfirst($state)),
+                    ->formatStateUsing(fn ($state) => ucfirst($state)),
 
                 TextColumn::make('user.fullname')
                     ->label('Processed By')
@@ -163,7 +157,7 @@ class ScreenshotsResource extends Resource
                     ->sortable()
                     ->alignment('center')
                     ->badge()
-                    ->color(fn($state) => match (true) {
+                    ->color(fn ($state) => match (true) {
                         $state >= 1000 => 'success',
                         $state >= 100 => 'warning',
                         default => 'gray',
@@ -181,7 +175,7 @@ class ScreenshotsResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->since()
-                    ->tooltip(fn($state) => $state->format('M d, Y H:i:s')),
+                    ->tooltip(fn ($state) => $state->format('M d, Y H:i:s')),
 
                 TextColumn::make('updated_at')
                     ->dateTime()
@@ -208,16 +202,16 @@ class ScreenshotsResource extends Resource
                     ->preload(),
 
                 Filter::make('high_views')
-                    ->query(fn(Builder $query): Builder => $query->where('views', '>=', 100))
+                    ->query(fn (Builder $query): Builder => $query->where('views', '>=', 100))
                     ->label('High Views (≥100)'),
 
                 Filter::make('recent')
-                    ->query(fn(Builder $query): Builder => $query->where('created_at', '>=', now()->subDays(7)))
+                    ->query(fn (Builder $query): Builder => $query->where('created_at', '>=', now()->subDays(7)))
                     ->label('Recent (7 days)')
                     ->default(),
 
                 Filter::make('no_views')
-                    ->query(fn(Builder $query): Builder => $query->where('views', 0))
+                    ->query(fn (Builder $query): Builder => $query->where('views', 0))
                     ->label('No Views'),
             ])
             ->actions([
@@ -227,9 +221,8 @@ class ScreenshotsResource extends Resource
                 Action::make('view_full_image')
                     ->icon('heroicon-o-eye')
                     ->color('info')
-                    ->url(fn($record) => asset($record->screenshot))
+                    ->url(fn ($record) => asset($record->screenshot))
                     ->openUrlInNewTab(),
-
 
             ])
             ->bulkActions([

@@ -2,10 +2,10 @@
 
 namespace App\Jobs;
 
-use App\Models\User;
 use App\Models\AdvertImages;
-use App\Models\Screenshots;
 use App\Models\Notification;
+use App\Models\Screenshots;
+use App\Models\User;
 use App\Services\FirebaseService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,11 +19,15 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const REQUIRED_SCREENSHOTS = 2;
+
     private const EXPIRY_HOURS = 24;
+
     private const REMINDER_HOURS = 18;
 
     protected User $user;
+
     protected AdvertImages $advert;
+
     protected int $hoursAfterFirst;
 
     public function __construct(User $user, AdvertImages $advert, int $hoursAfterFirst)
@@ -38,7 +42,8 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
         try {
             // Safety: this job should only ever send at 18 hours
             if ($this->hoursAfterFirst !== self::REMINDER_HOURS) {
-                Log::info("Skipping reminder: hoursAfterFirst={$this->hoursAfterFirst} (expected " . self::REMINDER_HOURS . ")");
+                Log::info("Skipping reminder: hoursAfterFirst={$this->hoursAfterFirst} (expected ".self::REMINDER_HOURS.')');
+
                 return;
             }
 
@@ -51,6 +56,7 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
 
             if ($alreadySent) {
                 Log::info("Reminder already sent (18h) for user {$this->user->id} advert {$this->advert->id}. Skipping.");
+
                 return;
             }
 
@@ -62,6 +68,7 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
             // Completed => do nothing
             if ($currentCount >= self::REQUIRED_SCREENSHOTS) {
                 Log::info("User {$this->user->id} completed campaign for advert {$this->advert->id}. Skipping reminder.");
+
                 return;
             }
 
@@ -71,8 +78,9 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
                 ->orderBy('created_at', 'asc')
                 ->first();
 
-            if (!$firstScreenshot) {
+            if (! $firstScreenshot) {
                 Log::warning("No first screenshot found for user {$this->user->id} and advert {$this->advert->id}");
+
                 return;
             }
 
@@ -80,13 +88,14 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
             if ($firstScreenshot->created_at->copy()->addHours(self::EXPIRY_HOURS)->isPast()) {
                 Log::info("Campaign expired for user {$this->user->id} and advert {$this->advert->id}");
                 $this->sendExpirationNotification($currentCount);
+
                 return;
             }
 
             // Send the one and only reminder (at 18 hours)
             $this->sendReminderNotification($currentCount);
         } catch (\Throwable $e) {
-            Log::error("Error in SendIncompleteScreenshotNotification job: " . $e->getMessage());
+            Log::error('Error in SendIncompleteScreenshotNotification job: '.$e->getMessage());
         }
     }
 
@@ -94,7 +103,7 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
     {
         $remaining = self::REQUIRED_SCREENSHOTS - $currentCount;
 
-        $title = "Complete Your Campaign! ⏰";
+        $title = 'Complete Your Campaign! ⏰';
         $message = "You have {$remaining} screenshot(s) remaining for '{$this->advert->name}'. Upload to complete your campaign.";
 
         $this->sendNotification($title, $message, 'warning', [
@@ -110,8 +119,8 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
 
     private function sendExpirationNotification(int $currentCount): void
     {
-        $title = "Campaign Expired 😔";
-        $message = "Unfortunately, the " . self::EXPIRY_HOURS . "-hour window for '{$this->advert->name}' has expired. You uploaded {$currentCount} out of " . self::REQUIRED_SCREENSHOTS . " screenshot(s).";
+        $title = 'Campaign Expired 😔';
+        $message = 'Unfortunately, the '.self::EXPIRY_HOURS."-hour window for '{$this->advert->name}' has expired. You uploaded {$currentCount} out of ".self::REQUIRED_SCREENSHOTS.' screenshot(s).';
 
         $this->sendNotification($title, $message, 'error', [
             'advert_id' => $this->advert->id,
@@ -125,8 +134,8 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
     private function sendNotification(string $title, string $message, string $type, array $data): void
     {
         try {
-            if (!empty($this->user->fcm_token)) {
-                $firebase = new FirebaseService();
+            if (! empty($this->user->fcm_token)) {
+                $firebase = new FirebaseService;
                 $firebase->sendToDevice($this->user->fcm_token, $title, $message);
             }
 
@@ -140,7 +149,7 @@ class SendIncompleteScreenshotNotification implements ShouldQueue
 
             Log::info("Sent notification to user {$this->user->id} for advert {$this->advert->id}: {$title}");
         } catch (\Throwable $e) {
-            Log::error("Failed to send notification to user {$this->user->id}: " . $e->getMessage());
+            Log::error("Failed to send notification to user {$this->user->id}: ".$e->getMessage());
         }
     }
 }

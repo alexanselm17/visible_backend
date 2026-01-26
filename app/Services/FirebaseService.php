@@ -14,7 +14,7 @@ class FirebaseService
     {
         $serviceAccountPath = config('firebase.credentials');
 
-        if (!file_exists($serviceAccountPath)) {
+        if (! file_exists($serviceAccountPath)) {
             throw new \Exception("Firebase credentials file not found at: {$serviceAccountPath}");
         }
 

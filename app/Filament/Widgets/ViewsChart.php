@@ -2,12 +2,13 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\BarChartWidget;
 use App\Models\Screenshots;
+use Filament\Widgets\BarChartWidget;
 
 class ViewsChart extends BarChartWidget
 {
     protected static ?string $heading = 'Daily Views (Last 7 Days)';
+
     protected static ?int $sort = 1;
 
     protected function getData(): array

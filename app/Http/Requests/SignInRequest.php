@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-
 use Illuminate\Foundation\Http\FormRequest;
 
 class SignInRequest extends FormRequest
@@ -27,7 +26,7 @@ class SignInRequest extends FormRequest
         return [
             'username' => 'required',
             'password' => 'required',
-            'app_version'=>'required'
+            'app_version' => 'required',
         ];
     }
 }

@@ -24,11 +24,11 @@ class CreditSalesRequest extends FormRequest
     public function rules()
     {
         return [
-            "posted_by"=> 'required|exists:App\Models\User,id',
-            "customer_id"=> 'required|exists:App\Models\Customers,id',
-            "transaction"=> 'required|exists:App\Models\Transaction,id',
-            "invoice_note"=>"required|string",
-            "amount"=>"required|numeric",
+            'posted_by' => 'required|exists:App\Models\User,id',
+            'customer_id' => 'required|exists:App\Models\Customers,id',
+            'transaction' => 'required|exists:App\Models\Transaction,id',
+            'invoice_note' => 'required|string',
+            'amount' => 'required|numeric',
         ];
     }
 }

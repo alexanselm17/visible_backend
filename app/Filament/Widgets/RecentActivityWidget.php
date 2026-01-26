@@ -1,18 +1,21 @@
 <?php
+
 namespace App\Filament\Widgets;
+
 use App\Models\Screenshots;
-use App\Models\AdvertImages;
 use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use Filament\Tables\Actions\Action;
 
 class RecentActivityWidget extends BaseWidget
 {
     protected static ?string $heading = 'Recent Screenshot Submissions';
+
     protected static ?int $sort = 4;
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -29,8 +32,9 @@ class RecentActivityWidget extends BaseWidget
                     ->size(60)
                     ->getStateUsing(function ($record) {
                         $path = $record->screenshot;
+
                         return $path
-                            ? asset('storage/' . $path)
+                            ? asset('storage/'.$path)
                             : asset('storage/products/default-product.png');
                     })
                     ->action(
@@ -41,10 +45,9 @@ class RecentActivityWidget extends BaseWidget
                             ->modalCancelAction(false)
                             ->modalWidth('sm')
                             ->modalContent(
-                                fn($record) =>
-                                view('filament.components.image-preview', [
+                                fn ($record) => view('filament.components.image-preview', [
                                     'url' => $record->screenshot
-                                        ? asset('storage/' . $record->screenshot)
+                                        ? asset('storage/'.$record->screenshot)
                                         : asset('storage/products/default-product.png'),
                                 ])
                             )

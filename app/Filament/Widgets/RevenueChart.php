@@ -2,13 +2,13 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\LineChartWidget;
-use App\Models\Campaign;
 use App\Models\AdvertImages;
+use Filament\Widgets\LineChartWidget;
 
 class RevenueChart extends LineChartWidget
 {
     protected static ?string $heading = 'Revenue vs Rewards Distributed (Last 7 Days)';
+
     protected static ?int $sort = 5;
 
     protected function getData(): array

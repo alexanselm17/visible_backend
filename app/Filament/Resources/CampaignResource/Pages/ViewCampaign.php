@@ -4,20 +4,19 @@ namespace App\Filament\Resources\CampaignResource\Pages;
 
 use App\Filament\Resources\CampaignResource;
 use App\Models\Campaign;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\Grid;
-use Filament\Infolists\Components\Tabs;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\ImageEntry;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\Split;
-use Filament\Infolists\Components\Group;
-use Filament\Support\Enums\FontWeight;
-use Filament\Support\Enums\IconSize;
 use Carbon\Carbon;
+use Filament\Infolists\Components\Grid;
+use Filament\Infolists\Components\Group;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\Split;
+use Filament\Infolists\Components\Tabs;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
+use Filament\Resources\Pages\ViewRecord;
+use Filament\Support\Enums\FontWeight;
 use Illuminate\Support\Facades\DB;
 
 class ViewCampaign extends ViewRecord
@@ -56,7 +55,7 @@ class ViewCampaign extends ViewRecord
                         'timestamp' => $screenshot->timestamp,
                         'number' => $screenshot->number,
                         'screenshot_id' => $screenshot->id,
-                        'url' => asset('storage/' . $screenshot->screenshot),
+                        'url' => asset('storage/'.$screenshot->screenshot),
                     ];
                 }
 
@@ -161,6 +160,7 @@ class ViewCampaign extends ViewRecord
                                                     $hasActiveAdverts = $record->adverts->some(function ($advert) {
                                                         return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
                                                     });
+
                                                     return $hasActiveAdverts ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle';
                                                 }
                                             )
@@ -170,6 +170,7 @@ class ViewCampaign extends ViewRecord
                                                     $hasActiveAdverts = $record->adverts->some(function ($advert) {
                                                         return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
                                                     });
+
                                                     return $hasActiveAdverts ? 'success' : 'danger';
                                                 }
                                             ),
@@ -182,6 +183,7 @@ class ViewCampaign extends ViewRecord
                                                     $hasActiveAdverts = $record->adverts->some(function ($advert) {
                                                         return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
                                                     });
+
                                                     return $hasActiveAdverts ? 'ACTIVE CAMPAIGN' : 'EXPIRED CAMPAIGN';
                                                 }
                                             )
@@ -192,6 +194,7 @@ class ViewCampaign extends ViewRecord
                                                     $hasActiveAdverts = $record->adverts->some(function ($advert) {
                                                         return $advert->valid_until && now()->lessThanOrEqualTo(Carbon::parse($advert->valid_until));
                                                     });
+
                                                     return $hasActiveAdverts ? 'success' : 'danger';
                                                 }
                                             )
@@ -207,7 +210,7 @@ class ViewCampaign extends ViewRecord
                                 ->schema([
                                     TextEntry::make('capital_invested')
                                         ->label('Total Investment')
-                                        ->getStateUsing(fn($record) => $record->adverts->sum('capital_invested'))
+                                        ->getStateUsing(fn ($record) => $record->adverts->sum('capital_invested'))
                                         ->money('KSH')
                                         ->color('primary')
                                         ->weight(FontWeight::Bold)
@@ -217,8 +220,7 @@ class ViewCampaign extends ViewRecord
                                     TextEntry::make('remaining_budget')
                                         ->label('Remaining Budget')
                                         ->getStateUsing(
-                                            fn($record) =>
-                                            $record->adverts->sum('capital_invested') - $record->adverts->sum(fn($advert) => $advert->screenshots->count() * $advert->reward)
+                                            fn ($record) => $record->adverts->sum('capital_invested') - $record->adverts->sum(fn ($advert) => $advert->screenshots->count() * $advert->reward)
                                         )
                                         ->money('KSH')
                                         ->color('success')
@@ -240,7 +242,7 @@ class ViewCampaign extends ViewRecord
                             ->schema([
                                 TextEntry::make('total_adverts')
                                     ->label('Active Adverts')
-                                    ->getStateUsing(fn($record) => $record->adverts->count())
+                                    ->getStateUsing(fn ($record) => $record->adverts->count())
                                     ->badge()
                                     ->size('xl')
                                     ->color('primary')
@@ -250,8 +252,7 @@ class ViewCampaign extends ViewRecord
                                 TextEntry::make('total_screenshots')
                                     ->label('Total Submissions')
                                     ->getStateUsing(
-                                        fn($record) =>
-                                        $record->adverts->sum(fn($advert) => $advert->screenshots->count())
+                                        fn ($record) => $record->adverts->sum(fn ($advert) => $advert->screenshots->count())
                                     )
                                     ->badge()
                                     ->size('xl')
@@ -262,8 +263,7 @@ class ViewCampaign extends ViewRecord
                                 TextEntry::make('total_views')
                                     ->label('Total Engagement')
                                     ->getStateUsing(
-                                        fn($record) =>
-                                        number_format($record->adverts->sum('views'))
+                                        fn ($record) => number_format($record->adverts->sum('views'))
                                     )
                                     ->badge()
                                     ->size('xl')
@@ -274,10 +274,8 @@ class ViewCampaign extends ViewRecord
                                 TextEntry::make('rewards_distributed')
                                     ->label('Rewards Paid')
                                     ->getStateUsing(
-                                        fn($record) =>
-                                        $record->adverts->sum(
-                                            fn($advert) =>
-                                            $advert->screenshots->count() * $advert->reward
+                                        fn ($record) => $record->adverts->sum(
+                                            fn ($advert) => $advert->screenshots->count() * $advert->reward
                                         )
                                     )
                                     ->money('USD')
@@ -293,8 +291,7 @@ class ViewCampaign extends ViewRecord
                                 TextEntry::make('capacity')
                                     ->label('Total Expected Participants')
                                     ->getStateUsing(
-                                        fn($record) =>
-                                        $record->adverts->sum('capacity')
+                                        fn ($record) => $record->adverts->sum('capacity')
                                     )
                                     ->numeric()
                                     ->badge()
@@ -313,8 +310,7 @@ class ViewCampaign extends ViewRecord
                                 TextEntry::make('created_at')
                                     ->label('Campaign Launched')
                                     ->formatStateUsing(
-                                        fn($state) =>
-                                        Carbon::parse($state)->format('M d, Y g:i A')
+                                        fn ($state) => Carbon::parse($state)->format('M d, Y g:i A')
                                     )
                                     ->color('success')
                                     ->icon('heroicon-o-rocket-launch')
@@ -325,6 +321,7 @@ class ViewCampaign extends ViewRecord
                                     ->getStateUsing(function ($record) {
                                         $start = Carbon::parse($record->created_at);
                                         $diff = $start->diff(now());
+
                                         return "{$diff->d} days {$diff->h} hours {$diff->i} minutes";
                                     })
                                     ->badge()
@@ -334,7 +331,7 @@ class ViewCampaign extends ViewRecord
                                 TextEntry::make('days_remaining')
                                     ->label('Days Remaining')
                                     ->getStateUsing(function ($record) {
-                                        if (!$record->valid_until) {
+                                        if (! $record->valid_until) {
                                             return 'No End Date';
                                         }
                                         if (now()->greaterThan(Carbon::parse($record->valid_until))) {
@@ -342,12 +339,12 @@ class ViewCampaign extends ViewRecord
                                         }
                                         $end = Carbon::parse($record->valid_until);
                                         $diff = now()->diff($end);
+
                                         return "{$diff->d} days {$diff->h} hours {$diff->i} minutes";
                                     })
                                     ->badge()
                                     ->color(
-                                        fn($record) =>
-                                        $record->valid_until &&
+                                        fn ($record) => $record->valid_until &&
                                             now()->lessThanOrEqualTo(Carbon::parse($record->valid_until))
                                             ? 'primary'
                                             : 'danger'
@@ -357,7 +354,6 @@ class ViewCampaign extends ViewRecord
                     ])
                     ->collapsible(),
 
-
                 // Main Content Tabs
                 Tabs::make('Campaign Management')
                     ->tabs([
@@ -366,7 +362,7 @@ class ViewCampaign extends ViewRecord
                         Tabs\Tab::make('adverts')
                             ->label('Adverts & User Content')
                             ->icon('heroicon-o-photo')
-                            ->badge(fn($record) => $record->adverts->count())
+                            ->badge(fn ($record) => $record->adverts->count())
                             ->schema([
                                 RepeatableEntry::make('adverts')
                                     ->label('')
@@ -382,8 +378,9 @@ class ViewCampaign extends ViewRecord
                                                             ->width(150)
                                                             ->getStateUsing(function ($record) {
                                                                 $path = $record->image_path ?? $record->image_path;
+
                                                                 return $path
-                                                                    ? asset('storage/' . $path)
+                                                                    ? asset('storage/'.$path)
                                                                     : asset('storage/products/default-product.png');
                                                             })
                                                             ->columnSpan(1),
@@ -429,7 +426,7 @@ class ViewCampaign extends ViewRecord
                                                         Group::make([
                                                             TextEntry::make('screenshots_count')
                                                                 ->label('Submissions')
-                                                                ->getStateUsing(fn($record) => $record->screenshots->count())
+                                                                ->getStateUsing(fn ($record) => $record->screenshots->count())
                                                                 ->badge()
                                                                 ->size('lg')
                                                                 ->color('primary')
@@ -437,7 +434,7 @@ class ViewCampaign extends ViewRecord
 
                                                             TextEntry::make('total_views')
                                                                 ->label('Total Views')
-                                                                ->getStateUsing(fn($record) => number_format($record->total_views))
+                                                                ->getStateUsing(fn ($record) => number_format($record->total_views))
                                                                 ->badge()
                                                                 ->size('lg')
                                                                 ->color('info')
@@ -445,7 +442,7 @@ class ViewCampaign extends ViewRecord
 
                                                             TextEntry::make('unique_users')
                                                                 ->label('Unique Users')
-                                                                ->getStateUsing(fn($record) => $record->unique_users)
+                                                                ->getStateUsing(fn ($record) => $record->unique_users)
                                                                 ->badge()
                                                                 ->size('lg')
                                                                 ->color('success')
@@ -460,7 +457,7 @@ class ViewCampaign extends ViewRecord
                                                     ->listWithLineBreaks()
                                                     ->bulleted()
                                                     ->color('gray')
-                                                    ->visible(fn($record) => !empty($record->badge)),
+                                                    ->visible(fn ($record) => ! empty($record->badge)),
 
                                                 // User Screenshots Section
                                                 Section::make('User Submissions')
@@ -476,8 +473,9 @@ class ViewCampaign extends ViewRecord
                                                                             ->width(120)
                                                                             ->getStateUsing(function ($record) {
                                                                                 $path = $record->screenshot;
+
                                                                                 return $path
-                                                                                    ? asset('storage/' . $path)
+                                                                                    ? asset('storage/'.$path)
                                                                                     : asset('storage/screenshots/default-screenshot.png');
                                                                             })
                                                                             ->columnSpan(1),
@@ -500,9 +498,8 @@ class ViewCampaign extends ViewRecord
                                                                         TextEntry::make('engagement_rate')
                                                                             ->label('Engagement')
                                                                             ->getStateUsing(
-                                                                                fn($record) =>
-                                                                                $record->views > 0 ?
-                                                                                    number_format(($record->views / 100) * 100, 1) . '%' :
+                                                                                fn ($record) => $record->views > 0 ?
+                                                                                    number_format(($record->views / 100) * 100, 1).'%' :
                                                                                     '0%'
                                                                             )
                                                                             ->badge()
@@ -511,7 +508,7 @@ class ViewCampaign extends ViewRecord
 
                                                                         TextEntry::make('reward_earned')
                                                                             ->label('Reward Earned')
-                                                                            ->getStateUsing(fn($record) => $record->advert->reward ?? 0)
+                                                                            ->getStateUsing(fn ($record) => $record->advert->reward ?? 0)
                                                                             ->money('kSH')
                                                                             ->color('warning')
                                                                             ->weight(FontWeight::Bold)
@@ -519,27 +516,27 @@ class ViewCampaign extends ViewRecord
 
                                                                         TextEntry::make('created_at')
                                                                             ->label('Submitted')
-                                                                            ->formatStateUsing(fn($state) => Carbon::parse($state)->format('M d, Y'))
+                                                                            ->formatStateUsing(fn ($state) => Carbon::parse($state)->format('M d, Y'))
                                                                             ->color('gray')
                                                                             ->columnSpan(1),
                                                                     ]),
                                                             ])
                                                             ->contained(false)
-                                                            ->visible(fn($record) => $record->screenshots->count() > 0),
+                                                            ->visible(fn ($record) => $record->screenshots->count() > 0),
 
                                                         // No screenshots message
                                                         Group::make([
                                                             TextEntry::make('no_screenshots')
                                                                 ->label('')
-                                                                ->getStateUsing(fn() => '📷 No submissions yet - waiting for user engagement!')
+                                                                ->getStateUsing(fn () => '📷 No submissions yet - waiting for user engagement!')
                                                                 ->color('gray')
                                                                 ->size('lg')
                                                                 ->extraAttributes(['class' => 'text-center italic']),
                                                         ])
-                                                            ->visible(fn($record) => $record->screenshots->count() === 0),
+                                                            ->visible(fn ($record) => $record->screenshots->count() === 0),
                                                     ])
                                                     ->collapsible()
-                                                    ->collapsed(fn($record) => $record->screenshots->count() === 0)
+                                                    ->collapsed(fn ($record) => $record->screenshots->count() === 0)
                                                     ->extraAttributes(['class' => 'border-t mt-4 pt-4']),
 
                                             ])
@@ -555,23 +552,27 @@ class ViewCampaign extends ViewRecord
                             ->icon('heroicon-o-shield-exclamation')
                             ->badge(function ($record) {
                                 $fraudPatterns = $this->detectFraudPatterns($record->id);
+
                                 return count($fraudPatterns) > 0 ? count($fraudPatterns) : null;
                             })
                             ->badgeColor(function ($record) {
                                 $fraudPatterns = $this->detectFraudPatterns($record->id);
-                                if (count($fraudPatterns) === 0) return 'success';
+                                if (count($fraudPatterns) === 0) {
+                                    return 'success';
+                                }
 
                                 $highRiskCount = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
-                                if ($highRiskCount > 0) return 'danger';
+                                if ($highRiskCount > 0) {
+                                    return 'danger';
+                                }
 
                                 $mediumRiskCount = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
-                                if ($mediumRiskCount > 0) return 'warning';
+                                if ($mediumRiskCount > 0) {
+                                    return 'warning';
+                                }
 
                                 return 'info';
                             })
-
-
-
 
                             ->schema([
                                 // Main Security Status Section
@@ -592,10 +593,14 @@ class ViewCampaign extends ViewRecord
                                                                 }
 
                                                                 $highRisk = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
-                                                                if ($highRisk > 0) return '🚨 HIGH RISK';
+                                                                if ($highRisk > 0) {
+                                                                    return '🚨 HIGH RISK';
+                                                                }
 
                                                                 $mediumRisk = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
-                                                                if ($mediumRisk > 0) return '⚠️ MEDIUM RISK';
+                                                                if ($mediumRisk > 0) {
+                                                                    return '⚠️ MEDIUM RISK';
+                                                                }
 
                                                                 return '🔍 LOW RISK';
                                                             })
@@ -603,13 +608,19 @@ class ViewCampaign extends ViewRecord
                                                             ->size('xl')
                                                             ->color(function ($record) {
                                                                 $fraudPatterns = $this->detectFraudPatterns($record->id);
-                                                                if (count($fraudPatterns) === 0) return 'success';
+                                                                if (count($fraudPatterns) === 0) {
+                                                                    return 'success';
+                                                                }
 
                                                                 $highRisk = collect($fraudPatterns)->where('risk_level.level', 'HIGH')->count();
-                                                                if ($highRisk > 0) return 'danger';
+                                                                if ($highRisk > 0) {
+                                                                    return 'danger';
+                                                                }
 
                                                                 $mediumRisk = collect($fraudPatterns)->where('risk_level.level', 'MEDIUM')->count();
-                                                                if ($mediumRisk > 0) return 'warning';
+                                                                if ($mediumRisk > 0) {
+                                                                    return 'warning';
+                                                                }
 
                                                                 return 'info';
                                                             })
@@ -622,10 +633,11 @@ class ViewCampaign extends ViewRecord
                                                     ->schema([
                                                         TextEntry::make('fraud_patterns_count')
                                                             ->label('Patterns')
-                                                            ->getStateUsing(fn($record) => count($this->detectFraudPatterns($record->id)))
+                                                            ->getStateUsing(fn ($record) => count($this->detectFraudPatterns($record->id)))
                                                             ->badge()
                                                             ->color(function ($record) {
                                                                 $count = count($this->detectFraudPatterns($record->id));
+
                                                                 return $count > 0 ? 'warning' : 'success';
                                                             })
                                                             ->icon('heroicon-o-shield-exclamation')
@@ -636,6 +648,7 @@ class ViewCampaign extends ViewRecord
                                                             ->getStateUsing(function ($record) {
                                                                 $fraudPatterns = $this->detectFraudPatterns($record->id);
                                                                 $allUsers = collect($fraudPatterns)->pluck('users')->flatten()->unique();
+
                                                                 return $allUsers->count();
                                                             })
                                                             ->badge()
@@ -645,7 +658,7 @@ class ViewCampaign extends ViewRecord
 
                                                         TextEntry::make('last_scan')
                                                             ->label('Last Scan')
-                                                            ->getStateUsing(fn() => now()->format('H:i'))
+                                                            ->getStateUsing(fn () => now()->format('H:i'))
                                                             ->badge()
                                                             ->color('gray')
                                                             ->icon('heroicon-o-clock')
@@ -655,7 +668,7 @@ class ViewCampaign extends ViewRecord
                                             ]),
                                     ])
                                     ->extraAttributes([
-                                        'class' => 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm'
+                                        'class' => 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm',
                                     ]),
 
                                 // Detailed Analysis Section
@@ -668,12 +681,12 @@ class ViewCampaign extends ViewRecord
                                             return [
                                                 TextEntry::make('no_fraud')
                                                     ->label('')
-                                                    ->getStateUsing(fn() => '✅ **No Suspicious Activity Detected**')
+                                                    ->getStateUsing(fn () => '✅ **No Suspicious Activity Detected**')
                                                     ->markdown()
                                                     ->columnSpanFull()
                                                     ->extraAttributes([
-                                                        'class' => 'text-center p-6 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded-lg border border-green-200 dark:border-green-800'
-                                                    ])
+                                                        'class' => 'text-center p-6 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 rounded-lg border border-green-200 dark:border-green-800',
+                                                    ]),
                                             ];
                                         }
 
@@ -687,13 +700,13 @@ class ViewCampaign extends ViewRecord
                                                 ->schema([
                                                     TextEntry::make("pattern_name_{$index}")
                                                         ->label('Pattern')
-                                                        ->getStateUsing(fn() => $fraud['advert_name'])
+                                                        ->getStateUsing(fn () => $fraud['advert_name'])
                                                         ->weight('bold')
                                                         ->size('lg'),
 
                                                     TextEntry::make("risk_level_{$index}")
                                                         ->label('Risk Level')
-                                                        ->getStateUsing(fn() => $riskLevel)
+                                                        ->getStateUsing(fn () => $riskLevel)
                                                         ->badge()
                                                         ->color(match ($riskLevel) {
                                                             'HIGH' => 'danger',
@@ -703,14 +716,14 @@ class ViewCampaign extends ViewRecord
 
                                                     TextEntry::make("pattern_users_{$index}")
                                                         ->label('Affected Users')
-                                                        ->getStateUsing(fn() => count($fraud['details']) . ' users')
+                                                        ->getStateUsing(fn () => count($fraud['details']).' users')
                                                         ->badge()
                                                         ->color('gray')
                                                         ->icon('heroicon-o-users'),
                                                 ])
                                                 ->columnSpanFull()
                                                 ->extraAttributes([
-                                                    'class' => 'p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4'
+                                                    'class' => 'p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-4',
                                                 ]);
 
                                             // User comparison cards
@@ -726,19 +739,19 @@ class ViewCampaign extends ViewRecord
                                                                         ->label('User 1')
                                                                         ->height(80)
                                                                         ->width(80)
-                                                                        ->getStateUsing(fn() => $pair[0]['url'] ?? 'https://via.placeholder.com/80x80.png?text=No+Image')
+                                                                        ->getStateUsing(fn () => $pair[0]['url'] ?? 'https://via.placeholder.com/80x80.png?text=No+Image')
                                                                         ->extraAttributes(['class' => 'rounded-lg']),
 
                                                                     TextEntry::make("user1_name_{$index}_{$pairIndex}")
                                                                         ->label('')
-                                                                        ->getStateUsing(fn() => $pair[0]['name'])
+                                                                        ->getStateUsing(fn () => $pair[0]['name'])
                                                                         ->weight('semibold')
                                                                         ->size('sm')
                                                                         ->extraAttributes(['class' => 'text-center']),
 
                                                                     TextEntry::make("user1_stats_{$index}_{$pairIndex}")
                                                                         ->label('')
-                                                                        ->getStateUsing(fn() => $pair[0]['views'] . ' views')
+                                                                        ->getStateUsing(fn () => $pair[0]['views'].' views')
                                                                         ->color('gray')
                                                                         ->size('xs')
                                                                         ->extraAttributes(['class' => 'text-center']),
@@ -750,7 +763,7 @@ class ViewCampaign extends ViewRecord
                                                                 ->schema([
                                                                     TextEntry::make("compare_btn_{$index}_{$pairIndex}")
                                                                         ->label('')
-                                                                        ->getStateUsing(fn() => '🔍 Compare')
+                                                                        ->getStateUsing(fn () => '🔍 Compare')
                                                                         ->badge()
                                                                         ->color('primary')
                                                                         ->size('sm')
@@ -808,8 +821,8 @@ class ViewCampaign extends ViewRecord
                 modal.remove();
             }
         });
-    "
-                                                                        ])
+    ",
+                                                                        ]),
 
                                                                 ])
                                                                 ->columnSpan(1),
@@ -821,19 +834,19 @@ class ViewCampaign extends ViewRecord
                                                                         ->label('User 2')
                                                                         ->height(80)
                                                                         ->width(80)
-                                                                        ->getStateUsing(fn() => $pair[1]['url'] ?? 'https://via.placeholder.com/80x80.png?text=No+Image')
+                                                                        ->getStateUsing(fn () => $pair[1]['url'] ?? 'https://via.placeholder.com/80x80.png?text=No+Image')
                                                                         ->extraAttributes(['class' => 'rounded-lg']),
 
                                                                     TextEntry::make("user2_name_{$index}_{$pairIndex}")
                                                                         ->label('')
-                                                                        ->getStateUsing(fn() => $pair[1]['name'])
+                                                                        ->getStateUsing(fn () => $pair[1]['name'])
                                                                         ->weight('semibold')
                                                                         ->size('sm')
                                                                         ->extraAttributes(['class' => 'text-center']),
 
                                                                     TextEntry::make("user2_stats_{$index}_{$pairIndex}")
                                                                         ->label('')
-                                                                        ->getStateUsing(fn() => $pair[1]['views'] . ' views')
+                                                                        ->getStateUsing(fn () => $pair[1]['views'].' views')
                                                                         ->color('gray')
                                                                         ->size('xs')
                                                                         ->extraAttributes(['class' => 'text-center']),
@@ -842,7 +855,7 @@ class ViewCampaign extends ViewRecord
                                                         ])
                                                         ->columnSpanFull()
                                                         ->extraAttributes([
-                                                            'class' => 'p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-3'
+                                                            'class' => 'p-4 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm mb-3',
                                                         ]);
                                                 }
                                             }
@@ -851,7 +864,7 @@ class ViewCampaign extends ViewRecord
                                             if ($index < count($fraudPatterns) - 1) {
                                                 $entries[] = TextEntry::make("divider_{$index}")
                                                     ->label('')
-                                                    ->getStateUsing(fn() => '')
+                                                    ->getStateUsing(fn () => '')
                                                     ->columnSpanFull()
                                                     ->extraAttributes(['class' => 'border-t border-gray-200 dark:border-gray-700 my-4']);
                                             }
@@ -860,9 +873,9 @@ class ViewCampaign extends ViewRecord
                                         return $entries;
                                     })
                                     ->collapsible()
-                                    ->collapsed(fn($record) => count($this->detectFraudPatterns($record->id)) === 0)
+                                    ->collapsed(fn ($record) => count($this->detectFraudPatterns($record->id)) === 0)
                                     ->extraAttributes([
-                                        'class' => 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm'
+                                        'class' => 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm',
                                     ]),
 
                                 // Quick Actions Section
@@ -873,57 +886,53 @@ class ViewCampaign extends ViewRecord
                                             ->schema([
                                                 TextEntry::make('refresh_scan')
                                                     ->label('Refresh Scan')
-                                                    ->getStateUsing(fn() => '🔄 Refresh')
+                                                    ->getStateUsing(fn () => '🔄 Refresh')
                                                     ->badge()
                                                     ->color('primary')
                                                     ->icon('heroicon-o-arrow-path')
                                                     ->extraAttributes([
                                                         'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
-                                                        'onclick' => 'window.location.reload()'
+                                                        'onclick' => 'window.location.reload()',
                                                     ]),
 
                                                 TextEntry::make('export_report')
                                                     ->label('Export Report')
-                                                    ->getStateUsing(fn() => '📄 Export')
+                                                    ->getStateUsing(fn () => '📄 Export')
                                                     ->badge()
                                                     ->color('success')
                                                     ->icon('heroicon-o-document-arrow-down')
                                                     ->extraAttributes([
                                                         'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
-                                                        'onclick' => 'alert("Export report functionality")'
+                                                        'onclick' => 'alert("Export report functionality")',
                                                     ]),
 
                                                 TextEntry::make('whitelist_users')
                                                     ->label('Whitelist Users')
-                                                    ->getStateUsing(fn() => '✅ Whitelist')
+                                                    ->getStateUsing(fn () => '✅ Whitelist')
                                                     ->badge()
                                                     ->color('warning')
                                                     ->icon('heroicon-o-shield-check')
                                                     ->extraAttributes([
                                                         'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
-                                                        'onclick' => 'if(confirm("Whitelist all flagged users?")) { alert("Whitelist functionality"); }'
+                                                        'onclick' => 'if(confirm("Whitelist all flagged users?")) { alert("Whitelist functionality"); }',
                                                     ]),
 
                                                 TextEntry::make('settings')
                                                     ->label('Security Settings')
-                                                    ->getStateUsing(fn() => '⚙️ Settings')
+                                                    ->getStateUsing(fn () => '⚙️ Settings')
                                                     ->badge()
                                                     ->color('gray')
                                                     ->icon('heroicon-o-cog-6-tooth')
                                                     ->extraAttributes([
                                                         'class' => 'cursor-pointer hover:opacity-75 transition-all duration-200',
-                                                        'onclick' => 'alert("Security settings panel")'
+                                                        'onclick' => 'alert("Security settings panel")',
                                                     ]),
-                                            ])
+                                            ]),
                                     ])
                                     ->extraAttributes([
-                                        'class' => 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg'
+                                        'class' => 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg',
                                     ]),
                             ]),
-
-
-
-
 
                         // Analytics Tab
                         Tabs\Tab::make('analytics')
@@ -938,9 +947,8 @@ class ViewCampaign extends ViewRecord
                                                     TextEntry::make('engagement_rate')
                                                         ->label('Overall Engagement Rate')
                                                         ->getStateUsing(
-                                                            fn($record) =>
-                                                            $record->total_screenshots > 0 ?
-                                                                number_format(($record->total_views / $record->total_screenshots), 1) . ' views per submission' :
+                                                            fn ($record) => $record->total_screenshots > 0 ?
+                                                                number_format(($record->total_views / $record->total_screenshots), 1).' views per submission' :
                                                                 'No data yet'
                                                         )
                                                         ->badge()
@@ -950,9 +958,8 @@ class ViewCampaign extends ViewRecord
                                                     TextEntry::make('roi')
                                                         ->label('Return on Investment')
                                                         ->getStateUsing(
-                                                            fn($record) =>
-                                                            $record->capital_invested > 0 ?
-                                                                number_format(($record->total_views / $record->capital_invested) * 100, 2) . ' views per $1' :
+                                                            fn ($record) => $record->capital_invested > 0 ?
+                                                                number_format(($record->total_views / $record->capital_invested) * 100, 2).' views per $1' :
                                                                 'Calculating...'
                                                         )
                                                         ->badge()
@@ -962,10 +969,9 @@ class ViewCampaign extends ViewRecord
                                                     TextEntry::make('cost_per_engagement')
                                                         ->label('Cost per Submission')
                                                         ->getStateUsing(
-                                                            fn($record) =>
-                                                            $record->total_screenshots > 0 ?
-                                                                '$' . number_format($record->total_rewards_distributed / $record->total_screenshots, 2) :
-                                                                '$' . number_format($record->reward, 2)
+                                                            fn ($record) => $record->total_screenshots > 0 ?
+                                                                '$'.number_format($record->total_rewards_distributed / $record->total_screenshots, 2) :
+                                                                '$'.number_format($record->reward, 2)
                                                         )
                                                         ->badge()
                                                         ->size('xl')
@@ -976,9 +982,8 @@ class ViewCampaign extends ViewRecord
                                                     TextEntry::make('budget_utilization')
                                                         ->label('Budget Utilization')
                                                         ->getStateUsing(
-                                                            fn($record) =>
-                                                            $record->capital_invested > 0 ?
-                                                                number_format(($record->total_rewards_distributed / $record->capital_invested) * 100, 1) . '%' :
+                                                            fn ($record) => $record->capital_invested > 0 ?
+                                                                number_format(($record->total_rewards_distributed / $record->capital_invested) * 100, 1).'%' :
                                                                 '0%'
                                                         )
                                                         ->badge()
@@ -988,8 +993,7 @@ class ViewCampaign extends ViewRecord
                                                     TextEntry::make('average_views_per_advert')
                                                         ->label('Avg Views per Advert')
                                                         ->getStateUsing(
-                                                            fn($record) =>
-                                                            $record->adverts->count() > 0 ?
+                                                            fn ($record) => $record->adverts->count() > 0 ?
                                                                 number_format($record->total_views / $record->adverts->count()) :
                                                                 '0'
                                                         )
@@ -1000,9 +1004,8 @@ class ViewCampaign extends ViewRecord
                                                     TextEntry::make('participation_rate')
                                                         ->label('Participation Rate')
                                                         ->getStateUsing(
-                                                            fn($record) =>
-                                                            $record->capacity > 0 ?
-                                                                number_format(($record->total_screenshots / $record->capacity) * 100, 1) . '%' :
+                                                            fn ($record) => $record->capacity > 0 ?
+                                                                number_format(($record->total_screenshots / $record->capacity) * 100, 1).'%' :
                                                                 'Unlimited'
                                                         )
                                                         ->badge()
@@ -1026,7 +1029,7 @@ class ViewCampaign extends ViewRecord
 
                                                 TextEntry::make('total_rewards_distributed')
                                                     ->label('Rewards Distributed')
-                                                    ->getStateUsing(fn($record) => $record->total_rewards_distributed)
+                                                    ->getStateUsing(fn ($record) => $record->total_rewards_distributed)
                                                     ->money('USD')
                                                     ->color('warning')
                                                     ->weight(FontWeight::Bold)
@@ -1034,7 +1037,7 @@ class ViewCampaign extends ViewRecord
 
                                                 TextEntry::make('remaining_budget')
                                                     ->label('Remaining Budget')
-                                                    ->getStateUsing(fn($record) => $record->remaining_budget)
+                                                    ->getStateUsing(fn ($record) => $record->remaining_budget)
                                                     ->money('USD')
                                                     ->color('success')
                                                     ->weight(FontWeight::Bold)
@@ -1043,8 +1046,7 @@ class ViewCampaign extends ViewRecord
                                                 TextEntry::make('projected_total_cost')
                                                     ->label('Projected Total Cost')
                                                     ->getStateUsing(
-                                                        fn($record) =>
-                                                        $record->capacity ?
+                                                        fn ($record) => $record->capacity ?
                                                             $record->capacity * $record->reward :
                                                             $record->total_rewards_distributed
                                                     )
@@ -1068,30 +1070,26 @@ class ViewCampaign extends ViewRecord
                                                 TextEntry::make('campaign_health')
                                                     ->label('Campaign Health')
                                                     ->getStateUsing(
-                                                        fn($record) =>
-                                                        $record->is_active && $record->remaining_budget > 0 ?
+                                                        fn ($record) => $record->is_active && $record->remaining_budget > 0 ?
                                                             '🟢 Healthy' : ($record->is_active ? '🟡 Low Budget' : '🔴 Expired')
                                                     )
                                                     ->badge()
                                                     ->size('lg')
                                                     ->color(
-                                                        fn($record) =>
-                                                        $record->is_active && $record->remaining_budget > 0 ?
+                                                        fn ($record) => $record->is_active && $record->remaining_budget > 0 ?
                                                             'success' : ($record->is_active ? 'warning' : 'danger')
                                                     ),
 
                                                 TextEntry::make('auto_pause_threshold')
                                                     ->label('Auto-Pause Threshold')
                                                     ->getStateUsing(
-                                                        fn($record) =>
-                                                        $record->remaining_budget < ($record->reward * 10) ?
+                                                        fn ($record) => $record->remaining_budget < ($record->reward * 10) ?
                                                             'Low Budget Alert' :
                                                             'Budget Sufficient'
                                                     )
                                                     ->badge()
                                                     ->color(
-                                                        fn($record) =>
-                                                        $record->remaining_budget < ($record->reward * 10) ?
+                                                        fn ($record) => $record->remaining_budget < ($record->reward * 10) ?
                                                             'warning' :
                                                             'success'
                                                     ),
@@ -1099,9 +1097,16 @@ class ViewCampaign extends ViewRecord
                                                 TextEntry::make('recommended_action')
                                                     ->label('Recommended Action')
                                                     ->getStateUsing(function ($record) {
-                                                        if (!$record->is_active) return '⏰ Extend or Archive';
-                                                        if ($record->remaining_budget < $record->reward) return '💰 Add Budget';
-                                                        if ($record->total_screenshots === 0) return '📢 Promote Campaign';
+                                                        if (! $record->is_active) {
+                                                            return '⏰ Extend or Archive';
+                                                        }
+                                                        if ($record->remaining_budget < $record->reward) {
+                                                            return '💰 Add Budget';
+                                                        }
+                                                        if ($record->total_screenshots === 0) {
+                                                            return '📢 Promote Campaign';
+                                                        }
+
                                                         return '✅ Monitor Performance';
                                                     })
                                                     ->badge()
@@ -1117,19 +1122,19 @@ class ViewCampaign extends ViewRecord
                                                 $insights = [];
 
                                                 if ($record->total_screenshots === 0) {
-                                                    $insights[] = "🎯 No submissions yet - consider promoting the campaign or adjusting rewards";
+                                                    $insights[] = '🎯 No submissions yet - consider promoting the campaign or adjusting rewards';
                                                 }
 
                                                 if ($record->total_views > 1000) {
-                                                    $insights[] = "🚀 High engagement! This campaign is performing well";
+                                                    $insights[] = '🚀 High engagement! This campaign is performing well';
                                                 }
 
                                                 if ($record->remaining_budget < ($record->reward * 5)) {
-                                                    $insights[] = "⚠️ Budget running low - consider adding funds to continue";
+                                                    $insights[] = '⚠️ Budget running low - consider adding funds to continue';
                                                 }
 
                                                 if (empty($insights)) {
-                                                    $insights[] = "📊 Campaign is running smoothly - monitor regularly for optimization opportunities";
+                                                    $insights[] = '📊 Campaign is running smoothly - monitor regularly for optimization opportunities';
                                                 }
 
                                                 return implode("\n", $insights);
@@ -1180,6 +1185,6 @@ class ViewCampaign extends ViewRecord
 
     public function getTitle(): string
     {
-        return $this->record->name . ' - Campaign Analytics';
+        return $this->record->name.' - Campaign Analytics';
     }
 }

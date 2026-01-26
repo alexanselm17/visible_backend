@@ -13,6 +13,7 @@ class Notification extends Model
 
     // ✅ Required for UUID primary key
     public $incrementing = false;
+
     protected $keyType = 'string';
 
     protected $fillable = [

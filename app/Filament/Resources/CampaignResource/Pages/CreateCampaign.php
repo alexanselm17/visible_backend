@@ -1,16 +1,13 @@
 <?php
 
-
 namespace App\Filament\Resources\CampaignResource\Pages;
 
 use App\Filament\Resources\CampaignResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Carbon;
-use Illuminate\Http\Request;
 use App\Http\Controllers\ProductController;
 use App\Http\Requests\StartCampaignRequest;
 use App\Repositories\Products\ProductRepositoryInterface;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\CreateRecord;
 
 class CreateCampaign extends CreateRecord
 {
@@ -21,7 +18,7 @@ class CreateCampaign extends CreateRecord
         try {
             $data = $this->form->getState();
 
-            $campaignRequest = new StartCampaignRequest();
+            $campaignRequest = new StartCampaignRequest;
             $campaignRequest->merge([
                 'name' => $data['name'],
             ]);
