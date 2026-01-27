@@ -148,7 +148,8 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get(
                 '/{user_id}/advert-submissions',
                 [AdvertSubmissionController::class, 'show']
-            );
+            )->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
+
 
 
             Route::get('/campaigns', [CampaignOwnerCampaignController::class, 'index']);

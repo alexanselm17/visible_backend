@@ -82,7 +82,6 @@ class AdvertSubmissionController extends Controller
     public function show(Request $request, string $userId)
     {
         try {
-            $this->assertCampaignOwner($userId);
 
             $campaignIds = Campaign::where('owner_id', $userId)->pluck('id');
 
