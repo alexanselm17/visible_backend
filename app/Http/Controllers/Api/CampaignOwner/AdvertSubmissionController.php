@@ -8,6 +8,7 @@ use App\Models\AdvertSubmission;
 use App\Models\Campaign;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 
 class AdvertSubmissionController extends Controller
 {
@@ -73,6 +74,56 @@ class AdvertSubmissionController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => 'Failed to submit advert.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function show(Request $request, string $userId)
+    {
+        try {
+            $this->assertCampaignOwner($userId);
+
+            $campaignIds = Campaign::where('owner_id', $userId)->pluck('id');
+
+            if ($campaignIds->isEmpty()) {
+                return response()->json([
+                    'ok' => true,
+                    'data' => [],
+                    'meta' => [
+                        'total' => 0
+                    ]
+                ], 200);
+            }
+
+            // 3️⃣ Filters
+            $status = $request->query('status');
+            $perPage = (int) $request->query('per_page', 10);
+
+            // 4️⃣ Fetch submissions
+            $query = AdvertSubmission::whereIn('campaign_id', $campaignIds)
+                ->orderBy('created_at', 'desc');
+
+            if ($status) {
+                $query->where('status', $status);
+            }
+
+            $submissions = $query->paginate($perPage);
+
+            return response()->json([
+                'ok' => true,
+                'data' => $submissions->items(),
+                'meta' => [
+                    'current_page' => $submissions->currentPage(),
+                    'last_page' => $submissions->lastPage(),
+                    'per_page' => $submissions->perPage(),
+                    'total' => $submissions->total(),
+                ]
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to fetch advert submissions.',
                 'error' => $th->getMessage(),
             ], 500);
         }
