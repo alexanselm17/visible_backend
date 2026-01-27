@@ -36,9 +36,9 @@ class ProductRepository implements ProductRepositoryInterface
                 $imageFile = $request->file('image');
                 $originalImageName = $imageFile->getClientOriginalName();
                 $sanitizedImageName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalImageName);
-                $imageFilename = time().'_'.$sanitizedImageName;
+                $imageFilename = time() . '_' . $sanitizedImageName;
                 $imageFile->move(public_path('storage/uploads'), $imageFilename);
-                $advert->image_path = 'uploads/'.$imageFilename;
+                $advert->image_path = 'uploads/' . $imageFilename;
             }
 
             // Handle video update (optional)
@@ -46,9 +46,9 @@ class ProductRepository implements ProductRepositoryInterface
                 $videoFile = $request->file('video');
                 $originalVideoName = $videoFile->getClientOriginalName();
                 $sanitizedVideoName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalVideoName);
-                $videoFilename = time().'_'.$sanitizedVideoName;
+                $videoFilename = time() . '_' . $sanitizedVideoName;
                 $videoFile->move(public_path('storage/uploads'), $videoFilename);
-                $advert->video_path = 'uploads/'.$videoFilename;
+                $advert->video_path = 'uploads/' . $videoFilename;
             }
 
             // Update other fields
@@ -120,6 +120,7 @@ class ProductRepository implements ProductRepositoryInterface
             // Create and save the campaign
             $campaign = Campaign::create([
                 'name' => $request->input('name'),
+                'owner_id' => $request->input('user_id'),
 
             ]);
 
@@ -137,6 +138,7 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
+    
     public function getCampaigns(Request $request)
     {
         try {
@@ -297,9 +299,9 @@ class ProductRepository implements ProductRepositoryInterface
             return response()->json([
                 'message' => 'Adverts retrieved successfully.',
                 'data' => $adverts->through(function ($advert) use ($status) {
-                    $imagePath = 'storage/'.$advert->image_path;
+                    $imagePath = 'storage/' . $advert->image_path;
                     $screenshot = $advert->screenshots->first();
-                    $screenshotPath = $screenshot?->screenshot ? 'storage/'.$screenshot->screenshot : null;
+                    $screenshotPath = $screenshot?->screenshot ? 'storage/' . $screenshot->screenshot : null;
 
                     $screenshotCount = match ($status) {
                         'available' => 0,
@@ -322,7 +324,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'image_url' => asset($imagePath),
                         'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
                         'video_path' => $advert->video_path,
-                        'video_url' => $advert->video_path ? asset('storage/'.$advert->video_path) : null,
+                        'video_url' => $advert->video_path ? asset('storage/' . $advert->video_path) : null,
                         'video_download_url' => $advert->video_path ? route('download.advert.image', ['path' => $advert->video_path]) : null,
                         'user_screenshot' => $screenshot?->screenshot,
                         'screenshot_url' => $screenshotPath ? asset($screenshotPath) : null,
@@ -365,7 +367,7 @@ class ProductRepository implements ProductRepositoryInterface
             $imageFile = $request->file('image');
             $originalImageName = $imageFile->getClientOriginalName();
             $sanitizedImageName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalImageName);
-            $imageFilename = time().'_'.$sanitizedImageName;
+            $imageFilename = time() . '_' . $sanitizedImageName;
             $imageFile->move(public_path('storage/uploads'), $imageFilename);
 
             // Prepare the optional video
@@ -374,9 +376,9 @@ class ProductRepository implements ProductRepositoryInterface
                 $videoFile = $request->file('video');
                 $originalVideoName = $videoFile->getClientOriginalName();
                 $sanitizedVideoName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalVideoName);
-                $videoFilename = time().'_'.$sanitizedVideoName;
+                $videoFilename = time() . '_' . $sanitizedVideoName;
                 $videoFile->move(public_path('storage/uploads'), $videoFilename);
-                $videoPath = 'uploads/'.$videoFilename;
+                $videoPath = 'uploads/' . $videoFilename;
             }
 
             // Get campaign
@@ -384,7 +386,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Save to DB
             $advert = new AdvertImages;
-            $advert->image_path = 'uploads/'.$imageFilename;
+            $advert->image_path = 'uploads/' . $imageFilename;
             $advert->video_path = $videoPath;
             $advert->category = $request->category;
             $advert->name = $request->name;
@@ -479,7 +481,7 @@ class ProductRepository implements ProductRepositoryInterface
                 return response()->json(['message' => '❌ Advert not found.'], 404);
             }
 
-            $advertPath = public_path('storage/'.$advert->image_path);
+            $advertPath = public_path('storage/' . $advert->image_path);
             $previousScreenshot = Screenshots::where('advert_id', $advert_id)
                 ->where('processed_by', $request->user_id)
                 ->latest()
@@ -524,7 +526,7 @@ class ProductRepository implements ProductRepositoryInterface
             $file = $request->file('screenshot');
             $originalName = $file->getClientOriginalName();
             $sanitizedName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $originalName);
-            $filename = time().'_'.$sanitizedName;
+            $filename = time() . '_' . $sanitizedName;
             $file->move(public_path('storage/screenshots'), $filename);
 
             $screenshotPath = public_path("storage/screenshots/{$filename}");
@@ -560,7 +562,7 @@ class ProductRepository implements ProductRepositoryInterface
             ";
 
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$apiKey,
+                'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->post('https://api.openai.com/v1/chat/completions', [
                 'model' => 'gpt-4o',
@@ -569,8 +571,8 @@ class ProductRepository implements ProductRepositoryInterface
                         'role' => 'user',
                         'content' => [
                             ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,'.$advertBase64]],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,'.$screenshotBase64]],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $advertBase64]],
+                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $screenshotBase64]],
                         ],
                     ],
                 ],
@@ -626,14 +628,14 @@ class ProductRepository implements ProductRepositoryInterface
             }
 
             $screenshot = new Screenshots;
-            $screenshot->screenshot = 'screenshots/'.$filename;
+            $screenshot->screenshot = 'screenshots/' . $filename;
             $screenshot->advert_id = $advert_id;
             $screenshot->views = $json['views'] ?? 0;
             $screenshot->timestamp = $json['timestamp'] ?? null;
             $screenshot->processed_by = $request->user_id;
             $screenshot->number = $number;
             $screenshot->save();
-            $message = $json['status'].' | Views: '.($json['views'] ?? 'Not visible');
+            $message = $json['status'] . ' | Views: ' . ($json['views'] ?? 'Not visible');
             if ($number == 2) {
                 if ($json['views'] < 50) {
                     DB::rollBack();
@@ -669,11 +671,11 @@ class ProductRepository implements ProductRepositoryInterface
             return response()->json([
                 'message' => $message,
                 'views' => $json['views'] ?? 'Not visible',
-                'path' => 'screenshots/'.$filename,
+                'path' => 'screenshots/' . $filename,
             ]);
         } catch (\Throwable $th) {
             DB::rollBack();
-            Log::error('Error verifying image: '.$th->getMessage());
+            Log::error('Error verifying image: ' . $th->getMessage());
 
             return response()->json([
                 'message' => 'An error occurred.',
@@ -711,7 +713,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'views' => $screenshot->views,
                         'timestamp' => $screenshot->timestamp,
                         'number' => $screenshot->number,
-                        'url' => URL::to('storage/'.$screenshot->screenshot),
+                        'url' => URL::to('storage/' . $screenshot->screenshot),
                     ];
                 }
 
@@ -752,8 +754,8 @@ class ProductRepository implements ProductRepositoryInterface
             return response()->json([
                 'success' => true,
                 'data' => $adverts->through(function ($advert) {
-                    $imagePath = 'storage/'.$advert->image_path;
-                    $videoPath = 'storage/'.$advert->video_path;
+                    $imagePath = 'storage/' . $advert->image_path;
+                    $videoPath = 'storage/' . $advert->video_path;
 
                     return [
                         'id' => $advert->id,
@@ -895,9 +897,9 @@ class ProductRepository implements ProductRepositoryInterface
             $ongoingData = [
                 'message' => 'Adverts retrieved successfully.',
                 'data' => $adverts->through(function ($advert) {
-                    $imagePath = 'storage/'.$advert->image_path;
+                    $imagePath = 'storage/' . $advert->image_path;
                     $screenshot = $advert->screenshots->first();
-                    $screenshotPath = $screenshot?->screenshot ? 'storage/'.$screenshot->screenshot : null;
+                    $screenshotPath = $screenshot?->screenshot ? 'storage/' . $screenshot->screenshot : null;
 
                     $screenshotCount = $advert->user_screenshot_count ?? 0;
 
@@ -1058,8 +1060,8 @@ class ProductRepository implements ProductRepositoryInterface
             }
 
             // Active/Expired adverts (by advert_images.valid_until)
-            $activeAdvertsCount = $adverts->filter(fn ($a) => Carbon::parse($a->valid_until)->gte($now))->count();
-            $expiredAdvertsCount = $adverts->filter(fn ($a) => Carbon::parse($a->valid_until)->lt($now))->count();
+            $activeAdvertsCount = $adverts->filter(fn($a) => Carbon::parse($a->valid_until)->gte($now))->count();
+            $expiredAdvertsCount = $adverts->filter(fn($a) => Carbon::parse($a->valid_until)->lt($now))->count();
 
             // Capacity + invested (adverts store these already)
             $totalCapacity = (int) $adverts->sum('capacity');
@@ -1151,9 +1153,9 @@ class ProductRepository implements ProductRepositoryInterface
             // Combine campaign stats
             $campaignStats = Campaign::query()
                 ->whereIn('campaigns.id', $campaignIds)
-                ->leftJoinSub($advertsAgg, 'a', fn ($j) => $j->on('a.campaign_id', '=', 'campaigns.id'))
-                ->leftJoinSub($screensAggByCampaign, 's', fn ($j) => $j->on('s.campaign_id', '=', 'campaigns.id'))
-                ->leftJoinSub($invoicesAggByCampaign, 'i', fn ($j) => $j->on('i.campaign_id', '=', 'campaigns.id'))
+                ->leftJoinSub($advertsAgg, 'a', fn($j) => $j->on('a.campaign_id', '=', 'campaigns.id'))
+                ->leftJoinSub($screensAggByCampaign, 's', fn($j) => $j->on('s.campaign_id', '=', 'campaigns.id'))
+                ->leftJoinSub($invoicesAggByCampaign, 'i', fn($j) => $j->on('i.campaign_id', '=', 'campaigns.id'))
                 ->selectRaw('
                 campaigns.id,
                 campaigns.name,
@@ -1190,7 +1192,7 @@ class ProductRepository implements ProductRepositoryInterface
              * We show active adverts even if they had no activity in range? You asked active adverts stats,
              * so we base this list on "adverts involved in range" AND still active.
              */
-            $campaignNameById = $campaigns->keyBy('id')->map(fn ($c) => $c->name);
+            $campaignNameById = $campaigns->keyBy('id')->map(fn($c) => $c->name);
 
             $activeAdvertsStats = AdvertImages::query()
                 ->whereIn('advert_images.id', $advertIds)
@@ -1986,7 +1988,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'success' => true,
                     'message' => 'Successfuly retrived a/c activity',
                     'activity' => $invoicingActivity,
-                ], );
+                ],);
             }
 
             if ($status === 'completed') {
@@ -2013,9 +2015,9 @@ class ProductRepository implements ProductRepositoryInterface
             return response()->json([
                 'message' => 'Adverts retrieved successfully.',
                 'data' => $adverts->through(function ($advert) use ($status) {
-                    $imagePath = 'storage/'.$advert->image_path;
+                    $imagePath = 'storage/' . $advert->image_path;
                     $screenshot = $advert->screenshots->first();
-                    $screenshotPath = $screenshot?->screenshot ? 'storage/'.$screenshot->screenshot : null;
+                    $screenshotPath = $screenshot?->screenshot ? 'storage/' . $screenshot->screenshot : null;
 
                     $screenshotCount = match ($status) {
                         'available' => 0,
@@ -2036,7 +2038,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'image_url' => asset($imagePath),
                         'download_url' => route('download.advert.image', ['path' => $advert->image_path]),
                         'video_path' => $advert->video_path,
-                        'video_url' => $advert->video_path ? asset('storage/'.$advert->video_path) : null,
+                        'video_url' => $advert->video_path ? asset('storage/' . $advert->video_path) : null,
                         'video_download_url' => $advert->video_path ? route('download.advert.image', ['path' => $advert->video_path]) : null,
                         'user_screenshot' => $screenshot?->screenshot,
                         'screenshot_url' => $screenshotPath ? asset($screenshotPath) : null,
@@ -2101,7 +2103,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             return Excel::download(
                 new GenericExport($data),
-                'payment_as_at_'.now()->format('Y-m-d_H-i-s').'.xlsx'
+                'payment_as_at_' . now()->format('Y-m-d_H-i-s') . '.xlsx'
             );
         } catch (\Throwable $th) {
             return response()->json([

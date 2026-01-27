@@ -1,13 +1,13 @@
 <?php
 
 use App\Http\Controllers\AdminFraudController;
+use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
+use App\Http\Controllers\Api\CampaignOwner\CampaignController as CampaignOwnerCampaignController;
+use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CustomersController;
+use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\NotificationController;
-
-use App\Http\Controllers\SetupController;
-use App\Http\Middleware\CheckActiveUser;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'v1'], function () {
@@ -116,8 +116,6 @@ Route::group(['prefix' => 'v1'], function () {
         });
 
 
-
-
         Route::prefix('notifications')->group(function () {
             Route::get('/user', [NotificationController::class, 'getUserNotifications']);
             Route::post('/mark-read', [NotificationController::class, 'markAsRead']);
@@ -140,4 +138,18 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/reviews', [AdminFraudController::class, 'listReviews']);
         });
     });
+
+
+    Route::prefix('campaign-owner')
+        ->middleware(['campaign_owner'])
+        ->group(function () {
+            Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
+            Route::post('/campaign/submission', [AdvertSubmissionController::class, 'submit']);
+
+            Route::get('/campaigns', [CampaignOwnerCampaignController::class, 'index']);
+            Route::post('/campaigns', [CampaignOwnerCampaignController::class, 'store']);
+            Route::get('/campaigns/{id}', [CampaignOwnerCampaignController::class, 'show']);
+            Route::put('/campaigns/{id}', [CampaignOwnerCampaignController::class, 'update']);
+            Route::delete('/campaigns/{id}', [CampaignOwnerCampaignController::class, 'destroy']);
+        });
 });
