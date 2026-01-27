@@ -174,12 +174,12 @@ class User extends Authenticatable implements FilamentUser
 
     public function hasAnyPermission(array $permissions)
     {
-        return collect($permissions)->some(fn ($permission) => $this->hasPermission($permission));
+        return collect($permissions)->some(fn($permission) => $this->hasPermission($permission));
     }
 
     public function hasAllPermissions(array $permissions)
     {
-        return collect($permissions)->every(fn ($permission) => $this->hasPermission($permission));
+        return collect($permissions)->every(fn($permission) => $this->hasPermission($permission));
     }
 
     /**
@@ -267,5 +267,25 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasOne(\App\Models\UserFraud::class, 'user_id', 'id')
             ->latestOfMany('flagged_at'); // or latestOfMany() if using id
+    }
+
+
+    public function campaignOwnerProfile()
+    {
+        return $this->hasOne(\App\Models\CampaignOwnerProfile::class, 'user_id');
+    }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(\App\Models\UserSubscription::class, 'user_id');
+    }
+
+    public function activeSubscription()
+    {
+        return $this->hasOne(\App\Models\UserSubscription::class, 'user_id')
+            ->where('status', 'ACTIVE')
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->latest('starts_at');
     }
 }

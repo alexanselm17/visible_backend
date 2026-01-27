@@ -22,6 +22,8 @@ class AdvertImages extends Model
         'valid_until',
         'capacity',
         'target_audience',
+        'status',
+        'owner_id',
     ];
 
     protected $keyType = 'string';
@@ -77,5 +79,20 @@ class AdvertImages extends Model
     public function getUniqueUsersAttribute()
     {
         return $this->screenshots->pluck('processed_by')->unique()->count();
+    }
+
+    public function submission()
+    {
+        return $this->belongsTo(AdvertSubmission::class, 'submission_id');
+    }
+
+    public function repostOf()
+    {
+        return $this->belongsTo(AdvertImages::class, 'repost_of_id');
+    }
+
+    public function reposts()
+    {
+        return $this->hasMany(AdvertImages::class, 'repost_of_id');
     }
 }
