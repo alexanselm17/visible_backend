@@ -36,6 +36,42 @@ class AdvertSubmission extends Model
         'capital_invested' => 'decimal:2',
     ];
 
+    protected $appends = [
+        'original_image_url',
+        'original_video_url',
+        'final_image_url',
+        'final_video_url',
+    ];
+
+    public function getOriginalImageUrlAttribute()
+    {
+        return $this->original_image_path
+            ? asset('storage/' . $this->original_image_path)
+            : null;
+    }
+
+    public function getOriginalVideoUrlAttribute()
+    {
+        return $this->original_video_path
+            ? asset('storage/' . $this->original_video_path)
+            : null;
+    }
+
+    public function getFinalImageUrlAttribute()
+    {
+        return $this->final_image_path
+            ? asset('storage/' . $this->final_image_path)
+            : null;
+    }
+
+    public function getFinalVideoUrlAttribute()
+    {
+        return $this->final_video_path
+            ? asset('storage/' . $this->final_video_path)
+            : null;
+    }
+
+
     protected static function boot()
     {
         parent::boot();

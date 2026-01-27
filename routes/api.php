@@ -152,10 +152,5 @@ Route::group(['prefix' => 'v1'], function () {
 
 
 
-            Route::get('/campaigns', [CampaignOwnerCampaignController::class, 'index']);
-            Route::post('/campaigns', [CampaignOwnerCampaignController::class, 'store']);
-            Route::get('/campaigns/{id}', [CampaignOwnerCampaignController::class, 'show']);
-            Route::put('/campaigns/{id}', [CampaignOwnerCampaignController::class, 'update']);
-            Route::delete('/campaigns/{id}', [CampaignOwnerCampaignController::class, 'destroy']);
         });
 });
