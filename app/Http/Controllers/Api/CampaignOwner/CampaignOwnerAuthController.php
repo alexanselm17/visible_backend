@@ -113,7 +113,7 @@ class CampaignOwnerAuthController extends Controller
                 ->orderBy('created_at', 'asc')
                 ->first();
 
-            $role = $user->role();
+            $role = $user->role;
 
             $subscription = $user->activeSubscription()->with('plan')->first();
 
@@ -139,7 +139,10 @@ class CampaignOwnerAuthController extends Controller
                         'account_status' => $user->campaignOwnerProfile->account_status,
                     ],
                     'default_campaign' => $campaign,
-                    'role' => $role,
+                    'role' => [
+                        'name' => $role->name,
+                        'slug' => $role->slug,
+                    ],
                     'subscription' => $subscription ? [
                         'status' => $subscription->status,
                         'starts_at' => $subscription->starts_at,
