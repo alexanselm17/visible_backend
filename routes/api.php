@@ -141,10 +141,9 @@ Route::group(['prefix' => 'v1'], function () {
 
 
     Route::prefix('campaign-owner')
-        ->middleware(['campaign_owner'])
         ->group(function () {
             Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
-            Route::post('/campaign/submission', [AdvertSubmissionController::class, 'submit']);
+            Route::post('/campaign/submission', [AdvertSubmissionController::class, 'submit'])->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
 
             Route::get('/campaigns', [CampaignOwnerCampaignController::class, 'index']);
             Route::post('/campaigns', [CampaignOwnerCampaignController::class, 'store']);
