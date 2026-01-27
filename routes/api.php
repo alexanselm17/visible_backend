@@ -145,6 +145,11 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
             Route::post('/campaign/submission', [AdvertSubmissionController::class, 'submit'])->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
             Route::get('/show/{userId}', [CampaignOwnerAuthController::class, 'show']);
+            Route::get(
+                '/{user_id}/advert-submissions',
+                [AdvertSubmissionController::class, 'show']
+            );
+
 
             Route::get('/campaigns', [CampaignOwnerCampaignController::class, 'index']);
             Route::post('/campaigns', [CampaignOwnerCampaignController::class, 'store']);
