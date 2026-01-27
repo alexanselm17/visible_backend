@@ -59,7 +59,6 @@ class CampaignOwnerAuthController extends Controller
                 $user->referal_code = $request->input('referal_code', '');
                 $user->my_code = $request->input('my_code', Str::upper(Str::random(8)));
 
-                $user->password = Hash::make($request->password);
                 $user->save();
 
                 $profile = new CampaignOwnerProfile();
