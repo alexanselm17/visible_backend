@@ -108,4 +108,9 @@ class ProductController extends Controller
     {
         return $this->productRepository->uploadPaymentExcell($request);
     }
+
+    public function getAdvertCampaigns(Request $request, $campaignId)
+    {
+        return $this->productRepository->getAdvertCampaigns($request, $campaignId);
+    }
 }
