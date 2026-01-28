@@ -92,4 +92,9 @@ class AdvertSubmission extends Model
     {
         return $this->belongsTo(User::class, 'submitted_by');
     }
+
+    public function designer()
+    {
+        return $this->belongsTo(User::class, 'designed_by');
+    }
 }
