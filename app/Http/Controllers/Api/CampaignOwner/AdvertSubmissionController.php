@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\CampaignOwner;
 
+use App\Enums\AdvertSubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\NotificationController;
 use App\Http\Requests\CampaignOwner\SubmitAdvertRequest;
@@ -219,7 +220,7 @@ class AdvertSubmissionController extends Controller
         try {
             $submission = AdvertSubmission::with(['user', 'campaign'])->findOrFail($submissionId);
 
-            if ($submission->status !== 'PENDING_DESIGN') {
+            if ($submission->status !== AdvertSubmissionStatus::PENDING_DESIGN) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Only PENDING_DESIGN submissions can be completed.',
@@ -251,7 +252,7 @@ class AdvertSubmissionController extends Controller
                 $submission->designed_by = $request->designer_id;
             }
 
-            $submission->status = 'DESIGN_DONE';
+            $submission->status = AdvertSubmissionStatus::DESIGN_DONE;
             $submission->save();
 
             DB::afterCommit(function () use ($submission) {
