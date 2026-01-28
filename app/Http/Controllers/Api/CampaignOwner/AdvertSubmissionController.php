@@ -416,7 +416,7 @@ class AdvertSubmissionController extends Controller
                 $submission = AdvertSubmission::with(['campaign'])->findOrFail($submissionId);
 
                 // Must be published
-                if ($submission->status !== 'PUBLISHED') {
+                if ($submission->status !== AdvertSubmissionStatus::DESIGN_DONE) {
                     return response()->json([
                         'ok' => false,
                         'message' => 'Only PUBLISHED submissions can be rolled out (posted).',

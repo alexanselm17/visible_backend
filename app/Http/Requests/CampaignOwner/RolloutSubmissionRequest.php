@@ -15,7 +15,8 @@ class RolloutSubmissionRequest extends FormRequest
     {
         return [
             'category'        => 'nullable|string|max:100',
-            'badge'           => 'nullable|string|max:100',
+            'badge' => 'required|array',
+            'badge.*' => 'string',
             'valid_until'     => 'nullable|date',
             'capacity'        => 'nullable|integer|min:0',
             'reward'          => 'nullable|numeric|min:0',
