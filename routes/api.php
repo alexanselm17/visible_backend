@@ -152,5 +152,8 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/submissions', [AdvertSubmissionController::class, 'indexAll']);
             Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
             Route::post('/submissions/{submissionId}/final', [AdvertSubmissionController::class, 'uploadFinalDesign'])->middleware(['auth:sanctum', 'check.active']);
+            Route::post('/submissions/{submissionId}/approve', [AdvertSubmissionController::class, 'approve']);
+            Route::post('/submissions/{submissionId}/reject', [AdvertSubmissionController::class, 'reject']);
+            Route::post('/submissions/{submissionId}/rollout', [AdvertSubmissionController::class, 'rolloutPost']);
         });
 });
