@@ -150,6 +150,7 @@ Route::group(['prefix' => 'v1'], function () {
                 [AdvertSubmissionController::class, 'show']
 
             );
+            Route::get('/submissions', [AdvertSubmissionController::class, 'indexAll']);
             Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
         });
 });

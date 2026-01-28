@@ -157,4 +157,56 @@ class AdvertSubmissionController extends Controller
             ], 500);
         }
     }
+
+    public function indexAll(Request $request)
+    {
+        try {
+            $status  = $request->query('status');
+            $perPage = (int) $request->query('per_page', 15);
+            $perPage = max(1, min(100, $perPage));
+
+            $query = AdvertSubmission::query()
+                ->with([
+                    'user',
+                    'campaign',
+                ])
+                ->orderBy('created_at', 'desc');
+
+            if (!empty($status)) {
+                $query->where('status', $status);
+            }
+
+            $submissions = $query->paginate($perPage);
+
+            // add absolute URLs (optional but useful)
+            $items = collect($submissions->items())->map(function ($s) {
+                $s->original_image_url = $s->original_image_path
+                    ? asset('storage/' . $s->original_image_path)
+                    : null;
+
+                $s->original_video_url = $s->original_video_path
+                    ? asset('storage/' . $s->original_video_path)
+                    : null;
+
+                return $s;
+            });
+
+            return response()->json([
+                'ok' => true,
+                'data' => $items,
+                'meta' => [
+                    'current_page' => $submissions->currentPage(),
+                    'last_page'    => $submissions->lastPage(),
+                    'per_page'     => $submissions->perPage(),
+                    'total'        => $submissions->total(),
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to fetch all advert submissions.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
 }
