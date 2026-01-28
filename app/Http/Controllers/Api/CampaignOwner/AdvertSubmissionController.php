@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\CampaignOwner;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\NotificationController;
 use App\Http\Requests\CampaignOwner\SubmitAdvertRequest;
 use App\Models\AdvertSubmission;
 use App\Models\Campaign;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -60,6 +62,34 @@ class AdvertSubmissionController extends Controller
                     'original_video_path' => $videoPath,
                     'status' => 'PENDING_DESIGN',
                 ]);
+
+                $user = User::find($request->user_id);
+
+                // 6️⃣ Send notifications
+                DB::afterCommit(function () use ($campaign, $submission, $user) {
+
+                    // Admins
+                    app(NotificationController::class)->notifyRoles(new Request([
+                        'roles' => ['admin'],
+                        'title' => 'New Advert Submission from ' . $user->fullname . ' (Admin Review)',
+                        'message' => "Please review the submission for campaign: {$campaign->name}.",
+                        'type' => 'info',
+                        'send_push' => true,
+                        'data' => ['submission_id' => $submission->id, 'action_type' => 'admin_review'],
+                    ]));
+
+                    // Designers
+                    app(NotificationController::class)->notifyRoles(new Request([
+                        'roles' => ['designer'],
+                        'title' => 'New Design Task',
+                        'message' => "New submission waiting design for campaign: {$campaign->name}.",
+                        'type' => 'info',
+                        'send_push' => true,
+                        'data' => ['submission_id' => $submission->id, 'action_type' => 'designer_task'],
+                    ]));
+                });
+
+
 
                 return response()->json([
                     'ok' => true,

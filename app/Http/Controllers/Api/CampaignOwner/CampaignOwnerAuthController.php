@@ -11,6 +11,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class CampaignOwnerAuthController extends Controller
 {
@@ -164,5 +166,50 @@ class CampaignOwnerAuthController extends Controller
                 'error' => $th->getMessage()
             ], 500);
         }
+    }
+
+
+    /**
+     * Get all users with Campaign Owner role
+     */
+    public function campaignOwners(Request $request): JsonResponse
+    {
+        $request->validate([
+            'per_page' => 'nullable|integer|min:1|max:100',
+            'search'   => 'nullable|string|max:255',
+        ]);
+
+        $perPage = $request->per_page ?? 10;
+        $search  = $request->search;
+
+        $query = User::with(['role'])
+            ->whereHas('role', function ($q) {
+                $q->where('slug', 'campaign_owner');
+            });
+
+        // Optional search
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('fullname', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        $users = $query->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $users->items(),
+            'meta' => [
+                'current_page' => $users->currentPage(),
+                'last_page'    => $users->lastPage(),
+                'per_page'     => $users->perPage(),
+                'total'        => $users->total(),
+                'has_more'     => $users->hasMorePages(),
+            ],
+        ]);
     }
 }
