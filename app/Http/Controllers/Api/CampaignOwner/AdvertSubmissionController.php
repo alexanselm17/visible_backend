@@ -81,16 +81,6 @@ class AdvertSubmissionController extends Controller
                         'send_push' => true,
                         'data' => ['submission_id' => $submission->id, 'action_type' => 'admin_review'],
                     ]));
-
-                    // Designers
-                    app(NotificationController::class)->notifyRoles(new Request([
-                        'roles' => ['designer'],
-                        'title' => 'New Design Task',
-                        'message' => "New submission waiting design for campaign: {$campaign->name}.",
-                        'type' => 'info',
-                        'send_push' => true,
-                        'data' => ['submission_id' => $submission->id, 'action_type' => 'designer_task'],
-                    ]));
                 });
 
 
@@ -307,6 +297,17 @@ class AdvertSubmissionController extends Controller
             $submission->status = AdvertSubmissionStatus::PENDING_DESIGN;
             $submission->save();
 
+            DB::afterCommit(function () use ($submission) {
+                app(NotificationController::class)->notifyRoles(new Request([
+                    'roles' => ['designer'],
+                    'title' => 'New Design Task',
+                    'message' => "New submission waiting design for campaign: {$submission->campaign->name}.",
+                    'type' => 'info',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'designer_task'],
+                ]));
+            });
+
             return response()->json([
                 'ok' => true,
                 'message' => 'Submission approved. Now waiting for design.',
@@ -336,6 +337,17 @@ class AdvertSubmissionController extends Controller
 
             $submission->status = AdvertSubmissionStatus::REJECTED;
             $submission->save();
+
+            DB::afterCommit(function () use ($submission) {
+                app(NotificationController::class)->notifyRoles(new Request([
+                    'roles' => ['campaign_owner'],
+                    'title' => 'Submission Rejected',
+                    'message' => "Submission rejected for campaign: {$submission->campaign->name}.",
+                    'type' => 'warning',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rejected'],
+                ]));
+            });
 
             return response()->json([
                 'ok' => true,
@@ -367,6 +379,17 @@ class AdvertSubmissionController extends Controller
 
             $submission->status = AdvertSubmissionStatus::PUBLISHED;
             $submission->save();
+
+            DB::afterCommit(function () use ($submission) {
+                app(NotificationController::class)->notifyRoles(new Request([
+                    'roles' => ['campaign_owner'],
+                    'title' => 'Submission Rolled Out (Posted)',
+                    'message' => "Submission rolled out (posted) for campaign: {$submission->campaign->name}.",
+                    'type' => 'info',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rolled_out'],
+                ]));
+            });
 
             return response()->json([
                 'ok' => true,
