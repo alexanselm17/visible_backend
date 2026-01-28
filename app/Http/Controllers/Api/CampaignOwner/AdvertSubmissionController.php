@@ -63,8 +63,9 @@ class AdvertSubmissionController extends Controller
                         : null,
                     'original_image_path' => 'submissions/' . $imageName,
                     'original_video_path' => $videoPath,
-                    'status' => 'PENDING_DESIGN',
+                    'status' => AdvertSubmissionStatus::PENDING_APPROVAL,
                 ]);
+
 
                 $user = User::find($request->user_id);
 
@@ -79,16 +80,6 @@ class AdvertSubmissionController extends Controller
                         'type' => 'info',
                         'send_push' => true,
                         'data' => ['submission_id' => $submission->id, 'action_type' => 'admin_review'],
-                    ]));
-
-                    // Designers
-                    app(NotificationController::class)->notifyRoles(new Request([
-                        'roles' => ['designer'],
-                        'title' => 'New Design Task',
-                        'message' => "New submission waiting design for campaign: {$campaign->name}.",
-                        'type' => 'info',
-                        'send_push' => true,
-                        'data' => ['submission_id' => $submission->id, 'action_type' => 'designer_task'],
                     ]));
                 });
 
@@ -286,6 +277,129 @@ class AdvertSubmissionController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => 'Failed to upload final design.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function approve(Request $request, string $submissionId)
+    {
+        try {
+            $submission = AdvertSubmission::with(['campaign', 'user'])->findOrFail($submissionId);
+
+            if ($submission->status !== AdvertSubmissionStatus::PENDING_APPROVAL) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Only PENDING_APPROVAL submissions can be approved.',
+                ], 422);
+            }
+
+            $submission->status = AdvertSubmissionStatus::PENDING_DESIGN;
+            $submission->save();
+
+            DB::afterCommit(function () use ($submission) {
+                app(NotificationController::class)->notifyRoles(new Request([
+                    'roles' => ['designer'],
+                    'title' => 'New Design Task',
+                    'message' => "New submission waiting design for campaign: {$submission->campaign->name}.",
+                    'type' => 'info',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'designer_task'],
+                ]));
+            });
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Submission approved. Now waiting for design.',
+                'data' => $submission,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to approve submission.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function reject(Request $request, string $submissionId)
+    {
+        try {
+            $submission = AdvertSubmission::findOrFail($submissionId);
+
+
+            if ($submission->status !== AdvertSubmissionStatus::PENDING_APPROVAL) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Only PENDING_APPROVAL submissions can be rejected.',
+                ], 422);
+            }
+
+            $submission->status = AdvertSubmissionStatus::REJECTED;
+            $submission->save();
+
+            DB::afterCommit(function () use ($submission) {
+                app(NotificationController::class)->notifyRoles(new Request([
+                    'roles' => ['campaign_owner'],
+                    'title' => 'Submission Rejected',
+                    'message' => "Submission rejected for campaign: {$submission->campaign->name}.",
+                    'type' => 'warning',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rejected'],
+                ]));
+            });
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Submission rejected.',
+                'data' => $submission,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to reject submission.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+
+
+    public function rolloutPost(Request $request, string $submissionId)
+    {
+        try {
+            $submission = AdvertSubmission::findOrFail($submissionId);
+
+            if ($submission->status !== AdvertSubmissionStatus::DESIGN_DONE) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Only PUBLISHED submissions can be rolled out (posted).',
+                ], 422);
+            }
+
+            $submission->status = AdvertSubmissionStatus::PUBLISHED;
+            $submission->save();
+
+            DB::afterCommit(function () use ($submission) {
+                app(NotificationController::class)->notifyRoles(new Request([
+                    'roles' => ['campaign_owner'],
+                    'title' => 'Submission Rolled Out (Posted)',
+                    'message' => "Submission rolled out (posted) for campaign: {$submission->campaign->name}.",
+                    'type' => 'info',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rolled_out'],
+                ]));
+            });
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Submission rolled out (posted).',
+                'data' => $submission,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to roll out (post) submission.',
                 'error' => $th->getMessage(),
             ], 500);
         }
