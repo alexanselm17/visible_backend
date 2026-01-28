@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\FirebaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class NotificationController extends Controller
 {
@@ -157,7 +158,7 @@ class NotificationController extends Controller
                 $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
             }
         }
 
@@ -208,7 +209,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
                 } catch (\Exception $e) {
-                    \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
+                    \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
                 }
             }
         }
@@ -279,7 +280,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($admin->fcm_token, $title, $message);
                 } catch (\Exception $e) {
-                    \Log::error("FCM error for admin [{$admin->id}]: ".$e->getMessage());
+                    \Log::error("FCM error for admin [{$admin->id}]: " . $e->getMessage());
                 }
             }
         }
@@ -332,7 +333,7 @@ class NotificationController extends Controller
                 $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
             }
         }
 
@@ -407,7 +408,7 @@ class NotificationController extends Controller
                 $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
             }
         }
 
@@ -420,5 +421,63 @@ class NotificationController extends Controller
                 'username' => $user->username,
             ],
         ]);
+    }
+
+    /**
+     * Send notification to users with specific roles
+     */
+    public function notifyRoles(Request $request): JsonResponse
+    {
+        $request->validate([
+            'roles' => 'required|array|min:1',
+            'roles.*' => 'required|string',
+            'title' => 'required|string|max:255',
+            'message' => 'required|string',
+            'type' => 'nullable|in:system,security,info,warning,success,error',
+            'data' => 'nullable|array',
+            'send_push' => 'nullable|boolean',
+        ]);
+
+        $roles = $request->roles;
+
+        $users = User::whereHas('role', function ($q) use ($roles) {
+            $q->whereIn('slug', $roles);
+        })->get();
+
+        if ($users->isEmpty()) {
+            return response()->json([
+                'message' => 'No users found for the specified roles',
+                'notifications_sent' => 0,
+            ], 200);
+        }
+
+        $firebase = new FirebaseService;
+        $created = 0;
+
+        foreach ($users as $user) {
+            Notification::create([
+                'user_id' => $user->id,
+                'title' => $request->title,
+                'message' => $request->message,
+                'type' => $request->type ?? 'info',
+                'data' => $request->data,
+            ]);
+
+            $created++;
+
+            if (($request->send_push ?? true) && $user->fcm_token) {
+                try {
+                    $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
+                } catch (\Exception $e) {
+                    Log::error("FCM error for role user [{$user->id}]: " . $e->getMessage());
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'Role notifications sent successfully',
+            'notifications_sent' => $created,
+            'roles' => $roles,
+        ], 200);
     }
 }
