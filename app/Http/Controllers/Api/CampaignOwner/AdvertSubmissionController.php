@@ -11,6 +11,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
+
 
 class AdvertSubmissionController extends Controller
 {
@@ -205,6 +207,84 @@ class AdvertSubmissionController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => 'Failed to fetch all advert submissions.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+
+
+    public function uploadFinalDesign(UploadFinalDesignRequest $request, string $submissionId)
+    {
+        try {
+            $submission = AdvertSubmission::with(['user', 'campaign'])->findOrFail($submissionId);
+
+            if ($submission->status !== 'PENDING_DESIGN') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Only PENDING_DESIGN submissions can be completed.',
+                ], 422);
+            }
+
+            if (!$request->hasFile('final_image') && !$request->hasFile('final_video')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Please upload at least final_image or final_video.',
+                ], 422);
+            }
+
+            if ($request->hasFile('final_image')) {
+                $img = $request->file('final_image');
+                $imgName = time() . '_' . Str::random(8) . '.' . $img->getClientOriginalExtension();
+                $img->move(public_path('storage/submissions/final'), $imgName);
+                $submission->final_image_path = 'submissions/final/' . $imgName;
+            }
+
+            if ($request->hasFile('final_video')) {
+                $vid = $request->file('final_video');
+                $vidName = time() . '_' . Str::random(8) . '.' . $vid->getClientOriginalExtension();
+                $vid->move(public_path('storage/submissions/final'), $vidName);
+                $submission->final_video_path = 'submissions/final/' . $vidName;
+            }
+
+            if ($request->filled('designer_id')) {
+                $submission->designed_by = $request->designer_id;
+            }
+
+            $submission->status = 'DESIGN_DONE';
+            $submission->save();
+
+            DB::afterCommit(function () use ($submission) {
+                $campaignOwnerId = optional($submission->campaign)->owner_id;
+
+                if ($campaignOwnerId) {
+                    app(NotificationController::class)->notifyRoles(new Request([
+                        'roles' => ['admin', 'campaign_owner'],
+                        'user_ids' => [$campaignOwnerId],
+                        'title' => 'Design Completed',
+                        'message' => "Your advert design is ready for campaign: {$submission->campaign->name}.",
+                        'type' => 'success',
+                        'send_push' => true,
+                        'data' => [
+                            'submission_id' => $submission->id,
+                            'action_type' => 'design_done'
+                        ],
+                    ]));
+                }
+            });
+
+            $submission->final_image_url = $submission->final_image_path ? asset('storage/' . $submission->final_image_path) : null;
+            $submission->final_video_url = $submission->final_video_path ? asset('storage/' . $submission->final_video_path) : null;
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Final design uploaded successfully.',
+                'data' => $submission,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to upload final design.',
                 'error' => $th->getMessage(),
             ], 500);
         }
