@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
+use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
+use App\Models\AdvertImages;
+
 
 
 class AdvertSubmissionController extends Controller
@@ -400,6 +403,103 @@ class AdvertSubmissionController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => 'Failed to roll out (post) submission.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function rolloutSubmission(RolloutSubmissionRequest $request, string $submissionId)
+    {
+        try {
+            return DB::transaction(function () use ($request, $submissionId) {
+
+                $submission = AdvertSubmission::with(['campaign'])->findOrFail($submissionId);
+
+                // Must be published
+                if ($submission->status !== 'PUBLISHED') {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Only PUBLISHED submissions can be rolled out (posted).',
+                        'status' => $submission->status,
+                    ], 422);
+                }
+
+                // Must have final media
+                if (empty($submission->final_image_path) && empty($submission->final_video_path)) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Final design media missing. Upload final image/video first.',
+                    ], 422);
+                }
+
+                $campaign = $submission->campaign;
+
+                // Reward priority:
+                // 1) request.reward
+                // 2) campaign.reward
+                $reward = $request->filled('reward') ? $request->reward : $campaign->reward;
+
+                // Create advert post (AdvertImages)
+                $advert = new AdvertImages();
+                $advert->campaign_id      = $campaign->id;
+
+                // Final designed media
+                $advert->image_path       = $submission->final_image_path;
+                $advert->video_path       = $submission->final_video_path;
+
+                // From submission
+                $advert->name             = $submission->name;
+                $advert->description      = $submission->description;
+                $advert->target_audience  = $submission->target_audience;
+
+                // From rollout request
+                $advert->category         = $request->category;
+                $advert->badge            = $request->badge;
+                $advert->valid_until      = $request->valid_until;
+                $advert->capacity         = $request->capacity;
+                $advert->reward           = $reward;
+                $advert->capital_invested = $request->capital_invested;
+
+                $advert->selling_price    = 0;
+
+                $advert->save();
+
+                // Update submission status -> POSTED
+                $submission->status = 'POSTED';
+                $submission->save();
+
+                // Notify users
+                $title = '📢 New Product posted!';
+                $body  = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status and earn ksh.{$advert->reward}";
+
+                $notifReq = new Request([
+                    'title' => $title,
+                    'message' => $body,
+                    'type' => 'info',
+                    'send_push' => true,
+                    'data' => [
+                        'advert_id' => $advert->id,
+                        'campaign_id' => $campaign->id,
+                        'submission_id' => $submission->id,
+                        'action_type' => 'rollout_posted',
+                    ],
+                ]);
+
+                // app(NotificationController::class)->notifyAllUsers($notifReq);
+
+                return response()->json([
+                    'ok' => true,
+                    'message' => 'Rolled out successfully. Submission is now POSTED.',
+                    'data' => [
+                        'submission' => $submission,
+                        'advert' => $advert,
+                    ],
+                ], 200);
+            });
+        } catch (\Throwable $th) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to roll out submission.',
                 'error' => $th->getMessage(),
             ], 500);
         }
