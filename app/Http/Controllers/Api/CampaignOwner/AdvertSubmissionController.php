@@ -465,7 +465,7 @@ class AdvertSubmissionController extends Controller
                 $advert->save();
 
                 // Update submission status -> POSTED
-                $submission->status = 'POSTED';
+                $submission->status = AdvertSubmissionStatus::PUBLISHED;
                 $submission->save();
 
                 // Notify users
