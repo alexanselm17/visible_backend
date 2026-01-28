@@ -150,6 +150,6 @@ Route::group(['prefix' => 'v1'], function () {
                 [AdvertSubmissionController::class, 'show']
 
             );
-            Route::post('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
+            Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
         });
 });
