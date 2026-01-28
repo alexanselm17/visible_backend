@@ -9,6 +9,7 @@ class AdvertSubmission extends Model
 {
     protected $table = 'advert_submissions';
 
+
     protected $fillable = [
         'campaign_id',
         'submitted_by',
