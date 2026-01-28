@@ -87,4 +87,9 @@ class AdvertSubmission extends Model
     {
         return $this->belongsTo(Campaign::class, 'campaign_id');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
 }
