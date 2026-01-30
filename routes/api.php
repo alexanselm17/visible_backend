@@ -138,10 +138,6 @@ Route::group(['prefix' => 'v1'], function () {
             // Optional history
             Route::get('/reviews', [AdminFraudController::class, 'listReviews']);
         });
-
-        Route::prefix('subscriptions')->group(function () {
-            Route::get('/all', [SubscriptionController::class, 'index']);
-        });
     });
 
 
@@ -161,4 +157,12 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/submissions/{submissionId}/reject', [AdvertSubmissionController::class, 'reject']);
             Route::post('/submissions/{submissionId}/rollout', [AdvertSubmissionController::class, 'rolloutSubmission']);
         });
+
+
+
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::prefix('subscriptions')->group(function () {
+            Route::get('/all', [SubscriptionController::class, 'index']);
+        });
+    });
 });
