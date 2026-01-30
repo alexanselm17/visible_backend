@@ -13,6 +13,7 @@ use App\Models\Invoice;
 use App\Models\Screenshots;
 use App\Models\SysMeta;
 use App\Models\User;
+use App\Services\ReferralRewardService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -622,7 +623,7 @@ class ProductRepository implements ProductRepositoryInterface
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => 'This screenshot has already been uploaded or not valid',
+                        'message' => 'This screenshot seems to have equal or lower views than your previous submission. Please try again with a higher view count.',
                     ], 400);
                 }
             }
@@ -639,22 +640,24 @@ class ProductRepository implements ProductRepositoryInterface
             if ($number == 2) {
                 if ($json['views'] < 50) {
                     DB::rollBack();
-
                     return response()->json([
                         'ok' => false,
                         'status' => 'failed',
-                        'message' => 'Minimum threshold not attained',
+                        'message' => 'To complete this task, your status must have at least 50 views. Please try again once you have met this requirement.',
                     ], 400);
+
+                    // Reward referral if applicable
+
+                    ReferralRewardService::handle($request->user_id);
                 }
                 // we now proceed to reward the users
                 $advert = AdvertImages::where('id', $advert_id)->first();
-                // $campaign = Campaign::where('id', $advert->campaign_id)->first();
                 $reward = $advert->reward;
 
                 $customerLastInvoice = Invoice::where('processed_by', $request->user_id)->latest()->first();
                 $customerBalance = $customerLastInvoice ? $customerLastInvoice->customer_balance : 0;
 
-                $invoice = Invoice::create([
+                Invoice::create([
                     'type' => 'Reward',
                     'amount' => $reward,
                     'processed_by' => $request->user_id,
