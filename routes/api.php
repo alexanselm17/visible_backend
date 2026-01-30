@@ -164,6 +164,8 @@ Route::group(['prefix' => 'v1'], function () {
         Route::prefix('subscriptions')->group(function () {
             Route::get('/all', [SubscriptionController::class, 'index']);
             Route::get('/show/{code}', [SubscriptionController::class, 'show']);
+            Route::post('buy', [SubscriptionController::class, 'buy']);
+            Route::get('me', [SubscriptionController::class, 'mySubscription']);
         });
     });
 });

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Subscriptions;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,6 +64,123 @@ class SubscriptionController extends Controller
         return response()->json([
             'ok' => true,
             'data' => $plan,
+        ]);
+    }
+
+    public function buy(Request $request): JsonResponse
+    {
+        $request->validate([
+            'plan_code' => 'required|string|exists:subscription_plans,code',
+            'auto_renew' => 'sometimes|boolean',
+        ]);
+
+        $user = $request->user();
+
+        $plan = DB::table('subscription_plans')
+            ->where('code', strtoupper($request->plan_code))
+            ->first();
+
+        if (!$plan) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Invalid subscription plan',
+            ], 404);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // 1️⃣ Expire existing active subscriptions
+            DB::table('user_subscriptions')
+                ->where('user_id', $user->id)
+                ->where('status', 'ACTIVE')
+                ->update([
+                    'status' => 'EXPIRED',
+                    'updated_at' => now(),
+                ]);
+
+            // 2️⃣ Calculate period
+            $startsAt = Carbon::now();
+            $endsAt = match ($plan->billing_period) {
+                'WEEK'  => $startsAt->copy()->addWeek(),
+                'MONTH' => $startsAt->copy()->addMonth(),
+                'YEAR'  => $startsAt->copy()->addYear(),
+                default => $startsAt->copy()->addMonth(),
+            };
+
+            // 3️⃣ Create subscription
+            DB::table('user_subscriptions')->insert([
+                'id' => Str::uuid(),
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'status' => 'ACTIVE',
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'auto_renew' => $request->boolean('auto_renew'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Subscription activated successfully',
+                'data' => [
+                    'plan' => $plan->code,
+                    'starts_at' => $startsAt,
+                    'ends_at' => $endsAt,
+                ],
+            ], 201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'Failed to subscribe',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get current user subscription
+     */
+    public function mySubscription(Request $request): JsonResponse
+    {
+        $subscription = DB::table('user_subscriptions as us')
+            ->join('subscription_plans as sp', 'sp.id', '=', 'us.plan_id')
+            ->where('us.user_id', $request->user()->id)
+            ->where('us.status', 'ACTIVE')
+            ->select(
+                'us.id',
+                'us.status',
+                'us.starts_at',
+                'us.ends_at',
+                'us.auto_renew',
+                'sp.code',
+                'sp.name',
+                'sp.billing_period',
+                'sp.price',
+                'sp.limits',
+                'sp.features'
+            )
+            ->first();
+
+        if (!$subscription) {
+            return response()->json([
+                'ok' => true,
+                'data' => null,
+                'message' => 'No active subscription',
+            ]);
+        }
+
+        $subscription->limits = json_decode($subscription->limits, true);
+        $subscription->features = json_decode($subscription->features, true);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $subscription,
         ]);
     }
 }
