@@ -80,7 +80,7 @@ class SubscriptionController extends Controller
         $targetUserId = $authUser->id;
 
         if ($request->filled('user_id')) {
-            if (!$authUser->hasRole('ADMIN')) {
+            if ($authUser->hasRole('ADMIN')) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'You are not allowed to buy a plan for another user',
