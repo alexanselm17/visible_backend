@@ -152,9 +152,28 @@ class SubscriptionController extends Controller
      */
     public function mySubscription(Request $request): JsonResponse
     {
+        $request->validate([
+            'user_id' => 'sometimes|uuid|exists:users,id',
+        ]);
+
+        $authUser = $request->user();
+
+        $targetUserId = $authUser->id;
+
+        if ($request->filled('user_id')) {
+            if (!$authUser->hasRole('ADMIN')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'You are not allowed to view subscriptions for other users',
+                ], 403);
+            }
+
+            $targetUserId = $request->user_id;
+        }
+
         $subscription = DB::table('user_subscriptions as us')
             ->join('subscription_plans as sp', 'sp.id', '=', 'us.plan_id')
-            ->where('us.user_id', $request->user()->id)
+            ->where('us.user_id', $targetUserId)
             ->where('us.status', 'ACTIVE')
             ->select(
                 'us.id',
