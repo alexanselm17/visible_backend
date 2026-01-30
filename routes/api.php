@@ -161,7 +161,7 @@ Route::group(['prefix' => 'v1'], function () {
 
 
     Route::middleware(['auth:sanctum'])->group(function () {
-        Route::prefix('subscriptions')->group(function () {
+        Route::group(['prefix' => 'subscriptions'], function () {
             Route::get('/all', [SubscriptionController::class, 'index']);
             Route::get('/show/{code}', [SubscriptionController::class, 'show']);
             Route::post('buy', [SubscriptionController::class, 'buy']);

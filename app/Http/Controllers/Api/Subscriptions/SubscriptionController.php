@@ -71,47 +71,50 @@ class SubscriptionController extends Controller
     {
         $request->validate([
             'plan_code' => 'required|string|exists:subscription_plans,code',
+            'user_id' => 'required|uuid|exists:users,id',
             'auto_renew' => 'sometimes|boolean',
         ]);
 
-        $user = $request->user();
+        $authUser = $request->user();
+
+        $targetUserId = $authUser->id;
+
+        if ($request->filled('user_id')) {
+            if (!$authUser->hasRole('ADMIN')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'You are not allowed to buy a plan for another user',
+                ], 403);
+            }
+
+            $targetUserId = $request->user_id;
+        }
 
         $plan = DB::table('subscription_plans')
             ->where('code', strtoupper($request->plan_code))
             ->first();
 
-        if (!$plan) {
-            return response()->json([
-                'ok' => false,
-                'message' => 'Invalid subscription plan',
-            ], 404);
-        }
-
         DB::beginTransaction();
 
         try {
-            // 1️⃣ Expire existing active subscriptions
             DB::table('user_subscriptions')
-                ->where('user_id', $user->id)
+                ->where('user_id', $targetUserId)
                 ->where('status', 'ACTIVE')
                 ->update([
                     'status' => 'EXPIRED',
                     'updated_at' => now(),
                 ]);
 
-            // 2️⃣ Calculate period
-            $startsAt = Carbon::now();
+            $startsAt = now();
             $endsAt = match ($plan->billing_period) {
-                'WEEK'  => $startsAt->copy()->addWeek(),
-                'MONTH' => $startsAt->copy()->addMonth(),
-                'YEAR'  => $startsAt->copy()->addYear(),
-                default => $startsAt->copy()->addMonth(),
+                'WEEK'  => now()->addWeek(),
+                'MONTH' => now()->addMonth(),
+                'YEAR'  => now()->addYear(),
             };
 
-            // 3️⃣ Create subscription
             DB::table('user_subscriptions')->insert([
-                'id' => Str::uuid(),
-                'user_id' => $user->id,
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'user_id' => $targetUserId,
                 'plan_id' => $plan->id,
                 'status' => 'ACTIVE',
                 'starts_at' => $startsAt,
@@ -127,6 +130,7 @@ class SubscriptionController extends Controller
                 'ok' => true,
                 'message' => 'Subscription activated successfully',
                 'data' => [
+                    'user_id' => $targetUserId,
                     'plan' => $plan->code,
                     'starts_at' => $startsAt,
                     'ends_at' => $endsAt,
@@ -137,11 +141,11 @@ class SubscriptionController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'Failed to subscribe',
-                'error' => $e->getMessage(),
+                'message' => 'Failed to activate subscription',
             ], 500);
         }
     }
+
 
     /**
      * Get current user subscription
