@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignController as CampaignOwnerCampaignController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
+use App\Http\Controllers\Api\Subscriptions\SubscriptionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ProductController;
@@ -136,6 +137,10 @@ Route::group(['prefix' => 'v1'], function () {
 
             // Optional history
             Route::get('/reviews', [AdminFraudController::class, 'listReviews']);
+        });
+
+        Route::prefix('subscriptions')->group(function () {
+            Route::get('/all', [SubscriptionController::class, 'index']);
         });
     });
 
