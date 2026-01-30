@@ -138,7 +138,7 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
-    
+
     public function getCampaigns(Request $request)
     {
         try {
@@ -2071,7 +2071,6 @@ class ProductRepository implements ProductRepositoryInterface
     public function getExcellFileForPayment(Request $request)
     {
         try {
-            // Get the latest invoice for each processed_by
             $latestInvoices = Invoice::select('invoices.*')
                 ->join(DB::raw('(SELECT MAX(created_at) AS latest_created, processed_by 
                                 FROM invoices 
@@ -2095,7 +2094,7 @@ class ProductRepository implements ProductRepositoryInterface
             $data = $latestInvoices->map(function ($invoice) {
                 return [
                     $invoice->fullname,
-                    (string) $invoice->phone,       // keep as string
+                    (string) $invoice->phone,
                     $invoice->customer_balance,
                     'Payment',
                 ];

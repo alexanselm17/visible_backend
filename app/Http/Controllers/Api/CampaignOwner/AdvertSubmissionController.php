@@ -442,6 +442,7 @@ class AdvertSubmissionController extends Controller
                 // Create advert post (AdvertImages)
                 $advert = new AdvertImages();
                 $advert->campaign_id      = $campaign->id;
+                $advert->submission_id = $submission->id;
 
                 // Final designed media
                 $advert->image_path       = $submission->final_image_path;
