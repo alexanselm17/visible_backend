@@ -551,19 +551,19 @@ class AdvertSubmissionController extends Controller
 
         /**
          * 3) ADVERT STATS (owned adverts)
+         * ✅ FIX: use valid_until instead of status
          */
         $advertStats = DB::table('advert_images')
             ->where('owner_id', $userId)
             ->selectRaw("
                 COUNT(*) as total_adverts,
-                SUM(status = 'ACTIVE') as active_adverts,
-                SUM(status <> 'ACTIVE') as inactive_adverts
+                SUM(CASE WHEN valid_until IS NOT NULL AND valid_until >= NOW() THEN 1 ELSE 0 END) as active_adverts,
+                SUM(CASE WHEN valid_until IS NULL OR valid_until < NOW() THEN 1 ELSE 0 END) as inactive_adverts
             ")
             ->first();
 
         /**
-         * 4) Find campaign IDs that belong to this owner
-         *    (based on adverts they own)
+         * 4) Owner campaign IDs (based on adverts)
          */
         $ownerCampaignIds = DB::table('advert_images')
             ->where('owner_id', $userId)
@@ -573,7 +573,6 @@ class AdvertSubmissionController extends Controller
 
         /**
          * 5) SUBMISSION STATS (based on campaign_id)
-         *    ✅ FIXED: advert_submissions has campaign_id, not advert_id
          */
         if ($ownerCampaignIds->isEmpty()) {
             $submissionStats = (object) [
@@ -598,11 +597,13 @@ class AdvertSubmissionController extends Controller
 
         /**
          * 6) TOP ACTIVE ADVERTS BY VIEWS
+         * ✅ FIX: active = valid_until >= NOW()
          */
         $topActiveAdverts = DB::table('screenshots as sc')
             ->join('advert_images as a', 'a.id', '=', 'sc.advert_id')
             ->where('a.owner_id', $userId)
-            ->where('a.status', 'ACTIVE')
+            ->whereNotNull('a.valid_until')
+            ->where('a.valid_until', '>=', now())
             ->selectRaw("
                 a.id,
                 a.name,
