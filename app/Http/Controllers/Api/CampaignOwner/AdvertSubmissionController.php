@@ -507,20 +507,25 @@ class AdvertSubmissionController extends Controller
     }
 
 
-    public function dashboard(Request $request)
+    public function dashboard(Request $request, string $userId)
     {
-        $request->validate([
-            'user_id' => 'required|uuid|exists:users,id',
-        ]);
+        // 1️⃣ Validate user exists
+        $campaignOwner = User::where('id', $userId)->firstOrFail();
 
-        $ownerId = $request->user_id;
+        // Optional but recommended: ensure role is campaign_owner
+        if (! $campaignOwner->hasRole('campaign_owner')) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'User is not a campaign owner',
+            ], 403);
+        }
 
         /**
-         * 1️⃣ ACTIVE SUBSCRIPTION
+         * 2️⃣ ACTIVE SUBSCRIPTION
          */
         $subscription = DB::table('user_subscriptions as us')
             ->join('subscription_plans as sp', 'sp.id', '=', 'us.plan_id')
-            ->where('us.user_id', $ownerId)
+            ->where('us.user_id', $userId)
             ->where('us.status', 'ACTIVE')
             ->where('us.starts_at', '<=', now())
             ->where('us.ends_at', '>=', now())
@@ -541,10 +546,10 @@ class AdvertSubmissionController extends Controller
         }
 
         /**
-         * 2️⃣ ADVERT STATS (owned adverts)
+         * 3️⃣ ADVERT STATS
          */
         $advertStats = DB::table('advert_images')
-            ->where('owner_id', $ownerId)
+            ->where('owner_id', $userId)
             ->selectRaw("
             COUNT(*) as total_adverts,
             SUM(status = 'ACTIVE') as active_adverts,
@@ -553,11 +558,11 @@ class AdvertSubmissionController extends Controller
             ->first();
 
         /**
-         * 3️⃣ SUBMISSION STATS (for adverts they own)
+         * 4️⃣ SUBMISSION STATS
          */
         $submissionStats = DB::table('advert_submissions as s')
             ->join('advert_images as a', 'a.id', '=', 's.advert_id')
-            ->where('a.owner_id', $ownerId)
+            ->where('a.owner_id', $userId)
             ->selectRaw("
             COUNT(*) as total_submissions,
             SUM(s.status = 'PENDING') as pending,
@@ -568,11 +573,11 @@ class AdvertSubmissionController extends Controller
             ->first();
 
         /**
-         * 4️⃣ TOP ACTIVE ADVERTS BY VIEWS
+         * 5️⃣ TOP ACTIVE ADVERTS BY VIEWS
          */
         $topAdverts = DB::table('screenshots as sc')
             ->join('advert_images as a', 'a.id', '=', 'sc.advert_id')
-            ->where('a.owner_id', $ownerId)
+            ->where('a.owner_id', $userId)
             ->where('a.status', 'ACTIVE')
             ->selectRaw("
             a.id,

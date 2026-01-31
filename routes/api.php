@@ -150,7 +150,7 @@ Route::group(['prefix' => 'v1'], function () {
                 '/{user_id}/advert-submissions',
                 [AdvertSubmissionController::class, 'show']
             );
-            Route::get('/dashboard/{userId}', [AdvertSubmissionController::class, 'dashboard'])->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
+            Route::get('/dashboard/{userId}', [AdvertSubmissionController::class, 'dashboard'])->middleware(['auth:sanctum']);
             Route::get('/submissions', [AdvertSubmissionController::class, 'indexAll']);
             Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
             Route::post('/submissions/{submissionId}/final', [AdvertSubmissionController::class, 'uploadFinalDesign'])->middleware(['auth:sanctum', 'check.active']);
