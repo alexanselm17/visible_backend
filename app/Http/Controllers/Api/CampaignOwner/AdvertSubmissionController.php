@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
 use App\Models\AdvertImages;
+use Illuminate\Http\JsonResponse;
+
 
 
 
@@ -507,12 +509,12 @@ class AdvertSubmissionController extends Controller
     }
 
 
-    public function dashboard(Request $request, string $userId)
+    public function dashboard(Request $request, string $userId): JsonResponse
     {
-        // 1️⃣ Validate user exists
+        // 1) Validate user exists
         $campaignOwner = User::where('id', $userId)->firstOrFail();
 
-        // Optional but recommended: ensure role is campaign_owner
+        // Optional: ensure user is campaign_owner role
         if (! $campaignOwner->hasRole('campaign_owner')) {
             return response()->json([
                 'ok' => false,
@@ -521,7 +523,7 @@ class AdvertSubmissionController extends Controller
         }
 
         /**
-         * 2️⃣ ACTIVE SUBSCRIPTION
+         * 2) ACTIVE SUBSCRIPTION
          */
         $subscription = DB::table('user_subscriptions as us')
             ->join('subscription_plans as sp', 'sp.id', '=', 'us.plan_id')
@@ -530,62 +532,86 @@ class AdvertSubmissionController extends Controller
             ->where('us.starts_at', '<=', now())
             ->where('us.ends_at', '>=', now())
             ->select(
+                'us.id as subscription_id',
+                'us.starts_at',
+                'us.ends_at',
+                'us.auto_renew',
                 'sp.code',
                 'sp.name',
                 'sp.billing_period',
                 'sp.limits',
-                'sp.features',
-                'us.starts_at',
-                'us.ends_at'
+                'sp.features'
             )
             ->first();
 
         if ($subscription) {
-            $subscription->limits = json_decode($subscription->limits, true);
-            $subscription->features = json_decode($subscription->features, true);
+            $subscription->limits = is_string($subscription->limits) ? json_decode($subscription->limits, true) : $subscription->limits;
+            $subscription->features = is_string($subscription->features) ? json_decode($subscription->features, true) : $subscription->features;
         }
 
         /**
-         * 3️⃣ ADVERT STATS
+         * 3) ADVERT STATS (owned adverts)
          */
         $advertStats = DB::table('advert_images')
             ->where('owner_id', $userId)
             ->selectRaw("
-            COUNT(*) as total_adverts,
-            SUM(status = 'ACTIVE') as active_adverts,
-            SUM(status != 'ACTIVE') as inactive_adverts
-        ")
+                COUNT(*) as total_adverts,
+                SUM(status = 'ACTIVE') as active_adverts,
+                SUM(status <> 'ACTIVE') as inactive_adverts
+            ")
             ->first();
 
         /**
-         * 4️⃣ SUBMISSION STATS
+         * 4) Find campaign IDs that belong to this owner
+         *    (based on adverts they own)
          */
-        $submissionStats = DB::table('advert_submissions as s')
-            ->join('advert_images as a', 'a.id', '=', 's.advert_id')
-            ->where('a.owner_id', $userId)
-            ->selectRaw("
-            COUNT(*) as total_submissions,
-            SUM(s.status = 'PENDING') as pending,
-            SUM(s.status = 'APPROVED') as approved,
-            SUM(s.status = 'REJECTED') as rejected,
-            SUM(s.status IN ('ROLLED_OUT','ROLLOUT','COMPLETED')) as completed
-        ")
-            ->first();
+        $ownerCampaignIds = DB::table('advert_images')
+            ->where('owner_id', $userId)
+            ->whereNotNull('campaign_id')
+            ->distinct()
+            ->pluck('campaign_id');
 
         /**
-         * 5️⃣ TOP ACTIVE ADVERTS BY VIEWS
+         * 5) SUBMISSION STATS (based on campaign_id)
+         *    ✅ FIXED: advert_submissions has campaign_id, not advert_id
          */
-        $topAdverts = DB::table('screenshots as sc')
+        if ($ownerCampaignIds->isEmpty()) {
+            $submissionStats = (object) [
+                'total_submissions' => 0,
+                'pending' => 0,
+                'approved' => 0,
+                'rejected' => 0,
+                'completed' => 0,
+            ];
+        } else {
+            $submissionStats = DB::table('advert_submissions')
+                ->whereIn('campaign_id', $ownerCampaignIds)
+                ->selectRaw("
+                    COUNT(*) as total_submissions,
+                    SUM(status = 'PENDING') as pending,
+                    SUM(status = 'APPROVED') as approved,
+                    SUM(status = 'REJECTED') as rejected,
+                    SUM(status IN ('ROLLED_OUT','ROLLOUT','COMPLETED')) as completed
+                ")
+                ->first();
+        }
+
+        /**
+         * 6) TOP ACTIVE ADVERTS BY VIEWS
+         */
+        $topActiveAdverts = DB::table('screenshots as sc')
             ->join('advert_images as a', 'a.id', '=', 'sc.advert_id')
             ->where('a.owner_id', $userId)
             ->where('a.status', 'ACTIVE')
             ->selectRaw("
-            a.id,
-            a.name,
-            COUNT(sc.id) as screenshots,
-            SUM(sc.views) as total_views
-        ")
-            ->groupBy('a.id', 'a.name')
+                a.id,
+                a.name,
+                a.campaign_id,
+                COUNT(sc.id) as screenshots_count,
+                COUNT(DISTINCT sc.processed_by) as unique_posters,
+                SUM(sc.views) as total_views
+            ")
+            ->groupBy('a.id', 'a.name', 'a.campaign_id')
             ->orderByDesc('total_views')
             ->limit(5)
             ->get();
@@ -593,23 +619,30 @@ class AdvertSubmissionController extends Controller
         return response()->json([
             'ok' => true,
             'data' => [
+                'campaign_owner' => [
+                    'id' => $campaignOwner->id,
+                    'fullname' => $campaignOwner->fullname,
+                    'phone' => $campaignOwner->phone,
+                    'email' => $campaignOwner->email,
+                ],
+
                 'subscription' => $subscription,
 
                 'adverts' => [
-                    'total' => (int) $advertStats->total_adverts,
-                    'active' => (int) $advertStats->active_adverts,
-                    'inactive' => (int) $advertStats->inactive_adverts,
+                    'total' => (int) ($advertStats->total_adverts ?? 0),
+                    'active' => (int) ($advertStats->active_adverts ?? 0),
+                    'inactive' => (int) ($advertStats->inactive_adverts ?? 0),
                 ],
 
                 'submissions' => [
-                    'total' => (int) $submissionStats->total_submissions,
-                    'pending' => (int) $submissionStats->pending,
-                    'approved' => (int) $submissionStats->approved,
-                    'rejected' => (int) $submissionStats->rejected,
-                    'completed' => (int) $submissionStats->completed,
+                    'total' => (int) ($submissionStats->total_submissions ?? 0),
+                    'pending' => (int) ($submissionStats->pending ?? 0),
+                    'approved' => (int) ($submissionStats->approved ?? 0),
+                    'rejected' => (int) ($submissionStats->rejected ?? 0),
+                    'completed' => (int) ($submissionStats->completed ?? 0),
                 ],
 
-                'top_active_adverts' => $topAdverts,
+                'top_active_adverts' => $topActiveAdverts,
             ],
         ]);
     }
