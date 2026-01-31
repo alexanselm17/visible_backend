@@ -634,6 +634,48 @@ class AdvertSubmissionController extends Controller
             ->limit(5)
             ->get();
 
+        /**
+         * 7) LAST 5 ADVERTS FROM HIS SUBMISSIONS
+         * - get latest 5 submissions by this owner (campaign_id in owner's campaigns)
+         * - attach advert_images row where submission_id = submission.id (if created)
+         */
+        $latestSubmittedAdverts = DB::table('advert_submissions as s')
+            ->leftJoin('advert_images as a', 'a.submission_id', '=', 's.id')
+            ->whereIn('s.campaign_id', $campaignIds)
+            ->orderBy('s.created_at', 'desc')
+            ->limit(5)
+            ->get([
+                's.id as submission_id',
+                's.campaign_id',
+                's.name as submission_name',
+                's.status as submission_status',
+                's.created_at as submitted_at',
+
+                's.final_image_path',
+                's.final_video_path',
+
+                'a.id as advert_id',
+                'a.name as advert_name',
+                'a.image_path as advert_image_path',
+                'a.valid_until',
+                'a.capacity',
+                'a.reward',
+            ])
+            ->map(function ($row) {
+                // Add urls for submission media
+                $row->final_image_url = $row->final_image_path ? asset('storage/' . $row->final_image_path) : null;
+                $row->final_video_url = $row->final_video_path ? asset('storage/' . $row->final_video_path) : null;
+
+                // Add url for advert image (if advert exists)
+                $row->advert_image_url = $row->advert_image_path ? asset('storage/' . $row->advert_image_path) : null;
+
+                // Active status derived from valid_until
+                $row->advert_is_active = $row->valid_until ? (now()->lte(\Carbon\Carbon::parse($row->valid_until))) : false;
+
+                return $row;
+            });
+
+
         return response()->json([
             'ok' => true,
             'data' => [
@@ -661,6 +703,8 @@ class AdvertSubmissionController extends Controller
                 ],
 
                 'top_active_adverts' => $topActiveAdverts,
+                'latest_submitted_adverts' => $latestSubmittedAdverts,
+
             ],
         ]);
     }
