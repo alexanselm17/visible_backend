@@ -22,8 +22,8 @@ class AdvertImages extends Model
         'valid_until',
         'capacity',
         'target_audience',
-        'status',
-        'owner_id',
+        'submission_id',
+        'repost_of_id',
     ];
 
     protected $keyType = 'string';

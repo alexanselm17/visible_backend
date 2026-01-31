@@ -508,7 +508,6 @@ class AdvertSubmissionController extends Controller
         }
     }
 
-
     public function dashboard(Request $request, string $userId): JsonResponse
     {
         // 1) Validate user exists
@@ -550,11 +549,48 @@ class AdvertSubmissionController extends Controller
         }
 
         /**
-         * 3) ADVERT STATS (owned adverts)
-         * ✅ FIX: use valid_until instead of status
+         * 3) Campaign IDs owned by this user
+         * ✅ campaigns.owner_id exists in your codebase
+         */
+        $campaignIds = DB::table('campaigns')
+            ->where('owner_id', $userId)
+            ->pluck('id');
+
+        if ($campaignIds->isEmpty()) {
+            return response()->json([
+                'ok' => true,
+                'data' => [
+                    'campaign_owner' => [
+                        'id' => $campaignOwner->id,
+                        'fullname' => $campaignOwner->fullname,
+                        'phone' => $campaignOwner->phone,
+                        'email' => $campaignOwner->email,
+                    ],
+                    'subscription' => $subscription,
+                    'adverts' => [
+                        'total' => 0,
+                        'active' => 0,
+                        'inactive' => 0,
+                    ],
+                    'submissions' => [
+                        'total' => 0,
+                        'pending' => 0,
+                        'approved' => 0,
+                        'rejected' => 0,
+                        'completed' => 0,
+                    ],
+                    'top_active_adverts' => [],
+                ],
+            ]);
+        }
+
+        /**
+         * 4) ADVERT STATS (adverts under these campaigns)
+         * ✅ FIX: no owner_id/status on advert_images
+         * Active = valid_until >= now()
          */
         $advertStats = DB::table('advert_images')
-            ->where('owner_id', $userId)
+            ->whereIn('campaign_id', $campaignIds)
             ->selectRaw("
                 COUNT(*) as total_adverts,
                 SUM(CASE WHEN valid_until IS NOT NULL AND valid_until >= NOW() THEN 1 ELSE 0 END) as active_adverts,
@@ -563,45 +599,26 @@ class AdvertSubmissionController extends Controller
             ->first();
 
         /**
-         * 4) Owner campaign IDs (based on adverts)
+         * 5) SUBMISSION STATS (submissions for those campaigns)
          */
-        $ownerCampaignIds = DB::table('advert_images')
-            ->where('owner_id', $userId)
-            ->whereNotNull('campaign_id')
-            ->distinct()
-            ->pluck('campaign_id');
-
-        /**
-         * 5) SUBMISSION STATS (based on campaign_id)
-         */
-        if ($ownerCampaignIds->isEmpty()) {
-            $submissionStats = (object) [
-                'total_submissions' => 0,
-                'pending' => 0,
-                'approved' => 0,
-                'rejected' => 0,
-                'completed' => 0,
-            ];
-        } else {
-            $submissionStats = DB::table('advert_submissions')
-                ->whereIn('campaign_id', $ownerCampaignIds)
-                ->selectRaw("
-                    COUNT(*) as total_submissions,
-                    SUM(status = 'PENDING') as pending,
-                    SUM(status = 'APPROVED') as approved,
-                    SUM(status = 'REJECTED') as rejected,
-                    SUM(status IN ('ROLLED_OUT','ROLLOUT','COMPLETED')) as completed
-                ")
-                ->first();
-        }
+        $submissionStats = DB::table('advert_submissions')
+            ->whereIn('campaign_id', $campaignIds)
+            ->selectRaw("
+                COUNT(*) as total_submissions,
+                SUM(status = 'PENDING') as pending,
+                SUM(status = 'APPROVED') as approved,
+                SUM(status = 'REJECTED') as rejected,
+                SUM(status IN ('ROLLED_OUT','ROLLOUT','COMPLETED')) as completed
+            ")
+            ->first();
 
         /**
          * 6) TOP ACTIVE ADVERTS BY VIEWS
-         * ✅ FIX: active = valid_until >= NOW()
+         * Join screenshots -> advert_images and filter by campaign_id list
          */
         $topActiveAdverts = DB::table('screenshots as sc')
             ->join('advert_images as a', 'a.id', '=', 'sc.advert_id')
-            ->where('a.owner_id', $userId)
+            ->whereIn('a.campaign_id', $campaignIds)
             ->whereNotNull('a.valid_until')
             ->where('a.valid_until', '>=', now())
             ->selectRaw("
