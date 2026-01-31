@@ -505,4 +505,107 @@ class AdvertSubmissionController extends Controller
             ], 500);
         }
     }
+
+
+    public function dashboard(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|uuid|exists:users,id',
+        ]);
+
+        $ownerId = $request->user_id;
+
+        /**
+         * 1️⃣ ACTIVE SUBSCRIPTION
+         */
+        $subscription = DB::table('user_subscriptions as us')
+            ->join('subscription_plans as sp', 'sp.id', '=', 'us.plan_id')
+            ->where('us.user_id', $ownerId)
+            ->where('us.status', 'ACTIVE')
+            ->where('us.starts_at', '<=', now())
+            ->where('us.ends_at', '>=', now())
+            ->select(
+                'sp.code',
+                'sp.name',
+                'sp.billing_period',
+                'sp.limits',
+                'sp.features',
+                'us.starts_at',
+                'us.ends_at'
+            )
+            ->first();
+
+        if ($subscription) {
+            $subscription->limits = json_decode($subscription->limits, true);
+            $subscription->features = json_decode($subscription->features, true);
+        }
+
+        /**
+         * 2️⃣ ADVERT STATS (owned adverts)
+         */
+        $advertStats = DB::table('advert_images')
+            ->where('owner_id', $ownerId)
+            ->selectRaw("
+            COUNT(*) as total_adverts,
+            SUM(status = 'ACTIVE') as active_adverts,
+            SUM(status != 'ACTIVE') as inactive_adverts
+        ")
+            ->first();
+
+        /**
+         * 3️⃣ SUBMISSION STATS (for adverts they own)
+         */
+        $submissionStats = DB::table('advert_submissions as s')
+            ->join('advert_images as a', 'a.id', '=', 's.advert_id')
+            ->where('a.owner_id', $ownerId)
+            ->selectRaw("
+            COUNT(*) as total_submissions,
+            SUM(s.status = 'PENDING') as pending,
+            SUM(s.status = 'APPROVED') as approved,
+            SUM(s.status = 'REJECTED') as rejected,
+            SUM(s.status IN ('ROLLED_OUT','ROLLOUT','COMPLETED')) as completed
+        ")
+            ->first();
+
+        /**
+         * 4️⃣ TOP ACTIVE ADVERTS BY VIEWS
+         */
+        $topAdverts = DB::table('screenshots as sc')
+            ->join('advert_images as a', 'a.id', '=', 'sc.advert_id')
+            ->where('a.owner_id', $ownerId)
+            ->where('a.status', 'ACTIVE')
+            ->selectRaw("
+            a.id,
+            a.name,
+            COUNT(sc.id) as screenshots,
+            SUM(sc.views) as total_views
+        ")
+            ->groupBy('a.id', 'a.name')
+            ->orderByDesc('total_views')
+            ->limit(5)
+            ->get();
+
+        return response()->json([
+            'ok' => true,
+            'data' => [
+                'subscription' => $subscription,
+
+                'adverts' => [
+                    'total' => (int) $advertStats->total_adverts,
+                    'active' => (int) $advertStats->active_adverts,
+                    'inactive' => (int) $advertStats->inactive_adverts,
+                ],
+
+                'submissions' => [
+                    'total' => (int) $submissionStats->total_submissions,
+                    'pending' => (int) $submissionStats->pending,
+                    'approved' => (int) $submissionStats->approved,
+                    'rejected' => (int) $submissionStats->rejected,
+                    'completed' => (int) $submissionStats->completed,
+                ],
+
+                'top_active_adverts' => $topAdverts,
+            ],
+        ]);
+    }
 }

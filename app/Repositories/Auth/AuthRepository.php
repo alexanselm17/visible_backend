@@ -161,7 +161,7 @@ class AuthRepository implements AuthRepositoryInterface
             Invoice::create([
                 "type" => "Referal",
                 "amount" => $rewardCoin,
-                "processed_by" => $whoReferedMe->id,
+                "processed_by" => $whoReferedMe->id,+++++
                 "customer_balance" => $customerBalance + $rewardCoin,
                 "posted_by" => $user->id,
             ]);
