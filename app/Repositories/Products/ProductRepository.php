@@ -5,6 +5,7 @@ namespace App\Repositories\Products;
 use App\Exports\GenericExport;
 use App\Http\Controllers\NotificationController;
 use App\Http\Requests\ProductAdvertRequest;
+use App\Http\Requests\RepostAdvertRequest;
 use App\Http\Requests\StartCampaignRequest;
 use App\Models\AdvertImages;
 use App\Models\Banking;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -428,6 +430,94 @@ class ProductRepository implements ProductRepositoryInterface
             ], 500);
         }
     }
+
+
+    public function repostAdvertProducts(RepostAdvertRequest $request)
+    {
+        try {
+            return DB::transaction(function () use ($request) {
+
+                $original = AdvertImages::findOrFail($request->advert_id);
+
+                $data = $original->only([
+                    'image_path',
+                    'video_path',
+                    'category',
+                    'name',
+                    'selling_price',
+                    'campaign_id',
+                    'reward',
+                    'description',
+                    'badge',
+                    'capital_invested',
+                    'valid_until',
+                    'capacity',
+                    'target_audience',
+                    'submission_id',
+                ]);
+
+                // New advert UUID
+                $data['id'] = (string) Str::uuid();
+
+                // Mark lineage
+                $data['repost_of_id'] = $original->id;
+
+                // ✅ Reuse same submission_id (no new submission created)
+                $data['submission_id'] = $original->submission_id;
+
+                // Apply overrides only when provided
+                foreach ($request->validated() as $key => $value) {
+                    if ($key !== 'advert_id' && $request->has($key)) {
+                        $data[$key] = $value;
+                    }
+                }
+
+                // If campaign changed via override, you may want to inherit campaign reward by default
+                // BUT only if reward not explicitly sent.
+                if ($request->has('campaign_id') && !$request->has('reward')) {
+                    $campaign = Campaign::find($data['campaign_id']);
+                    if ($campaign) {
+                        $data['reward'] = $campaign->reward;
+                    }
+                }
+
+                $newAdvert = AdvertImages::create($data);
+
+                // ✅ Notify users (same style as upload)
+                $title = '📢 Product reposted!';
+                $body = "🔥 {$newAdvert->name} is live again. Post it on your WhatsApp Status and earn ksh.{$newAdvert->reward}";
+
+                $request->merge([
+                    'title' => $title,
+                    'message' => $body,
+                    'type' => 'info',
+                    'send_push' => true,
+                ]);
+
+                // app(NotificationController::class)->notifyAllUsers($request);
+
+                return response()->json([
+                    'ok' => true,
+                    'status' => 'Success',
+                    'message' => 'Advert reposted successfully!',
+                    'data' => [
+                        'original_advert_id' => $original->id,
+                        'repost_advert_id' => $newAdvert->id,
+                        'submission_id_reused' => $newAdvert->submission_id,
+                    ]
+                ], 200);
+            });
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'An error occurred.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+
+
+
 
     public function uploadScreenShotPlusCompare(Request $request, $advert_id)
     {

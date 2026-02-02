@@ -50,6 +50,12 @@ class ProductController extends Controller
         return $this->productRepository->uploadAdvertProducts($request, $campaignId);
     }
 
+
+    public function repostAdvertProducts(ProductAdvertRequest $request, $advertId)
+    {
+        return $this->productRepository->repostAdvertProducts($request, $advertId);
+    }
+
     public function getAdvertProducts(Request $request)
     {
         return $this->productRepository->getAdvertProducts($request);

@@ -65,6 +65,8 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/fraud_advert/{campaignId}', [ProductController::class, 'getAdvertCampaignsFraud']);
             Route::put('/advert/{advertId}', [ProductController::class, 'updateAdvertProduct']);
             Route::post('/upload_product_advert/{campaignId}', [ProductController::class, 'uploadAdvertProducts']);
+            Route::post('/repost_product_advert/{advertId}', [ProductController::class, 'repostAdvertProducts']);
+
             Route::get('/get_product_advert', [ProductController::class, 'getAdvertProducts']);
             Route::post('/upload_screenshot/{advert_id}', [ProductController::class, 'uploadScreenShotPlusCompare']);
             Route::get('/dashboard/{userId}', [ProductController::class, 'getDashboardData']);
@@ -104,17 +106,17 @@ Route::group(['prefix' => 'v1'], function () {
             Route::put('/', [AuthController::class, 'updateProfile']);
         });
 
-        Route::group(['prefix' => 'product'], function () {
+        // Route::group(['prefix' => 'product'], function () {
 
-            //Admin and manager only
-            Route::post('/upload_product_advert', [ProductController::class, 'uploadAdvertProducts']);
-            Route::post('/', [ProductController::class, 'createProduct']);
-            Route::post('/{masterProductId}', [ProductController::class, 'createChildProduct']);
-            Route::put('/{productId}', [ProductController::class, 'updateProduct']);
+        //     //Admin and manager only
+        //     Route::post('/upload_product_advert', [ProductController::class, 'uploadAdvertProducts']);
+        //     Route::post('/', [ProductController::class, 'createProduct']);
+        //     Route::post('/{masterProductId}', [ProductController::class, 'createChildProduct']);
+        //     Route::put('/{productId}', [ProductController::class, 'updateProduct']);
 
-            Route::get('/', [ProductController::class, 'getProducts']);
-            Route::get('/search', [ProductController::class, 'searchProducts']);
-        });
+        //     Route::get('/', [ProductController::class, 'getProducts']);
+        //     Route::get('/search', [ProductController::class, 'searchProducts']);
+        // });
 
 
         Route::prefix('notifications')->group(function () {
