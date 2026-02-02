@@ -12,6 +12,8 @@ interface ProductRepositoryInterface
 
     public function uploadAdvertProducts(ProductAdvertRequest $request, $campaignId);
 
+    public function repostAdvertProducts(ProductAdvertRequest $request, $advertId);
+
     public function getAdvertProducts(Request $request);
 
     public function uploadScreenShotPlusCompare(Request $request, $advert_id);
