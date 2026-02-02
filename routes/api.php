@@ -65,7 +65,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/fraud_advert/{campaignId}', [ProductController::class, 'getAdvertCampaignsFraud']);
             Route::put('/advert/{advertId}', [ProductController::class, 'updateAdvertProduct']);
             Route::post('/upload_product_advert/{campaignId}', [ProductController::class, 'uploadAdvertProducts']);
-            Route::post('/repost_product_advert/{advertId}', [ProductController::class, 'repostAdvertProducts']);
+            Route::post('/repost_product_advert', [ProductController::class, 'repostAdvertProducts']);
 
             Route::get('/get_product_advert', [ProductController::class, 'getAdvertProducts']);
             Route::post('/upload_screenshot/{advert_id}', [ProductController::class, 'uploadScreenShotPlusCompare']);
