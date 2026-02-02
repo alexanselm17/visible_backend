@@ -3,6 +3,7 @@
 namespace App\Repositories\Products;
 
 use App\Http\Requests\ProductAdvertRequest;
+use App\Http\Requests\RepostAdvertRequest;
 use App\Http\Requests\StartCampaignRequest;
 use Illuminate\Http\Request;
 
@@ -12,7 +13,7 @@ interface ProductRepositoryInterface
 
     public function uploadAdvertProducts(ProductAdvertRequest $request, $campaignId);
 
-    public function repostAdvertProducts(ProductAdvertRequest $request, $advertId);
+    public function repostAdvertProducts(RepostAdvertRequest $request, $advertId);
 
     public function getAdvertProducts(Request $request);
 

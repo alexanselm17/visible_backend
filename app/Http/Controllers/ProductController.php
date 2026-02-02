@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProductAdvertRequest;
+use App\Http\Requests\RepostAdvertRequest;
 use App\Http\Requests\StartCampaignRequest;
 use App\Repositories\Products\ProductRepositoryInterface;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class ProductController extends Controller
     }
 
 
-    public function repostAdvertProducts(ProductAdvertRequest $request, $advertId)
+    public function repostAdvertProducts(RepostAdvertRequest $request, $advertId)
     {
         return $this->productRepository->repostAdvertProducts($request, $advertId);
     }
