@@ -52,9 +52,9 @@ class ProductController extends Controller
     }
 
 
-    public function repostAdvertProducts(RepostAdvertRequest $request, $advertId)
+    public function repostAdvertProducts(RepostAdvertRequest $request)
     {
-        return $this->productRepository->repostAdvertProducts($request, $advertId);
+        return $this->productRepository->repostAdvertProducts($request);
     }
 
     public function getAdvertProducts(Request $request)

@@ -13,7 +13,7 @@ interface ProductRepositoryInterface
 
     public function uploadAdvertProducts(ProductAdvertRequest $request, $campaignId);
 
-    public function repostAdvertProducts(RepostAdvertRequest $request, $advertId);
+    public function repostAdvertProducts(RepostAdvertRequest $request);
 
     public function getAdvertProducts(Request $request);
 

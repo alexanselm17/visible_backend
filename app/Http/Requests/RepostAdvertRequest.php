@@ -8,7 +8,7 @@ class RepostAdvertRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // add policy later if needed
+        return true;
     }
 
     public function rules(): array
