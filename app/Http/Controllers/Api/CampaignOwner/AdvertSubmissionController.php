@@ -321,7 +321,7 @@ class AdvertSubmissionController extends Controller
                 ]));
                 app(NotificationController::class)->notifyUser(new Request([
                     'userId' => [$submission->submitted_by],
-                    'title' => 'New Design Task',
+                    'title' => "Design for {$submission->name} submitted",
                     'message' => "Your submission was approved for advert: {$submission->name}.",
                     'type' => 'info',
                     'send_push' => true,
