@@ -497,49 +497,9 @@ class NotificationController extends Controller
         $userIds = $request->userId;
 
         $users = User::whereIn('id', $userIds)->get();
-
         if ($users->isEmpty()) {
             return response()->json([
                 'message' => 'No users found for the specified user IDs',
-                'notifications_sent' => 0,
-            ], 200);
-        }
-
-        $firebase = new FirebaseService;
-        $created = 0;
-
-        foreach ($users as $user) {
-            Notification::create([
-                'user_id' => $user->id,
-                'title' => $request->title,
-                'message' => $request->message,
-                'type' => $request->type ?? 'info',
-                'data' => $request->data,
-            ]);
-
-            $created++;
-
-            if (($request->send_push ?? true) && $user->fcm_token) {
-                try {
-                    $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
-                } catch (\Exception $e) {
-                    Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
-                }
-            }
-        }
-
-        return response()->json([
-            'message' => 'User notifications sent successfully',
-            'notifications_sent' => $created,
-            'user_ids' => $userIds,
-        ], 200);
-    }
-            $q->whereIn('slug', $roles);
-        })->get();
-
-        if ($users->isEmpty()) {
-            return response()->json([
-                'message' => 'No users found for the specified roles',
                 'notifications_sent' => 0,
             ], 200);
         }
@@ -568,9 +528,9 @@ class NotificationController extends Controller
         }
 
         return response()->json([
-            'message' => 'Role notifications sent successfully',
+            'message' => 'User notifications sent successfully',
             'notifications_sent' => $created,
-            'roles' => $roles,
+            'user_ids' => $userIds,
         ], 200);
     }
 }
