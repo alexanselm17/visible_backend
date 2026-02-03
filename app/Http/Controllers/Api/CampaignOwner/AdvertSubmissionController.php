@@ -256,7 +256,7 @@ class AdvertSubmissionController extends Controller
 
                 if ($campaignOwnerId) {
                     app(NotificationController::class)->notifyRoles(new Request([
-                        'roles' => ['admin', 'campaign_owner'],
+                        'roles' => ['admin'],
                         'user_ids' => [$campaignOwnerId],
                         'title' => 'Design Completed',
                         'message' => "Your advert design is ready for campaign: {$submission->campaign->name}.",
@@ -266,6 +266,14 @@ class AdvertSubmissionController extends Controller
                             'submission_id' => $submission->id,
                             'action_type' => 'design_done'
                         ],
+                    ]));
+
+                    app(NotificationController::class)->notifyUser(new Request([
+                        'userId' => [$submission->submitted_by],
+                        'title' => 'Design Completed',
+                        'message' => "Your advert design is ready for campaign: {$submission->name}.",
+                        'type' => 'success',
+                        'send_push' => true,
                     ]));
                 }
             });
@@ -311,6 +319,14 @@ class AdvertSubmissionController extends Controller
                     'send_push' => true,
                     'data' => ['submission_id' => $submission->id, 'action_type' => 'designer_task'],
                 ]));
+                app(NotificationController::class)->notifyUser(new Request([
+                    'userId' => [$submission->submitted_by],
+                    'title' => 'New Design Task',
+                    'message' => "Your submission was approved for advert: {$submission->name}.",
+                    'type' => 'info',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'approved_task'],
+                ]));
             });
 
             return response()->json([
@@ -352,6 +368,14 @@ class AdvertSubmissionController extends Controller
                     'send_push' => true,
                     'data' => ['submission_id' => $submission->id, 'action_type' => 'rejected'],
                 ]));
+                app(NotificationController::class)->notifyUser(new Request([
+                    'userId' => [$submission->submitted_by],
+                    'title' => 'Submission Rejected',
+                    'message' => "Submission rejected for campaign: {$submission->campaign->name}.",
+                    'type' => 'warning',
+                    'send_push' => true,
+                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rejected'],
+                ]));
             });
 
             return response()->json([
@@ -386,8 +410,8 @@ class AdvertSubmissionController extends Controller
             $submission->save();
 
             DB::afterCommit(function () use ($submission) {
-                app(NotificationController::class)->notifyRoles(new Request([
-                    'roles' => ['campaign_owner'],
+                app(NotificationController::class)->notifyUser(new Request([
+                    'userId' => [$submission->submitted_by],
                     'title' => 'Submission Rolled Out (Posted)',
                     'message' => "Submission rolled out (posted) for campaign: {$submission->campaign->name}.",
                     'type' => 'info',
@@ -471,24 +495,35 @@ class AdvertSubmissionController extends Controller
                 $submission->status = AdvertSubmissionStatus::PUBLISHED;
                 $submission->save();
 
-                // Notify users
-                $title = '📢 New Product posted!';
-                $body  = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status and earn ksh.{$advert->reward}";
 
-                $notifReq = new Request([
-                    'title' => $title,
-                    'message' => $body,
-                    'type' => 'info',
-                    'send_push' => true,
-                    'data' => [
-                        'advert_id' => $advert->id,
-                        'campaign_id' => $campaign->id,
-                        'submission_id' => $submission->id,
-                        'action_type' => 'rollout_posted',
-                    ],
-                ]);
+                DB::afterCommit(function () use ($submission, $advert) {
+                    // Notify users
+                    $title = '📢 New Product posted!';
+                    $body  = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status and earn ksh.{$advert->reward}";
 
-                // app(NotificationController::class)->notifyAllUsers($notifReq);
+                    $notifReq = new Request([
+                        'title' => $title,
+                        'message' => $body,
+                        'type' => 'info',
+                        'send_push' => true,
+                        'data' => [
+                            'advert_id' => $advert->id,
+                            'submission_id' => $submission->id,
+                            'action_type' => 'rollout_posted',
+                        ],
+                    ]);
+
+                    // app(NotificationController::class)->notifyAllUsers($notifReq);
+
+                    app(NotificationController::class)->notifyUser(new Request([
+                        'userId' => [$submission->submitted_by],
+                        'title' => 'Submission Rolled Out (Posted)',
+                        'message' => "Submission rolled out (posted) for campaign: {$submission->name}.",
+                        'type' => 'info',
+                        'send_push' => true,
+                        'data' => ['submission_id' => $submission->id, 'action_type' => 'rolled_out'],
+                    ]));
+                });
 
                 return response()->json([
                     'ok' => true,
