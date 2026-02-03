@@ -159,6 +159,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/submissions/{submissionId}/approve', [AdvertSubmissionController::class, 'approve']);
             Route::post('/submissions/{submissionId}/reject', [AdvertSubmissionController::class, 'reject']);
             Route::post('/submissions/{submissionId}/rollout', [AdvertSubmissionController::class, 'rolloutSubmission']);
+            Route::get('/submissions/pending', [AdvertSubmissionController::class, 'pendingDesign']);
         });
 
 

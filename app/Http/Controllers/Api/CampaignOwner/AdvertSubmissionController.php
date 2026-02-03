@@ -743,4 +743,46 @@ class AdvertSubmissionController extends Controller
             ],
         ]);
     }
+
+    public function pendingDesign(Request $request)
+    {
+        $perPage = (int) $request->query('per_page', 20);
+
+        $query = AdvertSubmission::query()
+            ->where('status', AdvertSubmissionStatus::PENDING_DESIGN)
+            ->orderBy('created_at', 'desc');
+
+        // Optional filters
+        if ($request->filled('campaign_id')) {
+            $query->where('campaign_id', $request->query('campaign_id'));
+        }
+
+        if ($request->filled('submitted_by')) {
+            // CHANGE 'user_id' to your real column if different (e.g. created_by)
+            $query->where('submitted_by', $request->query('submitted_by'));
+        }
+
+        if ($request->filled('from')) {
+            $query->whereDate('created_at', '>=', $request->query('from'));
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('created_at', '<=', $request->query('to'));
+        }
+
+        $query->with(['campaign', 'user']);
+
+        $submissions = $query->paginate($perPage);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $submissions->items(),
+            'meta' => [
+                'current_page' => $submissions->currentPage(),
+                'per_page' => $submissions->perPage(),
+                'total' => $submissions->total(),
+                'last_page' => $submissions->lastPage(),
+            ],
+        ], 200);
+    }
 }
