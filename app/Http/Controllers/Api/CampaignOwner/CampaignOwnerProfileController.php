@@ -12,10 +12,7 @@ use Illuminate\Support\Str;
 
 class CampaignOwnerProfileController extends Controller
 {
-    /**
-     * Resolve profile strictly by profile_id (UUID).
-     * NO auth(), NO auto-create.
-     */
+
     private function getProfile(string $profileId)
     {
         $profile = CampaignOwnerProfile::where('id', $profileId)->first();
@@ -30,9 +27,6 @@ class CampaignOwnerProfileController extends Controller
         return $profile;
     }
 
-    /* ============================================================
-     | Paths
-     |============================================================ */
     private function diskDir(): string
     {
         // public/storage/uploads/logos
@@ -44,11 +38,15 @@ class CampaignOwnerProfileController extends Controller
         // stored in DB
         return 'uploads/logos/' . $filename;
     }
+    private function logoUrl(?string $path): ?string
+    {
+        if (!$path) return null;
 
-    /* ============================================================
-     | GET logos
-     |============================================================ */
-    // GET /api/owner-profiles/{profileId}/logos
+        return asset('storage/' . ltrim($path, '/'));
+    }
+
+
+
     public function listLogos(string $profileId)
     {
         $profile = $this->getProfile($profileId);
@@ -59,22 +57,27 @@ class CampaignOwnerProfileController extends Controller
         $logos = CampaignOwnerLogo::where('profile_id', $profile->id)
             ->orderByDesc('is_primary')
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($logo) {
+                return [
+                    'id' => $logo->id,
+                    'is_primary' => (bool) $logo->is_primary,
+                    'logo_url' => $this->logoUrl($logo->logo_path),
+                    'created_at' => $logo->created_at,
+                ];
+            });
 
         return response()->json([
             'ok' => true,
             'data' => [
                 'profile_id' => $profile->id,
-                'current_logo_path' => $profile->logo_path,
+                'current_logo_url' => $this->logoUrl($profile->logo_path),
                 'logos' => $logos,
             ],
         ]);
     }
 
-    /* ============================================================
-     | UPLOAD logo
-     |============================================================ */
-    // POST /api/owner-profiles/{profileId}/logos
+
     public function uploadLogo(Request $request, string $profileId)
     {
         $profile = $this->getProfile($profileId);
@@ -132,10 +135,6 @@ class CampaignOwnerProfileController extends Controller
         });
     }
 
-    /* ============================================================
-     | MAKE PRIMARY
-     |============================================================ */
-    // PATCH /api/owner-profiles/{profileId}/logos/{logoId}/make-primary
     public function makeLogoPrimary(string $profileId, string $logoId)
     {
         $profile = $this->getProfile($profileId);
@@ -167,16 +166,13 @@ class CampaignOwnerProfileController extends Controller
                 'message' => 'Logo set as primary.',
                 'data' => [
                     'profile_id' => $profile->id,
-                    'current_logo_path' => $profile->fresh()->logo_path,
+                    'current_logo_url' => $this->logoUrl($profile->fresh()->logo_path),
                 ],
             ]);
         });
     }
 
-    /* ============================================================
-     | DELETE logo
-     |============================================================ */
-    // DELETE /api/owner-profiles/{profileId}/logos/{logoId}
+
     public function deleteLogo(string $profileId, string $logoId)
     {
         $profile = $this->getProfile($profileId);
@@ -227,7 +223,7 @@ class CampaignOwnerProfileController extends Controller
                 'message' => 'Logo deleted.',
                 'data' => [
                     'profile_id' => $profile->id,
-                    'current_logo_path' => $profile->fresh()->logo_path,
+                    'current_logo_url' => $this->logoUrl($profile->fresh()->logo_path),
                 ],
             ]);
         });
