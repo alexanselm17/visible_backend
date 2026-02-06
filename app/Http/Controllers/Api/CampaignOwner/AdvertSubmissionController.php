@@ -76,8 +76,6 @@ class AdvertSubmissionController extends Controller
 
                 // 6️⃣ Send notifications
                 DB::afterCommit(function () use ($campaign, $submission, $user) {
-
-                    // Admins
                     app(NotificationController::class)->notifyRoles(new Request([
                         'roles' => ['admin'],
                         'title' => 'New Advert Submission from ' . $user->fullname . ' (Admin Review)',
