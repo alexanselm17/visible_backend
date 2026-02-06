@@ -3,26 +3,71 @@
 namespace App\Http\Controllers\Api\CampaignOwner;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-
-use App\Models\CampaignOwnerProfile;
 use App\Models\CampaignOwnerLogo;
+use App\Models\CampaignOwnerProfile;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class CampaignOwnerProfileController extends Controller
 {
-    private function ownedProfileOrFail(string $profileId): CampaignOwnerProfile
+
+    private function getOrCreateOwnedProfile(string $profileId)
     {
-        return CampaignOwnerProfile::where('id', $profileId)
-            ->where('user_id', auth()->id())
-            ->firstOrFail();
+        $userId = auth()->id();
+
+        if (!$userId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Unauthorized. Please login again.',
+            ], 401);
+        }
+
+        $profile = CampaignOwnerProfile::where('id', $profileId)->first();
+
+        if (!$profile) {
+            $profile = CampaignOwnerProfile::create([
+                'id' => $profileId,
+                'user_id' => $userId,
+                'business_name' => null,
+                'business_category' => null,
+                'mpesa_phone' => null,
+                'website' => null,
+                'logo_path' => null,
+                'account_status' => 'pending',
+                'current_subscription_id' => null,
+            ]);
+        }
+
+        if ((string) $profile->user_id !== (string) $userId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Forbidden. This profile does not belong to you.',
+            ], 403);
+        }
+
+        return $profile;
     }
 
-    // GET /api/owner-profiles/{profileId}/logos
+    private function logosDiskDir(): string
+    {
+        return public_path('storage/uploads/logos');
+    }
+
+    private function logosDbPrefix(): string
+    {
+        return 'uploads/logos/';
+    }
+
     public function listLogos(string $profileId)
     {
-        $profile = $this->ownedProfileOrFail($profileId);
+        $profileOrResponse = $this->getOrCreateOwnedProfile($profileId);
+        if ($profileOrResponse instanceof \Illuminate\Http\JsonResponse) {
+            return $profileOrResponse;
+        }
+        /** @var CampaignOwnerProfile $profile */
+        $profile = $profileOrResponse;
 
         $logos = CampaignOwnerLogo::where('profile_id', $profile->id)
             ->orderByDesc('is_primary')
@@ -33,29 +78,46 @@ class CampaignOwnerProfileController extends Controller
             'ok' => true,
             'data' => [
                 'profile_id' => $profile->id,
-                'current_logo_path' => $profile->logo_path,
+                'current_logo_path' => $profile->logo_path, // e.g. uploads/logos/xxx.png
                 'logos' => $logos,
             ],
         ], 200);
     }
 
-    // POST /api/owner-profiles/{profileId}/logos  (multipart: logo, set_primary)
+    // POST /api/owner-profiles/{profileId}/logos (multipart: logo, set_primary)
     public function uploadLogo(Request $request, string $profileId)
     {
-        $profile = $this->ownedProfileOrFail($profileId);
+        $profileOrResponse = $this->getOrCreateOwnedProfile($profileId);
+        if ($profileOrResponse instanceof \Illuminate\Http\JsonResponse) {
+            return $profileOrResponse;
+        }
+        /** @var CampaignOwnerProfile $profile */
+        $profile = $profileOrResponse;
 
         $request->validate([
             'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'set_primary' => ['nullable'],
         ]);
 
+        // Ensure folder exists
+        $dir = $this->logosDiskDir();
+        if (!File::exists($dir)) {
+            File::makeDirectory($dir, 0755, true);
+        }
+
         $file = $request->file('logo');
-        $safeName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
-        $filename = time() . '_' . $safeName;
 
-        $file->move(public_path('storage/uploads'), $filename);
-        $path = 'uploads/' . $filename;
+        // Use uuid filename to avoid collisions
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $filename = (string) Str::uuid() . '.' . $ext;
 
+        // Save file
+        $file->move($dir, $filename);
+
+        // Store DB path (relative)
+        $path = $this->logosDbPrefix() . $filename; // uploads/logos/uuid.png
+
+        // Accept "true/false/1/0" from mobile
         $setPrimary = filter_var($request->input('set_primary', true), FILTER_VALIDATE_BOOLEAN);
 
         return DB::transaction(function () use ($profile, $path, $setPrimary) {
@@ -91,11 +153,23 @@ class CampaignOwnerProfileController extends Controller
     // PATCH /api/owner-profiles/{profileId}/logos/{logoId}/make-primary
     public function makeLogoPrimary(string $profileId, string $logoId)
     {
-        $profile = $this->ownedProfileOrFail($profileId);
+        $profileOrResponse = $this->getOrCreateOwnedProfile($profileId);
+        if ($profileOrResponse instanceof \Illuminate\Http\JsonResponse) {
+            return $profileOrResponse;
+        }
+        /** @var CampaignOwnerProfile $profile */
+        $profile = $profileOrResponse;
 
         $logo = CampaignOwnerLogo::where('id', $logoId)
             ->where('profile_id', $profile->id)
-            ->firstOrFail();
+            ->first();
+
+        if (!$logo) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Logo not found.',
+            ], 404);
+        }
 
         return DB::transaction(function () use ($profile, $logo) {
 
@@ -120,17 +194,37 @@ class CampaignOwnerProfileController extends Controller
     // DELETE /api/owner-profiles/{profileId}/logos/{logoId}
     public function deleteLogo(string $profileId, string $logoId)
     {
-        $profile = $this->ownedProfileOrFail($profileId);
+        $profileOrResponse = $this->getOrCreateOwnedProfile($profileId);
+        if ($profileOrResponse instanceof \Illuminate\Http\JsonResponse) {
+            return $profileOrResponse;
+        }
+        /** @var CampaignOwnerProfile $profile */
+        $profile = $profileOrResponse;
 
         $logo = CampaignOwnerLogo::where('id', $logoId)
             ->where('profile_id', $profile->id)
-            ->firstOrFail();
+            ->first();
+
+        if (!$logo) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Logo not found.',
+            ], 404);
+        }
 
         $wasPrimary = (bool) $logo->is_primary;
+        $logoPath = $logo->logo_path; // uploads/logos/uuid.png
 
-        return DB::transaction(function () use ($profile, $logo, $wasPrimary) {
+        return DB::transaction(function () use ($profile, $logo, $wasPrimary, $logoPath) {
 
+            // Delete DB record
             $logo->delete();
+
+            // Try delete file too (safe)
+            $abs = public_path('storage/' . $logoPath); // storage/uploads/logos/uuid.png
+            if (File::exists($abs)) {
+                @File::delete($abs);
+            }
 
             if ($wasPrimary) {
                 $newPrimary = CampaignOwnerLogo::where('profile_id', $profile->id)
