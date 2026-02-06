@@ -255,7 +255,6 @@ class AdvertSubmissionController extends Controller
                 if ($campaignOwnerId) {
                     app(NotificationController::class)->notifyRoles(new Request([
                         'roles' => ['admin'],
-                        'user_ids' => [$campaignOwnerId],
                         'title' => 'Design Completed',
                         'message' => "Your advert design is ready for campaign: {$submission->campaign->name}.",
                         'type' => 'success',
