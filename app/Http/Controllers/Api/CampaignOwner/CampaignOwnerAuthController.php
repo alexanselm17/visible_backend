@@ -133,6 +133,7 @@ class CampaignOwnerAuthController extends Controller
                         'is_active' => $user->is_active,
                     ],
                     'business_profile' => [
+                        'id' => $user->campaignOwnerProfile->id,
                         'business_name' => $user->campaignOwnerProfile->business_name,
                         'business_category' => $user->campaignOwnerProfile->business_category,
                         'mpesa_phone' => $user->campaignOwnerProfile->mpesa_phone,
