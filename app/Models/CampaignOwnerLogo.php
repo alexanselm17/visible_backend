@@ -18,6 +18,21 @@ class CampaignOwnerLogo extends Model
     protected $keyType = 'string';
     public $incrementing = false;
 
+    protected $casts = [
+        'is_primary' => 'boolean',
+    ];
+
+    protected $appends = [
+        'logo_url',
+    ];
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo_path
+            ? asset('storage/' . ltrim($this->logo_path, '/'))
+            : null;
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -33,4 +48,3 @@ class CampaignOwnerLogo extends Model
         return $this->belongsTo(CampaignOwnerProfile::class, 'profile_id');
     }
 }
-
