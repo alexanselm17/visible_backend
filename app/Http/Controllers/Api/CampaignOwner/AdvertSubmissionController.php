@@ -750,13 +750,11 @@ class AdvertSubmissionController extends Controller
             ->where('status', AdvertSubmissionStatus::PENDING_DESIGN)
             ->orderBy('created_at', 'desc');
 
-        // Optional filters
         if ($request->filled('campaign_id')) {
             $query->where('campaign_id', $request->query('campaign_id'));
         }
 
         if ($request->filled('submitted_by')) {
-            // CHANGE 'user_id' to your real column if different (e.g. created_by)
             $query->where('submitted_by', $request->query('submitted_by'));
         }
 
@@ -768,7 +766,10 @@ class AdvertSubmissionController extends Controller
             $query->whereDate('created_at', '<=', $request->query('to'));
         }
 
-        $query->with(['campaign', 'user']);
+        $query->with([
+            'campaign',
+            'user.campaignOwnerProfile.logos',
+        ]);
 
         $submissions = $query->paginate($perPage);
 
