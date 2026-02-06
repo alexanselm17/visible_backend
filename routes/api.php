@@ -165,7 +165,7 @@ Route::group(['prefix' => 'v1'], function () {
             // profile management
             Route::post('/{profileId}/logos', [CampaignOwnerProfileController::class, 'uploadLogo']);
             Route::get('/{profileId}/logos', [CampaignOwnerProfileController::class, 'listLogos']);
-            Route::patch('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);
+            Route::post('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);
             Route::delete('/{profileId}/logos/{logoId}', [CampaignOwnerProfileController::class, 'deleteLogo']);
         });
 
