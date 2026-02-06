@@ -2,65 +2,24 @@
 
 namespace App\Http\Controllers\Api\CampaignOwner;
 
-use App\Models\CampaignOwnerProfile;
-use App\Models\CampaignOwnerLogo;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use App\Http\Requests\UploadLogoRequest;
-use App\Http\Controllers\Controller;
+
+use App\Models\CampaignOwnerProfile;
+use App\Models\CampaignOwnerLogo;
 
 class CampaignOwnerProfileController extends Controller
 {
     private function ownedProfileOrFail(string $profileId): CampaignOwnerProfile
     {
         return CampaignOwnerProfile::where('id', $profileId)
-            ->where('user_id', auth()->id())   // ✅ ownership check
+            ->where('user_id', auth()->id())
             ->firstOrFail();
     }
 
-    public function uploadLogo(UploadLogoRequest $request, string $profileId)
-    {
-        $profile = $this->ownedProfileOrFail($profileId);
-
-        $file = $request->file('logo');
-        $safeName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
-        $filename = time() . '_' . $safeName;
-
-        $file->move(public_path('storage/uploads'), $filename);
-        $path = 'uploads/' . $filename;
-
-        $setPrimary = $request->boolean('set_primary', true);
-
-        return DB::transaction(function () use ($profile, $path, $setPrimary) {
-
-            if ($setPrimary) {
-                CampaignOwnerLogo::where('profile_id', $profile->id)
-                    ->update(['is_primary' => false]);
-            }
-
-            $logo = CampaignOwnerLogo::create([
-                'profile_id' => $profile->id,
-                'logo_path' => $path,
-                'is_primary' => $setPrimary,
-            ]);
-
-            if ($setPrimary) {
-                $profile->update(['logo_path' => $path]); // current logo
-            }
-
-            return response()->json([
-                'ok' => true,
-                'message' => 'Logo uploaded successfully.',
-                'data' => [
-                    'profile_id' => $profile->id,
-                    'logo' => $logo,
-                    'current_logo_path' => $profile->fresh()->logo_path,
-                ]
-            ], 201);
-        });
-    }
-
+    // GET /api/owner-profiles/{profileId}/logos
     public function listLogos(string $profileId)
     {
         $profile = $this->ownedProfileOrFail($profileId);
@@ -76,10 +35,60 @@ class CampaignOwnerProfileController extends Controller
                 'profile_id' => $profile->id,
                 'current_logo_path' => $profile->logo_path,
                 'logos' => $logos,
-            ]
+            ],
         ], 200);
     }
 
+    // POST /api/owner-profiles/{profileId}/logos  (multipart: logo, set_primary)
+    public function uploadLogo(Request $request, string $profileId)
+    {
+        $profile = $this->ownedProfileOrFail($profileId);
+
+        $request->validate([
+            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'set_primary' => ['nullable'],
+        ]);
+
+        $file = $request->file('logo');
+        $safeName = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
+        $filename = time() . '_' . $safeName;
+
+        $file->move(public_path('storage/uploads'), $filename);
+        $path = 'uploads/' . $filename;
+
+        $setPrimary = filter_var($request->input('set_primary', true), FILTER_VALIDATE_BOOLEAN);
+
+        return DB::transaction(function () use ($profile, $path, $setPrimary) {
+
+            if ($setPrimary) {
+                CampaignOwnerLogo::where('profile_id', $profile->id)
+                    ->update(['is_primary' => false]);
+            }
+
+            $logo = CampaignOwnerLogo::create([
+                'id' => (string) Str::uuid(),
+                'profile_id' => $profile->id,
+                'logo_path' => $path,
+                'is_primary' => $setPrimary,
+            ]);
+
+            if ($setPrimary) {
+                $profile->update(['logo_path' => $path]);
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Logo uploaded successfully.',
+                'data' => [
+                    'profile_id' => $profile->id,
+                    'logo' => $logo,
+                    'current_logo_path' => $profile->fresh()->logo_path,
+                ],
+            ], 201);
+        });
+    }
+
+    // PATCH /api/owner-profiles/{profileId}/logos/{logoId}/make-primary
     public function makeLogoPrimary(string $profileId, string $logoId)
     {
         $profile = $this->ownedProfileOrFail($profileId);
@@ -103,11 +112,12 @@ class CampaignOwnerProfileController extends Controller
                     'profile_id' => $profile->id,
                     'logo_id' => $logo->id,
                     'current_logo_path' => $profile->fresh()->logo_path,
-                ]
+                ],
             ], 200);
         });
     }
 
+    // DELETE /api/owner-profiles/{profileId}/logos/{logoId}
     public function deleteLogo(string $profileId, string $logoId)
     {
         $profile = $this->ownedProfileOrFail($profileId);
@@ -144,7 +154,7 @@ class CampaignOwnerProfileController extends Controller
                 'data' => [
                     'profile_id' => $profile->id,
                     'current_logo_path' => $profile->fresh()->logo_path,
-                ]
+                ],
             ], 200);
         });
     }
