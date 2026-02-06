@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignController as CampaignOwnerCampaignController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
+use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
 use App\Http\Controllers\Api\Subscriptions\SubscriptionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CampaignController;
@@ -160,6 +161,12 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/submissions/{submissionId}/reject', [AdvertSubmissionController::class, 'reject']);
             Route::post('/submissions/{submissionId}/rollout', [AdvertSubmissionController::class, 'rolloutSubmission']);
             Route::get('/submissions/pending', [AdvertSubmissionController::class, 'pendingDesign']);
+
+            // profile management
+            Route::post('/{profileId}/logos', [CampaignOwnerProfileController::class, 'uploadLogo']);
+            Route::get('/{profileId}/logos', [CampaignOwnerProfileController::class, 'listLogos']);
+            Route::patch('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);
+            Route::delete('/{profileId}/logos/{logoId}', [CampaignOwnerProfileController::class, 'deleteLogo']);
         });
 
 

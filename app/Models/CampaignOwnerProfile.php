@@ -42,4 +42,8 @@ class CampaignOwnerProfile extends Model
     {
         return $this->belongsTo(UserSubscription::class, 'current_subscription_id');
     }
+    public function logos()
+    {
+        return $this->hasMany(\App\Models\CampaignOwnerLogo::class, 'profile_id');
+    }
 }
