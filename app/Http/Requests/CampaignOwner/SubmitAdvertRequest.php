@@ -21,6 +21,14 @@ class SubmitAdvertRequest extends FormRequest
             'target_audience' => ['nullable', 'json'],
             'image' => ['required', 'image', 'max:5120'],
             'video' => ['nullable', 'file', 'max:20480'],
+
+
+            // Multiple originals:
+            'images' => 'nullable|array',
+            'images.*' => 'file|mimes:jpg,jpeg,png,webp|max:10240',
+
+            'videos' => 'nullable|array',
+            'videos.*' => 'file|mimes:mp4,mov,avi,webm|max:51200',
         ];
     }
 }

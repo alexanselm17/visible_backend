@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
 use App\Models\AdvertImages;
+use App\Models\AdvertSubmissionMedia;
 use Illuminate\Http\JsonResponse;
 
 
@@ -22,12 +23,12 @@ use Illuminate\Http\JsonResponse;
 
 class AdvertSubmissionController extends Controller
 {
+
     public function submit(SubmitAdvertRequest $request)
     {
         try {
             return DB::transaction(function () use ($request) {
 
-                // 1️⃣ Get campaign automatically using owner_id
                 $campaign = Campaign::where('owner_id', $request->user_id)
                     ->orderBy('created_at', 'asc')
                     ->first();
@@ -39,24 +40,17 @@ class AdvertSubmissionController extends Controller
                     ], 404);
                 }
 
-                // 2️⃣ (HOOK) Subscription check
-                // TODO: enforce subscription limits here
-
-                // 3️⃣ Store original image
-                $imageFile = $request->file('image');
-                $imageName = time() . '_' . Str::random(8) . '.' . $imageFile->getClientOriginalExtension();
-                $imageFile->move(public_path('storage/submissions'), $imageName);
-
-                // 4️⃣ Store optional video
-                $videoPath = null;
-                if ($request->hasFile('video')) {
-                    $videoFile = $request->file('video');
-                    $videoName = time() . '_' . Str::random(8) . '.' . $videoFile->getClientOriginalExtension();
-                    $videoFile->move(public_path('storage/submissions'), $videoName);
-                    $videoPath = 'submissions/' . $videoName;
+                // Must have at least 1 file
+                $hasImages = $request->hasFile('images');
+                $hasVideos = $request->hasFile('videos');
+                if (!$hasImages && !$hasVideos) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Upload at least one image or video.',
+                    ], 422);
                 }
 
-                // 5️⃣ Create advert submission
+                // Create submission first (no original_* single fields anymore needed)
                 $submission = AdvertSubmission::create([
                     'campaign_id' => $campaign->id,
                     'submitted_by' => $request->user_id,
@@ -66,15 +60,53 @@ class AdvertSubmissionController extends Controller
                     'target_audience' => $request->target_audience
                         ? json_decode($request->target_audience, true)
                         : null,
-                    'original_image_path' => 'submissions/' . $imageName,
-                    'original_video_path' => $videoPath,
                     'status' => AdvertSubmissionStatus::PENDING_APPROVAL,
                 ]);
 
+                $sort = 0;
 
+                // Save multiple images
+                if ($hasImages) {
+                    foreach ($request->file('images') as $img) {
+                        $original = $img->getClientOriginalName();
+                        $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $original);
+                        $name = time() . '_' . Str::random(6) . '_' . $safe;
+
+                        $img->move(public_path('storage/submissions/original/images'), $name);
+
+                        AdvertSubmissionMedia::create([
+                            'submission_id' => $submission->id,
+                            'type' => 'IMAGE',
+                            'path' => 'submissions/original/images/' . $name,
+                            'original_name' => $original,
+                            'sort_order' => $sort++,
+                        ]);
+                    }
+                }
+
+                // Save multiple videos
+                if ($hasVideos) {
+                    foreach ($request->file('videos') as $vid) {
+                        $original = $vid->getClientOriginalName();
+                        $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $original);
+                        $name = time() . '_' . Str::random(6) . '_' . $safe;
+
+                        $vid->move(public_path('storage/submissions/original/videos'), $name);
+
+                        AdvertSubmissionMedia::create([
+                            'submission_id' => $submission->id,
+                            'type' => 'VIDEO',
+                            'path' => 'submissions/original/videos/' . $name,
+                            'original_name' => $original,
+                            'sort_order' => $sort++,
+                        ]);
+                    }
+                }
+
+                $submission->load(['campaign', 'user', 'media']);
+
+                // notifications (same as your code)
                 $user = User::find($request->user_id);
-
-                // 6️⃣ Send notifications
                 DB::afterCommit(function () use ($campaign, $submission, $user) {
                     app(NotificationController::class)->notifyRoles(new Request([
                         'roles' => ['admin'],
@@ -86,11 +118,9 @@ class AdvertSubmissionController extends Controller
                     ]));
                 });
 
-
-
                 return response()->json([
                     'ok' => true,
-                    'message' => 'Advert submitted successfully. Awaiting design.',
+                    'message' => 'Advert submitted successfully. Pending approval.',
                     'data' => [
                         'submission' => $submission,
                         'campaign' => $campaign,
@@ -105,6 +135,7 @@ class AdvertSubmissionController extends Controller
             ], 500);
         }
     }
+
 
     public function show(Request $request, string $userId)
     {
@@ -473,7 +504,6 @@ class AdvertSubmissionController extends Controller
 
                 // From submission
                 $advert->name             = $submission->name;
-                $advert->description      = $submission->description;
                 $advert->target_audience  = $submission->target_audience;
 
                 // From rollout request
@@ -483,6 +513,7 @@ class AdvertSubmissionController extends Controller
                 $advert->capacity         = $request->capacity;
                 $advert->reward           = $reward;
                 $advert->capital_invested = $request->capital_invested;
+                $advert->description      = $request->description;
 
                 $advert->selling_price    = 0;
 

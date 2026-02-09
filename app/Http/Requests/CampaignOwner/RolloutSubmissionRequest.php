@@ -17,10 +17,11 @@ class RolloutSubmissionRequest extends FormRequest
             'category'        => 'nullable|string|max:100',
             'badge' => 'required|array',
             'badge.*' => 'string',
-            'valid_until'     => 'nullable|date',
-            'capacity'        => 'nullable|integer|min:0',
-            'reward'          => 'nullable|numeric|min:0',
-            'capital_invested' => 'nullable|numeric|min:0',
+            'valid_until'     => 'required|date',
+            'capacity'        => 'required|integer|min:0',
+            'reward'          => 'required|numeric|min:0',
+            'capital_invested' => 'required|numeric|min:0',
+            'description'     => 'required|string',
         ];
     }
 }
