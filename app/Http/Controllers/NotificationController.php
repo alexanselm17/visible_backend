@@ -486,7 +486,7 @@ class NotificationController extends Controller
     {
         $request->validate([
             'userId' => 'required|array|min:1',
-            'userId.*' => 'required|integer|exists:users,id',
+            'userId.*' => 'required|dynamic|exists:users,id',
             'title' => 'required|string|max:255',
             'message' => 'required|string',
             'type' => 'nullable|in:system,security,info,warning,success,error',

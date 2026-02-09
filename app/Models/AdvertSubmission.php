@@ -17,8 +17,6 @@ class AdvertSubmission extends Model
         'name',
         'description',
         'target_audience',
-        'original_image_path',
-        'original_video_path',
         'final_image_path',
         'final_video_path',
         'status',
@@ -38,25 +36,26 @@ class AdvertSubmission extends Model
     ];
 
     protected $appends = [
-        'original_image_url',
-        'original_video_url',
+        'original_images',
+        'original_videos',
         'final_image_url',
         'final_video_url',
     ];
 
-    public function getOriginalImageUrlAttribute()
+    public function getOriginalImagesAttribute()
     {
-        return $this->original_image_path
-            ? asset('storage/' . $this->original_image_path)
-            : null;
+        return $this->media
+            ? $this->media->where('type', 'IMAGE')->values()
+            : [];
     }
 
-    public function getOriginalVideoUrlAttribute()
+    public function getOriginalVideosAttribute()
     {
-        return $this->original_video_path
-            ? asset('storage/' . $this->original_video_path)
-            : null;
+        return $this->media
+            ? $this->media->where('type', 'VIDEO')->values()
+            : [];
     }
+
 
     public function getFinalImageUrlAttribute()
     {
@@ -97,5 +96,11 @@ class AdvertSubmission extends Model
     public function designer()
     {
         return $this->belongsTo(User::class, 'designed_by');
+    }
+
+    public function media()
+    {
+        return $this->hasMany(\App\Models\AdvertSubmissionMedia::class, 'submission_id')
+            ->orderBy('sort_order');
     }
 }
