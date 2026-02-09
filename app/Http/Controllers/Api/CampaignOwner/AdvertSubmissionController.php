@@ -800,6 +800,7 @@ class AdvertSubmissionController extends Controller
         $query->with([
             'campaign',
             'user.campaignOwnerProfile.logos',
+            'media',
         ]);
 
         $submissions = $query->paginate($perPage);
