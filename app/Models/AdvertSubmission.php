@@ -100,7 +100,7 @@ class AdvertSubmission extends Model
 
     public function media()
     {
-        return $this->hasMany(\App\Models\AdvertSubmissionMedia::class, 'submission_id')
+        return $this->hasMany(AdvertSubmissionMedia::class, 'submission_id')
             ->orderBy('sort_order');
     }
 }
