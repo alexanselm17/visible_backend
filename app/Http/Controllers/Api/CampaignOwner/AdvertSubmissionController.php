@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api\CampaignOwner;
 
-use AdvertSubmission;
-use AdvertSubmissionMedia as GlobalAdvertSubmissionMedia;
+use App\Models\AdvertSubmission;
+use App\Models\AdvertSubmissionMedia;
 use App\Enums\AdvertSubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\NotificationController;
@@ -16,7 +16,6 @@ use Illuminate\Http\Request;
 use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
 use App\Models\AdvertImages;
-use App\Models\AdvertSubmissionMedia;
 use Illuminate\Http\JsonResponse;
 
 
@@ -75,7 +74,7 @@ class AdvertSubmissionController extends Controller
 
                         $img->move(public_path('storage/submissions/original/images'), $name);
 
-                        GlobalAdvertSubmissionMedia::create([
+                        AdvertSubmissionMedia::create([
                             'submission_id' => $submission->id,
                             'type' => 'IMAGE',
                             'path' => 'submissions/original/images/' . $name,
@@ -94,7 +93,7 @@ class AdvertSubmissionController extends Controller
 
                         $vid->move(public_path('storage/submissions/original/videos'), $name);
 
-                        GlobalAdvertSubmissionMedia::create([
+                        AdvertSubmissionMedia::create([
                             'submission_id' => $submission->id,
                             'type' => 'VIDEO',
                             'path' => 'submissions/original/videos/' . $name,
