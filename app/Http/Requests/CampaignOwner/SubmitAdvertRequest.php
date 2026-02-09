@@ -19,6 +19,7 @@ class SubmitAdvertRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
             'target_audience' => ['nullable', 'json'],
+            
 
 
             // Multiple originals:
