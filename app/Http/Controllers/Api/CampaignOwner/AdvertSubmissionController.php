@@ -198,6 +198,7 @@ class AdvertSubmissionController extends Controller
                 ->with([
                     'user',
                     'campaign',
+                    'media',
                 ])
                 ->orderBy('created_at', 'desc');
 
