@@ -1,5 +1,6 @@
 <?php
 
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -24,6 +25,7 @@ class AdvertSubmissionMedia extends Model
     protected static function boot()
     {
         parent::boot();
+
         static::creating(function ($m) {
             if (empty($m->{$m->getKeyName()})) {
                 $m->{$m->getKeyName()} = (string) Str::uuid();

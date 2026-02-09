@@ -1,15 +1,13 @@
 <?php
 
-use App\Models\Campaign;
-use App\Models\User;
-use App\Models\AdvertSubmissionMedia;
+namespace App\Models;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class AdvertSubmission extends Model
 {
     protected $table = 'advert_submissions';
-
 
     protected $fillable = [
         'campaign_id',
@@ -43,36 +41,6 @@ class AdvertSubmission extends Model
         'final_video_url',
     ];
 
-    public function getOriginalImagesAttribute()
-    {
-        return $this->media
-            ? $this->media->where('type', 'IMAGE')->values()
-            : [];
-    }
-
-    public function getOriginalVideosAttribute()
-    {
-        return $this->media
-            ? $this->media->where('type', 'VIDEO')->values()
-            : [];
-    }
-
-
-    public function getFinalImageUrlAttribute()
-    {
-        return $this->final_image_path
-            ? asset('storage/' . $this->final_image_path)
-            : null;
-    }
-
-    public function getFinalVideoUrlAttribute()
-    {
-        return $this->final_video_path
-            ? asset('storage/' . $this->final_video_path)
-            : null;
-    }
-
-
     protected static function boot()
     {
         parent::boot();
@@ -82,6 +50,36 @@ class AdvertSubmission extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+    }
+
+    public function media()
+    {
+        return $this->hasMany(AdvertSubmissionMedia::class, 'submission_id')
+            ->orderBy('sort_order');
+    }
+
+    public function getOriginalImagesAttribute()
+    {
+        return $this->relationLoaded('media')
+            ? $this->media->where('type', 'IMAGE')->values()
+            : [];
+    }
+
+    public function getOriginalVideosAttribute()
+    {
+        return $this->relationLoaded('media')
+            ? $this->media->where('type', 'VIDEO')->values()
+            : [];
+    }
+
+    public function getFinalImageUrlAttribute()
+    {
+        return $this->final_image_path ? asset('storage/' . $this->final_image_path) : null;
+    }
+
+    public function getFinalVideoUrlAttribute()
+    {
+        return $this->final_video_path ? asset('storage/' . $this->final_video_path) : null;
     }
 
     public function campaign()
@@ -97,11 +95,5 @@ class AdvertSubmission extends Model
     public function designer()
     {
         return $this->belongsTo(User::class, 'designed_by');
-    }
-
-    public function media()
-    {
-        return $this->hasMany(AdvertSubmissionMedia::class, 'submission_id')
-            ->orderBy('sort_order');
     }
 }
