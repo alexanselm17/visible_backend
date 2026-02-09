@@ -140,28 +140,29 @@ class AdvertSubmissionController extends Controller
     public function show(Request $request, string $userId)
     {
         try {
-
             $campaignIds = Campaign::where('owner_id', $userId)->pluck('id');
 
             if ($campaignIds->isEmpty()) {
                 return response()->json([
                     'ok' => true,
                     'data' => [],
-                    'meta' => [
-                        'total' => 0
-                    ]
+                    'meta' => ['total' => 0],
                 ], 200);
             }
 
-            // 3️⃣ Filters
-            $status = $request->query('status');
-            $perPage = (int) $request->query('per_page', 10);
+            $status  = $request->query('status');
+            $perPage = max(1, min(100, (int) $request->query('per_page', 10)));
 
-            // 4️⃣ Fetch submissions
-            $query = AdvertSubmission::whereIn('campaign_id', $campaignIds)
+            $query = AdvertSubmission::query()
+                ->whereIn('campaign_id', $campaignIds)
+                ->with([
+                    'campaign',
+                    'user',
+                    'media',
+                ])
                 ->orderBy('created_at', 'desc');
 
-            if ($status) {
+            if (!empty($status)) {
                 $query->where('status', $status);
             }
 
