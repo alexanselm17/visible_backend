@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Models;
-
+use App\Models\Campaign;
+use App\Models\User;
+use App\Models\AdvertSubmissionMedia;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
