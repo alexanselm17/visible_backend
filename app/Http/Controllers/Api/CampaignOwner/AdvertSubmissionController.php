@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
+use App\Http\Requests\RejectSubmissionRequest;
 use App\Models\AdvertImages;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -375,25 +376,10 @@ class AdvertSubmissionController extends Controller
         }
     }
 
-    public function reject(Request $request, string $submissionId)
+    public function reject(RejectSubmissionRequest $request, string $submissionId)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'reason'  => 'required|string|min:5|max:1000',
-                'user_id' => 'required|exists:users,id',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'ok' => false,
-                    'message' => 'Validation failed.',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-
-            $validated = $validator->validated();
-
-            $user = User::find($validated['user_id']);
+            $user = User::find($request->user_id);
 
             if (! $user || ! $user->hasRole('admin')) {
                 return response()->json([
@@ -412,8 +398,8 @@ class AdvertSubmissionController extends Controller
             }
 
             $submission->status = AdvertSubmissionStatus::REJECTED;
-            $submission->rejection_reason = $validated['reason'];
-            $submission->reviewed_by = $validated['user_id'];
+            $submission->rejection_reason = $request->reason;
+            $submission->reviewed_by = $request->user_id;
             $submission->reviewed_at = now();
             $submission->save();
 
@@ -421,7 +407,9 @@ class AdvertSubmissionController extends Controller
                 app(NotificationController::class)->notifyUser(new Request([
                     'userId' => [$submission->submitted_by],
                     'title' => 'Submission Rejected',
-                    'message' => "Your submission for '{$submission->campaign->name}' was rejected.\nReason: {$submission->rejection_reason}",
+                    'message' =>
+                    "Your submission for '{$submission->campaign->name}' was rejected.\n"
+                        . "Reason: {$submission->rejection_reason}",
                     'type' => 'warning',
                     'send_push' => true,
                     'data' => [
@@ -448,6 +436,7 @@ class AdvertSubmissionController extends Controller
             ], 500);
         }
     }
+
 
 
 
