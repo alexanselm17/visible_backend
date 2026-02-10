@@ -485,8 +485,8 @@ class NotificationController extends Controller
     public function notifyUser(Request $request): JsonResponse
     {
         $request->validate([
-            'userId' => 'required|array|min:1',
-            'userId.*' => 'required|dynamic|exists:users,id',
+            'userId'   => 'required|array|min:1',
+            'userId.*' => 'required|uuid|exists:users,id',
             'title' => 'required|string|max:255',
             'message' => 'required|string',
             'type' => 'nullable|in:system,security,info,warning,success,error',

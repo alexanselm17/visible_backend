@@ -18,7 +18,6 @@ use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
 use App\Http\Requests\RejectSubmissionRequest;
 use App\Models\AdvertImages;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
 
 
 
