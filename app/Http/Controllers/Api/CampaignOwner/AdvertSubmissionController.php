@@ -376,8 +376,21 @@ class AdvertSubmissionController extends Controller
     public function reject(Request $request, string $submissionId)
     {
         try {
-            $submission = AdvertSubmission::findOrFail($submissionId);
+            $validated = $request->validate([
+                'reason' => 'required|string|min:5|max:1000',
+                'user_id' => 'required|exists:users,id',
+            ]);
 
+            $user = User::find($validated['user_id']);
+
+            if (! $user->hasRole('admin')) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'You are not authorized to reject this submission.',
+                ], 403);
+            }
+
+            $submission = AdvertSubmission::with('campaign')->findOrFail($submissionId);
 
             if ($submission->status !== AdvertSubmissionStatus::PENDING_APPROVAL) {
                 return response()->json([
@@ -387,32 +400,41 @@ class AdvertSubmissionController extends Controller
             }
 
             $submission->status = AdvertSubmissionStatus::REJECTED;
+            $submission->rejection_reason = $validated['reason'];
+            $submission->reviewed_by = $validated['user_id'];
+            $submission->reviewed_at = now();
             $submission->save();
 
+            // 4️⃣ Notifications
             DB::afterCommit(function () use ($submission) {
-                app(NotificationController::class)->notifyRoles(new Request([
-                    'roles' => ['campaign_owner'],
-                    'title' => 'Submission Rejected',
-                    'message' => "Submission rejected for campaign: {$submission->campaign->name}.",
-                    'type' => 'warning',
-                    'send_push' => true,
-                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rejected'],
-                ]));
                 app(NotificationController::class)->notifyUser(new Request([
                     'userId' => [$submission->submitted_by],
                     'title' => 'Submission Rejected',
-                    'message' => "Submission rejected for campaign: {$submission->campaign->name}.",
+                    'message' => "Your submission for '{$submission->campaign->name}' was rejected.\nReason: {$submission->rejection_reason}",
                     'type' => 'warning',
                     'send_push' => true,
-                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rejected'],
+                    'data' => [
+                        'submission_id' => $submission->id,
+                        'action_type' => 'rejected',
+                    ],
                 ]));
             });
 
             return response()->json([
                 'ok' => true,
-                'message' => 'Submission rejected.',
-                'data' => $submission,
+                'message' => 'Submission rejected successfully.',
+                'data' => [
+                    'submission_id' => $submission->id,
+                    'status' => $submission->status,
+                    'rejection_reason' => $submission->rejection_reason,
+                ],
             ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Throwable $th) {
             return response()->json([
                 'ok' => false,
