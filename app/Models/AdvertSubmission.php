@@ -39,6 +39,8 @@ class AdvertSubmission extends Model
         'original_videos',
         'final_image_url',
         'final_video_url',
+        'final_thumbnail_url',
+
     ];
 
     protected static function boot()
@@ -80,6 +82,11 @@ class AdvertSubmission extends Model
     public function getFinalVideoUrlAttribute()
     {
         return $this->final_video_path ? asset('storage/' . $this->final_video_path) : null;
+    }
+
+    public function getFinalThumbnailUrlAttribute()
+    {
+        return $this->final_thumbnail_path ? asset('storage/' . $this->final_thumbnail_path) : null;
     }
 
     public function campaign()

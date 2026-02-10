@@ -276,6 +276,12 @@ class AdvertSubmissionController extends Controller
                 $vidName = time() . '_' . Str::random(8) . '.' . $vid->getClientOriginalExtension();
                 $vid->move(public_path('storage/submissions/final'), $vidName);
                 $submission->final_video_path = 'submissions/final/' . $vidName;
+
+                // ✅ required thumbnail
+                $thumb = $request->file('thumbnail_image');
+                $thumbName = time() . '_' . Str::random(8) . '.' . $thumb->getClientOriginalExtension();
+                $thumb->move(public_path('storage/submissions/final/thumbnails'), $thumbName);
+                $submission->final_thumbnail_path = 'submissions/final/thumbnails/' . $thumbName;
             }
 
             if ($request->filled('designer_id')) {
@@ -381,7 +387,7 @@ class AdvertSubmissionController extends Controller
         try {
             $user = User::find($request->user_id);
 
-            if (! $user || ! $user->hasRole('admin')) {
+            if (! $user || ! $user->isAdmin()) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'You are not authorized to reject this submission.',
@@ -743,16 +749,10 @@ class AdvertSubmissionController extends Controller
                 'a.reward',
             ])
             ->map(function ($row) {
-                // Add urls for submission media
                 $row->final_image_url = $row->final_image_path ? asset('storage/' . $row->final_image_path) : null;
                 $row->final_video_url = $row->final_video_path ? asset('storage/' . $row->final_video_path) : null;
-
-                // Add url for advert image (if advert exists)
                 $row->advert_image_url = $row->advert_image_path ? asset('storage/' . $row->advert_image_path) : null;
-
-                // Active status derived from valid_until
                 $row->advert_is_active = $row->valid_until ? (now()->lte(\Carbon\Carbon::parse($row->valid_until))) : false;
-
                 return $row;
             });
 
