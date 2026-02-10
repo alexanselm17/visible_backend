@@ -17,6 +17,8 @@ use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
 use App\Models\AdvertImages;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Validator;
+
 
 
 
@@ -376,14 +378,24 @@ class AdvertSubmissionController extends Controller
     public function reject(Request $request, string $submissionId)
     {
         try {
-            $validated = $request->validate([
-                'reason' => 'required|string|min:5|max:1000',
+            $validator = Validator::make($request->all(), [
+                'reason'  => 'required|string|min:5|max:1000',
                 'user_id' => 'required|exists:users,id',
             ]);
 
+            if ($validator->fails()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $validated = $validator->validated();
+
             $user = User::find($validated['user_id']);
 
-            if (! $user->hasRole('admin')) {
+            if (! $user || ! $user->hasRole('admin')) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'You are not authorized to reject this submission.',
@@ -405,7 +417,6 @@ class AdvertSubmissionController extends Controller
             $submission->reviewed_at = now();
             $submission->save();
 
-            // 4️⃣ Notifications
             DB::afterCommit(function () use ($submission) {
                 app(NotificationController::class)->notifyUser(new Request([
                     'userId' => [$submission->submitted_by],
@@ -429,12 +440,6 @@ class AdvertSubmissionController extends Controller
                     'rejection_reason' => $submission->rejection_reason,
                 ],
             ], 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'ok' => false,
-                'message' => 'Validation failed.',
-                'errors' => $e->errors(),
-            ], 422);
         } catch (\Throwable $th) {
             return response()->json([
                 'ok' => false,
