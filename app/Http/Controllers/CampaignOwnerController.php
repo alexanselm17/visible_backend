@@ -11,7 +11,7 @@ use App\Models\User;
 use App\Repositories\Products\ProductRepositoryInterface;
 use Illuminate\Http\Request;
 
-class CampaignController extends Controller
+class CampaignOwnerController extends Controller
 {
     public function __construct(
         private readonly CampaignRepositoryInterface $campaignRepo,

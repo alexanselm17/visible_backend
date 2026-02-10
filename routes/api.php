@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
-use App\Http\Controllers\Api\CampaignOwner\CampaignController as CampaignOwnerCampaignController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
 use App\Http\Controllers\Api\Subscriptions\SubscriptionController;
