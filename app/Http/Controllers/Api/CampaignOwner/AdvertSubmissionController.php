@@ -289,6 +289,7 @@ class AdvertSubmissionController extends Controller
             }
 
             $submission->status = AdvertSubmissionStatus::DESIGN_DONE;
+            $submission->designed_at = now();
             $submission->save();
 
             DB::afterCommit(function () use ($submission) {
@@ -347,6 +348,7 @@ class AdvertSubmissionController extends Controller
             }
 
             $submission->status = AdvertSubmissionStatus::PENDING_DESIGN;
+            $submission->reviewed_at = now();
             $submission->save();
 
             DB::afterCommit(function () use ($submission) {
