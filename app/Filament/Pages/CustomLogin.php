@@ -2,7 +2,7 @@
 
 // app/Filament/Pages/Auth/CustomLogin.php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Pages\Auth;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Requests\SignInRequest;
