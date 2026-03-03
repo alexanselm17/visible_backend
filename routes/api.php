@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
+use App\Http\Controllers\Api\Image\ImageManipulationController;
 use App\Http\Controllers\Api\Subscriptions\SubscriptionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProductController;
@@ -166,6 +167,12 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);
             Route::delete('/{profileId}/logos/{logoId}', [CampaignOwnerProfileController::class, 'deleteLogo']);
         });
+
+    Route::prefix('image')->group(function () {
+        Route::post('/stamp', [ImageManipulationController::class, 'encodeImage']);
+        Route::post('/decode', [ImageManipulationController::class, 'decodeScreenshot']);
+        Route::get('/download/{filename}', [ImageManipulationController::class, 'downloadImage']);
+    });
 
 
 
