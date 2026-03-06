@@ -63,6 +63,7 @@ class AdvertSubmissionController extends Controller
                         ? json_decode($request->target_audience, true)
                         : null,
                     'status' => AdvertSubmissionStatus::PENDING_APPROVAL,
+                    'type' => $request->type,
                 ]);
 
                 $sort = 0;
