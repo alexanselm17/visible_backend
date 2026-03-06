@@ -20,9 +20,6 @@ use App\Models\AdvertImages;
 use Illuminate\Http\JsonResponse;
 
 
-
-
-
 class AdvertSubmissionController extends Controller
 {
 
@@ -531,6 +528,7 @@ class AdvertSubmissionController extends Controller
                 // From submission
                 $advert->name             = $submission->name;
                 $advert->target_audience  = $submission->target_audience;
+                $advert->type     = $submission->type;
 
                 // From rollout request
                 $advert->category         = $request->category;

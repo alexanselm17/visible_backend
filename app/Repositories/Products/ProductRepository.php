@@ -318,6 +318,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'created_at' => $advert->created_at,
                         'name' => $advert->name,
                         'badge' => $advert->badge,
+                        'type' => $advert->type,
                         'description' => $advert->description,
                         'reward' => $advert->reward,
                         'capacity' => $advert->capacity,
@@ -951,7 +952,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Get last 5 reward invoices with advert names
             $recentRewards = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
+                ->where('invoices.type', 'Reward')
                 ->leftJoin('advert_images', 'invoices.advert_id', '=', 'advert_images.id')
                 ->orderBy('invoices.created_at', 'desc')
                 ->limit(5)
