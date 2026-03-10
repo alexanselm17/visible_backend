@@ -3,223 +3,257 @@
 namespace App\Http\Controllers\Api\Image;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\AdvertImages;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
-use Illuminate\Http\Request;
-use Zxing\QrReader;
-
 
 class ImageManipulationController extends Controller
 {
-    /**
-     * Stamp the image with a dynamically scaled, numeric-only QR code.
-     */
-
     public function encodeImage(Request $request)
     {
         $request->validate([
             'image' => 'required|image|mimes:jpeg,png,jpg|max:10240',
             'identifier' => 'required|numeric|digits:10',
-            'ad_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120'
+            'advert_id' => 'required|string|exists:advert_images,id',
+            'header_text' => 'nullable|string|max:1000',
+            'caption' => 'nullable|string|max:120',
         ]);
 
         $identifier = $request->input('identifier');
         $uploadedFile = $request->file('image');
+        $advertId = $request->input('advert_id');
+        $captionText = $request->input('caption');
+
+        $headerText = $request->input(
+            'header_text',
+            'The content media attached to this advertisement campaign has no affiliation to VISIBLE DM or its partners but has been attached solely by the holder of this account in full knowledge and consent. For any queries, contact 0712345678.'
+        );
+
+        $advertRecord = AdvertImages::findOrFail($advertId);
+        $adImagePath = public_path('storage/' . ltrim($advertRecord->image_path, '/'));
+
+        if (!file_exists($adImagePath)) {
+            return response()->json([
+                'message' => 'Advert image file not found.'
+            ], 404);
+        }
+
+        $templatePath = public_path('images/not_full_sample.jpeg');
+        if (!file_exists($templatePath)) {
+            return response()->json([
+                'message' => 'Blank template image missing.'
+            ], 500);
+        }
+
+        $titleFontPath = public_path('fonts/Roboto_SemiCondensed-SemiBold.ttf');
+        $bodyFontPath = public_path('fonts/Roboto_SemiCondensed-Regular.ttf');
+
+        if (!file_exists($titleFontPath)) {
+            $titleFontPath = public_path('fonts/Roboto-Bold.ttf');
+        }
+        if (!file_exists($bodyFontPath)) {
+            $bodyFontPath = public_path('fonts/Roboto-Regular.ttf');
+        }
 
         $manager = new ImageManager(new Driver());
 
-        // ==========================================
-        // 1. THE CANVAS (1080x1920)
-        // ==========================================
+        // ======================================================
+        // 1. FINAL CANVAS
+        // ======================================================
         $canvasWidth = 1080;
-        $canvasHeight = 1920;
+        $canvasHeight = 1350;
         $canvas = $manager->create($canvasWidth, $canvasHeight)->fill('000000');
 
+        // ======================================================
+        // 2. TOP BANNER - CENTERED, FULL, SHARPER TEXT
+        // ======================================================
+        $topMargin = 18;
+        $headerTargetWidth = 920;
 
-        // ==========================================
-        // 2. THE HEADER (Fixing the tiny QR code)
-        // ==========================================
-        $templatePath = public_path('images/base_template.png');
-        if (!file_exists($templatePath)) {
-            return response()->json(['message' => 'Template image missing.'], 500);
-        }
         $header = $manager->read($templatePath);
+        $header->scaleDown(width: $headerTargetWidth);
 
-        // "White Sticker" QR Math
-        $circleDiameter = $header->height();
-        $qrSize = (int) ($circleDiameter * 0.65);
+        $headerWidth = $header->width();
+        $headerHeight = $header->height();
+
+        // QR placement on final-size banner
+        $sideCircleWidth = $headerHeight;
+        $qrSize = (int) round($sideCircleWidth * 0.60);
+
         $qrCodeImage = (string) QrCode::format('png')
-            ->size($qrSize)->margin(2)->errorCorrection('H')->generate((string) $identifier);
-        $qr = $manager->read($qrCodeImage);
+            ->size($qrSize)
+            ->margin(1)
+            ->errorCorrection('H')
+            ->generate((string) $identifier);
 
-        $qrOffset = (int) (($circleDiameter / 2) - ($qrSize / 2));
-        $header->place($qr, 'top-left', $qrOffset, $qrOffset);
+        $qrOffsetX = (int) round(($sideCircleWidth - $qrSize) / 2);
+        $qrOffsetY = (int) round(($headerHeight - $qrSize) / 2);
 
-        // --- THE FIX IS HERE ---
-        // Instead of forcing a tiny height, we scale by width. 
-        // 950px width guarantees it stretches nicely across the screen 
-        // while keeping the QR code large enough for scanners to easily read.
-        $header->scaleDown(width: 950);
+        $header->place(
+            $manager->read($qrCodeImage),
+            'top-left',
+            $qrOffsetX,
+            $qrOffsetY
+        );
 
-        // Place it 120px from the top (Clears the WhatsApp Profile UI)
-        $headerTopY = 120;
-        $canvas->place($header, 'top', 0, $headerTopY);
-        $headerBottomY = $headerTopY + $header->height();
+        // Text zone between QR and logo
+        $textPadding = (int) round($headerHeight * 0.05);
+        $textLeft = $sideCircleWidth + $textPadding;
+        $textRight = $headerWidth - $sideCircleWidth - $textPadding;
+        $textCenterX = (int) round(($textLeft + $textRight) / 2);
 
+        $titleY = (int) round($headerHeight * 0.08);
+        $underlineY = (int) round($headerHeight * 0.19);
+        $bodyY = (int) round($headerHeight * 0.23);
 
-        // ==========================================
-        // 3. THE ADVERT (Full width, No Cropping)
-        // ==========================================
-        // Default bottom safe zone if no ad is uploaded
-        $adTopY = $canvasHeight - 120;
-
-        if ($request->hasFile('ad_image')) {
-            $adFile = $request->file('ad_image');
-            $ad = $manager->read($adFile->getPathname());
-
-            // Step A: Proportionally scale the ad to strictly fit the 1080px width.
-            // This does NOT crop the image; it keeps the entire thing visible.
-            $ad->scale(width: 1080);
-
-            // Step B: Safety Net
-            // If the scaled ad is excessively tall (taller than 400px), it will ruin the layout.
-            // We scale it down to a safe height box. It will no longer touch the side edges,
-            // but the entire image will still be 100% visible and uncropped.
-            if ($ad->height() > 400) {
-                $ad->scaleDown(width: 1080, height: 400);
-            }
-
-            // Calculate exact placement to push it up 120px from the bottom
-            $adTopY = $canvasHeight - 120 - $ad->height();
-
-            // Place the ad. 'top' anchor keeps it horizontally centered if the safety net triggered.
-            $canvas->place($ad, 'top', 0, $adTopY);
+        if (file_exists($titleFontPath)) {
+            $header->text('DISCLAIMER', $textCenterX, $titleY, function ($font) use ($titleFontPath, $headerHeight) {
+                $font->file($titleFontPath);
+                $font->size((int) round($headerHeight * 0.11));
+                $font->color('000000');
+                $font->align('center');
+                $font->valign('top');
+            });
         }
 
+        $underlineWidth = (int) round(($textRight - $textLeft) * 0.42);
+        $header->drawLine(function ($line) use ($textCenterX, $underlineWidth, $underlineY) {
+            $line->from((int) round($textCenterX - ($underlineWidth / 2)), $underlineY);
+            $line->to((int) round($textCenterX + ($underlineWidth / 2)), $underlineY);
+            $line->color('000000');
+            $line->width(1);
+        });
 
-        // ==========================================
-        // 4. THE MAIN IMAGE (~3/4 of the Screen)
-        // ==========================================
+        $bodyText = preg_replace('/^DISCLAIMER\s*/i', '', trim($headerText));
+        $bodyText = trim($bodyText);
+        $wrappedBodyText = wordwrap($bodyText, 34, "\n");
+
+        if (file_exists($bodyFontPath)) {
+            $header->text($wrappedBodyText, $textCenterX, $bodyY, function ($font) use ($bodyFontPath, $headerHeight) {
+                $font->file($bodyFontPath);
+                $font->size((int) round($headerHeight * 0.09));
+                $font->color('000000');
+                $font->align('center');
+                $font->valign('top');
+                $font->lineHeight(1.30);
+            });
+        }
+
+        $headerTopY = $topMargin;
+        $headerX = (int) round(($canvasWidth - $header->width()) / 2);
+
+        $canvas->place($header, 'top-left', $headerX, $headerTopY);
+        $headerBottomY = $headerTopY + $header->height();
+        // ======================================================
+        // 3. BOTTOM AD - FULL WIDTH COVER
+        // ======================================================
+        $ad = $manager->read($adImagePath);
+
+        $bottomMargin = 18;
+        $adTargetWidth = 1080;
+        $adTargetHeight = 200;
+        $adTopY = $canvasHeight - $bottomMargin - $adTargetHeight;
+
+        $adSrcW = $ad->width();
+        $adSrcH = $ad->height();
+
+        $adScale = max($adTargetWidth / $adSrcW, $adTargetHeight / $adSrcH);
+        $adResizedW = (int) ceil($adSrcW * $adScale);
+        $adResizedH = (int) ceil($adSrcH * $adScale);
+
+        $ad->resize($adResizedW, $adResizedH);
+
+        $adCropX = (int) max(0, floor(($adResizedW - $adTargetWidth) / 2));
+        $adCropY = (int) max(0, floor(($adResizedH - $adTargetHeight) / 2));
+
+        $ad->crop($adTargetWidth, $adTargetHeight, $adCropX, $adCropY);
+        $canvas->place($ad, 'top-left', 0, $adTopY);
+
+        // ======================================================
+        // 4. MAIN IMAGE
+        // ======================================================
         $mainImage = $manager->read($uploadedFile->getPathname());
 
-        // Calculate the massive empty space left in the middle
-        // (From Y: 250 down to Y: 1550 = 1300 pixels of vertical space!)
-        $padding = 30; // Small 30px gap so images don't touch
-        $availableTop = $headerBottomY + $padding;
-        $availableBottom = $adTopY - $padding;
-        $availableHeight = $availableBottom - $availableTop;
+        $sidePadding = 24;
+        $sectionGap = 18;
+        $captionSpace = ($captionText && file_exists($bodyFontPath)) ? 70 : 0;
 
-        // Scale the main image into this massive space
-        $mainImage->scaleDown(width: 1080, height: $availableHeight);
+        $availableTop = $headerBottomY + $sectionGap;
+        $availableBottom = $adTopY - $sectionGap;
 
-        // Center it vertically inside the available area
-        $mainImageY = $availableTop + (int) (($availableHeight - $mainImage->height()) / 2);
+        $targetX = $sidePadding;
+        $targetY = $availableTop + $captionSpace;
+        $targetWidth = $canvasWidth - ($sidePadding * 2);
+        $targetHeight = $availableBottom - $availableTop - $captionSpace;
 
-        $canvas->place($mainImage, 'top', 0, $mainImageY);
+        if ($captionText && file_exists($bodyFontPath)) {
+            $lineY = $availableTop + 14;
 
+            $canvas->drawLine(function ($line) use ($sidePadding, $canvasWidth, $lineY) {
+                $line->from($sidePadding, $lineY);
+                $line->to($canvasWidth - $sidePadding, $lineY);
+                $line->color('000000');
+                $line->width(2);
+            });
 
-        // ==========================================
-        // 5. SAVE & RESPOND
-        // ==========================================
+            $canvas->text($captionText, $sidePadding, $lineY + 12, function ($font) use ($bodyFontPath) {
+                $font->file($bodyFontPath);
+                $font->size(24);
+                $font->color('000000');
+                $font->align('left');
+                $font->valign('top');
+                $font->lineHeight(1.18);
+            });
+        }
+
+        $srcW = $mainImage->width();
+        $srcH = $mainImage->height();
+
+        $scale = max($targetWidth / $srcW, $targetHeight / $srcH);
+        $resizedW = (int) ceil($srcW * $scale);
+        $resizedH = (int) ceil($srcH * $scale);
+
+        $mainImage->resize($resizedW, $resizedH);
+
+        $cropX = (int) max(0, floor(($resizedW - $targetWidth) / 2));
+        $cropY = (int) max(0, floor(($resizedH - $targetHeight) / 2));
+
+        $mainImage->crop($targetWidth, $targetHeight, $cropX, $cropY);
+        $canvas->place($mainImage, 'top-left', $targetX, $targetY);
+
+        // ======================================================
+        // 5. SAVE
+        // ======================================================
         $filename = 'stamped_' . time() . '.png';
-        $path = storage_path('app/public/image_ads/encoded/' . $filename);
-        $canvas->toPng()->save($path);
+        $saveDirectory = public_path('storage/image_ads/encoded');
+        $savePath = $saveDirectory . '/' . $filename;
+
+        if (!file_exists($saveDirectory)) {
+            mkdir($saveDirectory, 0755, true);
+        }
+
+        $canvas->toPng()->save($savePath);
 
         return response()->json([
-            'message' => 'Fractional layout generated perfectly',
+            'message' => 'Layout generated successfully',
             'filename' => $filename,
-            'download_url' => url('/api/whatsapp/download/' . $filename),
-            'identifier' => $identifier
+            'download_url' => url('/storage/image_ads/encoded/' . $filename),
+            'identifier' => $identifier,
+            'advert_id' => $advertId,
         ]);
     }
-    // public function encodeImage(Request $request)
-    // {
-    //     $request->validate([
-    //         'image' => 'required|image|mimes:jpeg,png,jpg|max:5120',
-    //         'identifier' => 'required|numeric|digits:10'
-    //     ]);
 
-    //     $identifier = $request->input('identifier');
-    //     $uploadedFile = $request->file('image');
-
-    //     $manager = new ImageManager(new Driver());
-    //     $image = $manager->read($uploadedFile->getPathname());
-
-    //     // Bumped to 15% and a minimum of 120px to survive high-res phone screenshots
-    //     $qrSize = (int) max(120, $image->width() * 0.15);
-
-    //     // The margin(2) remains to create the white box
-    //     $qrCodeImage = (string) QrCode::format('png')
-    //         ->size($qrSize)
-    //         ->margin(2)
-    //         ->errorCorrection('H')
-    //         ->generate((string) $identifier);
-
-    //     $qr = $manager->read($qrCodeImage);
-
-    //     // The Critical Fix: 15 pixels of padding so the white margin 
-    //     // doesn't touch the black WhatsApp background.
-    //     $xOffset = 15;
-    //     $yPosition = 15;
-
-    //     $image->place($qr, 'top-left', $xOffset, $yPosition);
-
-    //     $filename = 'stamped_' . time() . '.png';
-    //     $path = storage_path('app/public/' . $filename);
-    //     $image->toPng()->save($path);
-
-    //     return response()->json([
-    //         'message' => 'Image ready for WhatsApp Status',
-    //         'filename' => $filename,
-    //         'download_url' => url('/api/whatsapp/download/' . $filename),
-    //         'identifier' => $identifier
-    //     ]);
-    // }
-    // /**
-    //  * Decode the 10-digit ID from a WhatsApp screenshot.
-    //  */
-    public function decodeScreenshot(Request $request)
+    public function decodeScreenshot(Request $request, \App\Services\ImageDecoderService $decoder)
     {
         $request->validate([
             'screenshot' => 'required|image|max:10240',
         ]);
 
         $uploadedFile = $request->file('screenshot');
+        $text = $decoder->decode($uploadedFile);
 
-        // 1. PRE-PROCESS THE SCREENSHOT
-        // Initialize Intervention Image
-        $manager = new \Intervention\Image\ImageManager(new \Intervention\Image\Drivers\Gd\Driver());
-        $image = $manager->read($uploadedFile->getPathname());
-
-        // Normalize the width to 1080px (in case it's a massive 4K phone screenshot)
-        $image->scaleDown(width: 1080);
-
-        // Crop to just the top 800 pixels. 
-        // We know the QR code is safely in this top section. 
-        // This throws away the meme and the ad so they don't confuse the scanner.
-        $image->crop(1080, 800, 0, 0);
-
-        // Convert to grayscale. Removing color drastically improves the PHP scanner's accuracy.
-        $image->greyscale();
-
-        // Save this cleaned, cropped sliver to a temporary file
-        $tempPath = storage_path('app/public/image_ads/decode/temp_qr_' . time() . '.png');
-        $image->toPng()->save($tempPath);
-
-        // 2. RUN THE SCANNER
-        // Feed the clean, cropped temp file to the QrReader instead of the raw screenshot
-        $qrcode = new \Zxing\QrReader($tempPath);
-        $text = $qrcode->text();
-
-        // 3. CLEAN UP
-        // Delete the temporary image so we don't clog up your server storage
-        if (file_exists($tempPath)) {
-            @unlink($tempPath);
-        }
-
-        // 4. VERIFY
-        // Check if we got a text result and that it matches our 10-digit format
         if ($text && preg_match('/^\d{10}$/', $text)) {
             return response()->json([
                 'message' => 'Screenshot verified successfully!',
@@ -233,12 +267,8 @@ class ImageManipulationController extends Controller
         ], 404);
     }
 
-    /**
-     * Force download the stamped image.
-     */
     public function downloadImage($filename)
     {
-        // Prevent directory traversal attacks
         $filename = basename($filename);
         $path = storage_path('app/public/image_ads/encoded/' . $filename);
 
@@ -248,7 +278,6 @@ class ImageManipulationController extends Controller
             ], 404);
         }
 
-        // Return the file as a downloadable attachment
         return response()->download($path);
     }
 }

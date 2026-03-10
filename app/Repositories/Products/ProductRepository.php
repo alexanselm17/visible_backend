@@ -530,6 +530,25 @@ class ProductRepository implements ProductRepositoryInterface
                 'user_id' => 'required|exists:users,id',
             ]);
 
+            $user = \App\Models\User::findOrFail($request->user_id);
+            $expectedIdentifier = (string) $user->my_code;
+
+            // 2. Use the shared Service to decode the screenshot
+            $decoderService = new \App\Services\ImageDecoderService();
+            $decodedText = $decoderService->decode($request->file('screenshot'));
+
+            if (!$decodedText || trim($decodedText) !== trim($expectedIdentifier)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'Verification failed. The QR code does not match your account or is missing.',
+                    'raw_output' => $decodedText
+                ], 422);
+            }
+
+
             $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
                 ->where('advert_images.id', $advert_id)
                 ->select('campaigns.*')
