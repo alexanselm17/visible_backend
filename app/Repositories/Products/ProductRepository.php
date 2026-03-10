@@ -448,6 +448,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'selling_price',
                     'campaign_id',
                     'reward',
+                    'type',
                     'description',
                     'badge',
                     'capital_invested',
