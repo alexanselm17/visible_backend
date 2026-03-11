@@ -405,6 +405,7 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->capacity = $request->capacity;
             $advert->reward = $request->reward;
             $advert->target_audience = json_decode($request->target_audience, true);
+            $advert->type = $request->type;
             $advert->save();
 
             // Notify users
