@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
 use App\Http\Controllers\Api\Image\ImageManipulationController;
 use App\Http\Controllers\Api\Subscriptions\SubscriptionController;
+use App\Http\Controllers\Api\Plan\CreditPlanController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\NotificationController;
@@ -175,7 +176,7 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
 
-    
+
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::group(['prefix' => 'plans'], function () {
             Route::get('/all', [CreditPlanController::class, 'index']);
