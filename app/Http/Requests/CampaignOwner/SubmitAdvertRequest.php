@@ -15,8 +15,7 @@ class SubmitAdvertRequest extends FormRequest
     {
         return [
             'user_id' => ['required', 'uuid', 'exists:users,id'],
-            'capital_invested' => ['required', 'numeric', 'min:1'],
-            'name' => ['required', 'string', 'max:255'],
+            'credits' => ['required', 'numeric', 'min:1'],
             'description' => ['required', 'string'],
             'target_audience' => ['nullable', 'json'],
             'type' => ['required', 'string', 'in:ads,image'],

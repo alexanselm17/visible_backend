@@ -175,6 +175,13 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
 
+    
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::group(['prefix' => 'plans'], function () {
+            Route::get('/all', [CreditPlanController::class, 'index']);
+        });
+    });
+
 
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::group(['prefix' => 'subscriptions'], function () {

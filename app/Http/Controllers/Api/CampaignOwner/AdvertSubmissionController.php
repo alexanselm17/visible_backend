@@ -23,10 +23,10 @@ use Illuminate\Http\JsonResponse;
 class AdvertSubmissionController extends Controller
 {
 
-    public function submit(SubmitAdvertRequest $request)
+    public function submit(SubmitAdvertRequest $request, \App\Services\WalletEscrowService $walletService)
     {
         try {
-            return DB::transaction(function () use ($request) {
+            return DB::transaction(function () use ($request, $walletService) {
 
                 $campaign = Campaign::where('owner_id', $request->user_id)
                     ->orderBy('created_at', 'asc')
@@ -39,7 +39,17 @@ class AdvertSubmissionController extends Controller
                     ], 404);
                 }
 
-                // Must have at least 1 file
+                $creditsToLock = (float) $request->credits;
+                if ($creditsToLock <= 0) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'You must specify a valid amount of credits to use.'
+                    ], 422);
+                }
+
+                $costPerCredit = 500;
+                $capitalInvested = $creditsToLock * $costPerCredit;
+
                 $hasImages = $request->hasFile('images');
                 $hasVideos = $request->hasFile('videos');
                 if (!$hasImages && !$hasVideos) {
@@ -49,12 +59,11 @@ class AdvertSubmissionController extends Controller
                     ], 422);
                 }
 
-                // Create submission first (no original_* single fields anymore needed)
+                // 1. CREATE SUBMISSION FIRST (To generate the ID)
                 $submission = AdvertSubmission::create([
                     'campaign_id' => $campaign->id,
                     'submitted_by' => $request->user_id,
-                    'capital_invested' => $request->capital_invested,
-                    'name' => $request->name,
+                    'capital_invested' => $capitalInvested,
                     'description' => $request->description,
                     'target_audience' => $request->target_audience
                         ? json_decode($request->target_audience, true)
@@ -62,6 +71,22 @@ class AdvertSubmissionController extends Controller
                     'status' => AdvertSubmissionStatus::PENDING_APPROVAL,
                     'type' => $request->type,
                 ]);
+
+                // 2. ESCROW LOCK: Now we can pass the $submission->id
+                try {
+                    $walletService->lockCreditsForCampaign(
+                        $request->user_id,
+                        $submission->id,
+                        $creditsToLock
+                    );
+                } catch (\Exception $e) {
+                    // The DB::transaction will automatically delete the $submission here
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Insufficient wallet balance to launch this advert. Please top up your credits.',
+                        'error' => $e->getMessage()
+                    ], 402);
+                }
 
                 $sort = 0;
 
@@ -105,7 +130,7 @@ class AdvertSubmissionController extends Controller
 
                 $submission->load(['campaign', 'user', 'media']);
 
-                // notifications (same as your code)
+                // notifications 
                 $user = User::find($request->user_id);
                 DB::afterCommit(function () use ($campaign, $submission, $user) {
                     app(NotificationController::class)->notifyRoles(new Request([
@@ -120,7 +145,7 @@ class AdvertSubmissionController extends Controller
 
                 return response()->json([
                     'ok' => true,
-                    'message' => 'Advert submitted successfully. Pending approval.',
+                    'message' => 'Advert submitted successfully. Credits have been locked pending completion.',
                     'data' => [
                         'submission' => $submission,
                         'campaign' => $campaign,
@@ -135,7 +160,6 @@ class AdvertSubmissionController extends Controller
             ], 500);
         }
     }
-
 
     public function show(Request $request, string $userId)
     {
@@ -296,7 +320,7 @@ class AdvertSubmissionController extends Controller
                     app(NotificationController::class)->notifyRoles(new Request([
                         'roles' => ['admin'],
                         'title' => 'Design Completed',
-                        'message' => "Your advert design is ready for campaign: {$submission->campaign->name}.",
+                        'message' => "{$submission->campaign->name} submission design is ready for review.",
                         'type' => 'success',
                         'send_push' => true,
                         'data' => [
@@ -444,47 +468,6 @@ class AdvertSubmissionController extends Controller
 
 
 
-
-    public function rolloutPost(Request $request, string $submissionId)
-    {
-        try {
-            $submission = AdvertSubmission::findOrFail($submissionId);
-
-            if ($submission->status !== AdvertSubmissionStatus::DESIGN_DONE) {
-                return response()->json([
-                    'ok' => false,
-                    'message' => 'Only PUBLISHED submissions can be rolled out (posted).',
-                ], 422);
-            }
-
-            $submission->status = AdvertSubmissionStatus::PUBLISHED;
-            $submission->save();
-
-            DB::afterCommit(function () use ($submission) {
-                app(NotificationController::class)->notifyUser(new Request([
-                    'userId' => [$submission->submitted_by],
-                    'title' => 'Submission Rolled Out (Posted)',
-                    'message' => "Submission rolled out (posted) for campaign: {$submission->campaign->name}.",
-                    'type' => 'info',
-                    'send_push' => true,
-                    'data' => ['submission_id' => $submission->id, 'action_type' => 'rolled_out'],
-                ]));
-            });
-
-            return response()->json([
-                'ok' => true,
-                'message' => 'Submission rolled out (posted).',
-                'data' => $submission,
-            ], 200);
-        } catch (\Throwable $th) {
-            return response()->json([
-                'ok' => false,
-                'message' => 'Failed to roll out (post) submission.',
-                'error' => $th->getMessage(),
-            ], 500);
-        }
-    }
-
     public function rolloutSubmission(RolloutSubmissionRequest $request, string $submissionId)
     {
         try {
@@ -496,7 +479,7 @@ class AdvertSubmissionController extends Controller
                 if ($submission->status !== AdvertSubmissionStatus::DESIGN_DONE) {
                     return response()->json([
                         'ok' => false,
-                        'message' => 'Only PUBLISHED submissions can be rolled out (posted).',
+                        'message' => 'Only DESIGN_DONE submissions can be rolled out (posted).',
                         'status' => $submission->status,
                     ], 422);
                 }
@@ -511,15 +494,24 @@ class AdvertSubmissionController extends Controller
 
                 $campaign = $submission->campaign;
 
-                // Reward priority:
-                // 1) request.reward
-                // 2) campaign.reward
+
                 $reward = $request->filled('reward') ? $request->reward : $campaign->reward;
+
+                if ($reward <= 0) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => 'Reward must be greater than zero to calculate campaign capacity.',
+                    ], 422);
+                }
+
+                $capitalInvested = (float) $submission->capital_invested;
+                $costPerCredit = 500;
+                $capacity = floor($capitalInvested / $costPerCredit);
 
                 // Create advert post (AdvertImages)
                 $advert = new AdvertImages();
                 $advert->campaign_id      = $campaign->id;
-                $advert->submission_id = $submission->id;
+                $advert->submission_id    = $submission->id;
 
                 // Final designed media
                 $advert->image_path       = $submission->final_image_path;
@@ -528,49 +520,35 @@ class AdvertSubmissionController extends Controller
                 // From submission
                 $advert->name             = $submission->name;
                 $advert->target_audience  = $submission->target_audience;
-                $advert->type     = $submission->type;
+                $advert->type             = $submission->type;
 
-                // From rollout request
+                // From rollout request & calculated variables
                 $advert->category         = $request->category;
                 $advert->badge            = $request->badge;
                 $advert->valid_until      = $request->valid_until;
-                $advert->capacity         = $request->capacity;
                 $advert->reward           = $reward;
-                $advert->capital_invested = $request->capital_invested;
                 $advert->description      = $request->description;
 
+                // Injected dynamically from the submission and calculations
+                $advert->capital_invested = $capitalInvested;
+                $advert->capacity         = (int) $capacity;
                 $advert->selling_price    = 0;
 
                 $advert->save();
 
-                // Update submission status -> POSTED
+                // Update submission status -> POSTED (or PUBLISHED)
                 $submission->status = AdvertSubmissionStatus::PUBLISHED;
                 $submission->save();
-
 
                 DB::afterCommit(function () use ($submission, $advert) {
                     // Notify users
                     $title = '📢 New Product posted!';
-                    $body  = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status and earn ksh.{$advert->reward}";
-
-                    $notifReq = new Request([
-                        'title' => $title,
-                        'message' => $body,
-                        'type' => 'info',
-                        'send_push' => true,
-                        'data' => [
-                            'advert_id' => $advert->id,
-                            'submission_id' => $submission->id,
-                            'action_type' => 'rollout_posted',
-                        ],
-                    ]);
-
-                    // app(NotificationController::class)->notifyAllUsers($notifReq);
+                    $body  = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status and earn Ksh. {$advert->reward}";
 
                     app(NotificationController::class)->notifyUser(new Request([
                         'userId' => [$submission->submitted_by],
-                        'title' => 'Submission Rolled Out (Posted)',
-                        'message' => "Submission rolled out (posted) for campaign: {$submission->name}.",
+                        'title' => $title,
+                        'message' => $body,
                         'type' => 'info',
                         'send_push' => true,
                         'data' => ['submission_id' => $submission->id, 'action_type' => 'rolled_out'],
