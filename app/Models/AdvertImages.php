@@ -22,6 +22,7 @@ class AdvertImages extends Model
         'valid_until',
         'capacity',
         'target_audience',
+        'type',
         'submission_id',
         'repost_of_id',
     ];
