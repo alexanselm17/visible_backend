@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             Roleseeder::class,
             SysMetaSeeder::class
+            
 
         ]);
     }
