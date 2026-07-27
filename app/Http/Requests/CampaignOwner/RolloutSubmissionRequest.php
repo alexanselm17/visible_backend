@@ -18,9 +18,7 @@ class RolloutSubmissionRequest extends FormRequest
             'badge' => 'required|array',
             'badge.*' => 'string',
             'valid_until'     => 'required|date',
-            'capacity'        => 'required|integer|min:0',
             'reward'          => 'required|numeric|min:0',
-            'capital_invested' => 'required|numeric|min:0',
             'description'     => 'required|string',
         ];
     }

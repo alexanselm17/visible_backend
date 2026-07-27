@@ -318,6 +318,7 @@ class ProductRepository implements ProductRepositoryInterface
                         'created_at' => $advert->created_at,
                         'name' => $advert->name,
                         'badge' => $advert->badge,
+                        'type' => $advert->type,
                         'description' => $advert->description,
                         'reward' => $advert->reward,
                         'capacity' => $advert->capacity,
@@ -404,6 +405,7 @@ class ProductRepository implements ProductRepositoryInterface
             $advert->capacity = $request->capacity;
             $advert->reward = $request->reward;
             $advert->target_audience = json_decode($request->target_audience, true);
+            $advert->type = $request->type;
             $advert->save();
 
             // Notify users
@@ -447,6 +449,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'selling_price',
                     'campaign_id',
                     'reward',
+                    'type',
                     'description',
                     'badge',
                     'capital_invested',
@@ -528,6 +531,25 @@ class ProductRepository implements ProductRepositoryInterface
                 'screenshot' => 'required|image|mimes:jpeg,png,jpg|max:3072',
                 'user_id' => 'required|exists:users,id',
             ]);
+
+            $user = \App\Models\User::findOrFail($request->user_id);
+            $expectedIdentifier = (string) $user->my_code;
+
+            // 2. Use the shared Service to decode the screenshot
+            $decoderService = new \App\Services\ImageDecoderService();
+            $decodedText = $decoderService->decode($request->file('screenshot'));
+
+            if (!$decodedText || trim($decodedText) !== trim($expectedIdentifier)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'Verification failed. The QR code does not match your account or is missing.',
+                    'raw_output' => $decodedText
+                ], 422);
+            }
+
 
             $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
                 ->where('advert_images.id', $advert_id)
@@ -951,7 +973,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             // Get last 5 reward invoices with advert names
             $recentRewards = Invoice::where('processed_by', $userId)
-                ->where('type', 'Reward')
+                ->where('invoices.type', 'Reward')
                 ->leftJoin('advert_images', 'invoices.advert_id', '=', 'advert_images.id')
                 ->orderBy('invoices.created_at', 'desc')
                 ->limit(5)

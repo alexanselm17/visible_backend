@@ -16,6 +16,7 @@ class AdvertSubmission extends Model
         'name',
         'description',
         'target_audience',
+        'type',
         'final_image_path',
         'final_video_path',
         'status',
@@ -24,6 +25,7 @@ class AdvertSubmission extends Model
         'reviewed_by',
         'reviewed_at',
         'rejection_reason',
+
     ];
 
     protected $keyType = 'string';
