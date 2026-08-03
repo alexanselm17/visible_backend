@@ -245,7 +245,7 @@ class AuthRepository implements AuthRepositoryInterface
             }
 
             // let's update the login status
-            $user->is_logged_in = 1;
+            // $user->is_logged_in = 1;
             $user->save();
 
             $token = $user->createToken('api-token-v' . $request->app_version)->plainTextToken;
