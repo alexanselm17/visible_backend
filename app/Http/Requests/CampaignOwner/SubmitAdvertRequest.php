@@ -24,15 +24,17 @@ class SubmitAdvertRequest extends FormRequest
     {
         return [
             'user_id' => ['sometimes', 'nullable', 'uuid', 'exists:users,id'],
-            'credits' => ['required', 'numeric', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
             'target_audience' => ['nullable', 'json'],
+            'target_reach' => ['required', 'integer', 'min:1', 'max:1000000'],
             'type' => ['required', 'string', 'in:VIDEO,IMAGE,TEXT'],
             'video_duration_seconds' => ['required_if:type,VIDEO', 'nullable', 'integer', 'min:1'],
-            'images' => ['required_if:type,IMAGE', 'nullable', 'array', 'min:1'],
+
+            'images' => ['required_if:type,IMAGE', 'nullable', 'array', 'min:1', 'max:1'],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
-            'videos' => ['required_if:type,VIDEO', 'nullable', 'array', 'min:1'],
+
+            'videos' => ['required_if:type,VIDEO', 'nullable', 'array', 'min:1', 'max:1'],
             'videos.*' => ['file', 'mimes:mp4,mov,avi,webm', 'max:51200'],
         ];
     }
@@ -40,9 +42,12 @@ class SubmitAdvertRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'video_duration_seconds.required_if' => 'Video duration is required for Gold token calculation.',
-            'images.required_if' => 'Upload at least one image for an image campaign.',
-            'videos.required_if' => 'Upload at least one video for a video campaign.',
+            'target_reach.required' => 'Enter the number of people you want this advert to reach.',
+            'video_duration_seconds.required_if' => 'Video duration is required to calculate Gold token usage.',
+            'images.required_if' => 'Upload an image for an image campaign.',
+            'images.max' => 'An image advert currently supports one image per submission.',
+            'videos.required_if' => 'Upload a video for a video campaign.',
+            'videos.max' => 'A video advert currently supports one video per submission.',
         ];
     }
 }
