@@ -4,18 +4,16 @@ use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
+use App\Http\Controllers\Api\CampaignOwner\TokenizedAdvertSubmissionController;
 use App\Http\Controllers\Api\Image\ImageManipulationController;
-use App\Http\Controllers\Api\Subscriptions\SubscriptionController;
 use App\Http\Controllers\Api\Plan\CreditPlanController;
+use App\Http\Controllers\Api\Tokens\TokenController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ProductController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'v1'], function () {
-
-
-    //Auth Routes
     Route::group(['prefix' => 'auth'], function () {
         Route::post('/fcm-token', [NotificationController::class, 'updateFcmToken']);
         Route::post('/signup', [AuthController::class, 'signup']);
@@ -25,37 +23,25 @@ Route::group(['prefix' => 'v1'], function () {
         Route::put('/logout', [AuthController::class, 'signOut']);
     });
 
-
     Route::get('/download/advert/{path}', function ($path) {
-        $fullPath = public_path("storage/" . $path);
-        if (!file_exists($fullPath)) {
-            return response()->json(['error' => 'File not found.'], 404);
-        }
-
+        $fullPath = public_path('storage/' . $path);
+        if (!file_exists($fullPath)) return response()->json(['error' => 'File not found.'], 404);
         $filename = basename($path);
-        $headers = [
+        return response()->make(file_get_contents($fullPath), 200, [
             'Content-Type' => 'application/octet-stream',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Content-Transfer-Encoding' => 'binary',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
             'Pragma' => 'public',
-        ];
-
-        return response()->make(file_get_contents($fullPath), 200, $headers);
+        ]);
     })->where('path', '.*')->name('download.advert.image');
-
-
-
 
     Route::group(['prefix' => 'user'], function () {
         Route::post('/assign_permissions', [AuthController::class, 'assignPermissionsToUser']);
         Route::get('/user_permissions/{userId}', [AuthController::class, 'getUserPermissions']);
         Route::put('/reset_password', [AuthController::class, 'restorePassword']);
     });
-
-
-
 
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
         Route::group(['prefix' => 'campaign'], function () {
@@ -67,13 +53,13 @@ Route::group(['prefix' => 'v1'], function () {
             Route::put('/advert/{advertId}', [ProductController::class, 'updateAdvertProduct']);
             Route::post('/upload_product_advert/{campaignId}', [ProductController::class, 'uploadAdvertProducts']);
             Route::post('/repost_product_advert', [ProductController::class, 'repostAdvertProducts']);
-
             Route::get('/get_product_advert', [ProductController::class, 'getAdvertProducts']);
             Route::post('/upload_screenshot/{advert_id}', [ProductController::class, 'uploadScreenShotPlusCompare']);
             Route::get('/dashboard/{userId}', [ProductController::class, 'getDashboardData']);
             Route::get('/admin_dashboard', [ProductController::class, 'getAdminDashboardData']);
         });
     });
+
     Route::group(['prefix' => 'campaign/report'], function () {
         Route::get('/campaign_report', [ProductController::class, 'getCampaignReports']);
         Route::get('/timely_campaign_report', [ProductController::class, 'getCampaignTimelyReports']);
@@ -86,10 +72,7 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('/payment', [ProductController::class, 'uploadPaymentExcell']);
     });
 
-
-
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
-        //User Routes
         Route::group(['prefix' => 'user'], function () {
             Route::get('/activate', [AuthController::class, 'activateCard']);
             Route::get('/profile/{userId}', [AuthController::class, 'getUserProfileById']);
@@ -97,28 +80,12 @@ Route::group(['prefix' => 'v1'], function () {
             Route::put('/assign_role', [AuthController::class, 'assignRole']);
             Route::put('/unassign_role', [AuthController::class, 'unAssignRole']);
             Route::get('/user_referals/{userId}', [AuthController::class, 'getAllUserReferred']);
-
             Route::get('/get_Roles', [AuthController::class, 'getRoles']);
-            // Route::put('/assign_role', [AuthController::class, 'assignRole']);
             Route::get('/search', [AuthController::class, 'searchUser']);
-            //  Route::put('/unassign_role', [AuthController::class, 'unAssignRole']);
             Route::get('/', [AuthController::class, 'getAllUsers']);
             Route::get('/user_without_role', [AuthController::class, 'getAllUsersWithoutRole']);
             Route::put('/', [AuthController::class, 'updateProfile']);
         });
-
-        // Route::group(['prefix' => 'product'], function () {
-
-        //     //Admin and manager only
-        //     Route::post('/upload_product_advert', [ProductController::class, 'uploadAdvertProducts']);
-        //     Route::post('/', [ProductController::class, 'createProduct']);
-        //     Route::post('/{masterProductId}', [ProductController::class, 'createChildProduct']);
-        //     Route::put('/{productId}', [ProductController::class, 'updateProduct']);
-
-        //     Route::get('/', [ProductController::class, 'getProducts']);
-        //     Route::get('/search', [ProductController::class, 'searchProducts']);
-        // });
-
 
         Route::prefix('notifications')->group(function () {
             Route::get('/user', [NotificationController::class, 'getUserNotifications']);
@@ -128,46 +95,34 @@ Route::group(['prefix' => 'v1'], function () {
             Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
         });
 
-
         Route::prefix('admin/fraud')->group(function () {
             Route::get('/campaign/{campaignId}', [AdminFraudController::class, 'getFraudForCampaign']);
             Route::get('/campaigns', [AdminFraudController::class, 'getFraudForAllCampaigns']);
-
-            // Review actions
             Route::post('/review', [AdminFraudController::class, 'reviewFraudGroup']);
             Route::get('/guilty-users', [AdminFraudController::class, 'getGuiltyFraudUsers']);
             Route::post('/bulk-action', [AdminFraudController::class, 'bulkFraudAction']);
-
-            // Optional history
             Route::get('/reviews', [AdminFraudController::class, 'listReviews']);
         });
     });
 
-
-    Route::prefix('campaign-owner')
-        ->group(function () {
-            Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
-            Route::post('/campaign/submission', [AdvertSubmissionController::class, 'submit'])->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
-            Route::get('/show/{userId}', [CampaignOwnerAuthController::class, 'show']);
-            Route::get(
-                '/{user_id}/advert-submissions',
-                [AdvertSubmissionController::class, 'show']
-            );
-            Route::get('/dashboard/{userId}', [AdvertSubmissionController::class, 'dashboard'])->middleware(['auth:sanctum']);
-            Route::get('/submissions', [AdvertSubmissionController::class, 'indexAll']);
-            Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
-            Route::post('/submissions/{submissionId}/final', [AdvertSubmissionController::class, 'uploadFinalDesign'])->middleware(['auth:sanctum', 'check.active']);
-            Route::post('/submissions/{submissionId}/approve', [AdvertSubmissionController::class, 'approve']);
-            Route::post('/submissions/{submissionId}/reject', [AdvertSubmissionController::class, 'reject']);
-            Route::post('/submissions/{submissionId}/rollout', [AdvertSubmissionController::class, 'rolloutSubmission']);
-            Route::get('/submissions/pending', [AdvertSubmissionController::class, 'pendingDesign']);
-
-            // profile management
-            Route::post('/{profileId}/logos', [CampaignOwnerProfileController::class, 'uploadLogo']);
-            Route::get('/{profileId}/logos', [CampaignOwnerProfileController::class, 'listLogos']);
-            Route::post('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);
-            Route::delete('/{profileId}/logos/{logoId}', [CampaignOwnerProfileController::class, 'deleteLogo']);
-        });
+    Route::prefix('campaign-owner')->group(function () {
+        Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
+        Route::post('/campaign/submission', [TokenizedAdvertSubmissionController::class, 'submit'])->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
+        Route::get('/show/{userId}', [CampaignOwnerAuthController::class, 'show']);
+        Route::get('/{user_id}/advert-submissions', [AdvertSubmissionController::class, 'show']);
+        Route::get('/submissions', [AdvertSubmissionController::class, 'indexAll']);
+        Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
+        Route::get('/dashboard/{userId}', [TokenizedAdvertSubmissionController::class, 'dashboard'])->middleware(['auth:sanctum']);
+        Route::post('/submissions/{submissionId}/final', [TokenizedAdvertSubmissionController::class, 'uploadFinalDesign'])->middleware(['auth:sanctum', 'check.active']);
+        Route::post('/submissions/{submissionId}/approve', [TokenizedAdvertSubmissionController::class, 'approve'])->middleware(['auth:sanctum', 'check.active']);
+        Route::post('/submissions/{submissionId}/reject', [TokenizedAdvertSubmissionController::class, 'reject'])->middleware(['auth:sanctum', 'check.active']);
+        Route::post('/submissions/{submissionId}/rollout', [TokenizedAdvertSubmissionController::class, 'rolloutSubmission'])->middleware(['auth:sanctum', 'check.active']);
+        Route::get('/submissions/pending', [AdvertSubmissionController::class, 'pendingDesign']);
+        Route::post('/{profileId}/logos', [CampaignOwnerProfileController::class, 'uploadLogo']);
+        Route::get('/{profileId}/logos', [CampaignOwnerProfileController::class, 'listLogos']);
+        Route::post('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);
+        Route::delete('/{profileId}/logos/{logoId}', [CampaignOwnerProfileController::class, 'deleteLogo']);
+    });
 
     Route::prefix('image')->group(function () {
         Route::post('/stamp', [ImageManipulationController::class, 'encodeImage']);
@@ -175,21 +130,22 @@ Route::group(['prefix' => 'v1'], function () {
         Route::get('/download/{filename}', [ImageManipulationController::class, 'downloadImage']);
     });
 
-
-
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::group(['prefix' => 'plans'], function () {
             Route::get('/all', [CreditPlanController::class, 'index']);
         });
     });
 
-
-    Route::middleware(['auth:sanctum'])->group(function () {
-        Route::group(['prefix' => 'subscriptions'], function () {
-            Route::get('/all', [SubscriptionController::class, 'index']);
-            Route::get('/show/{code}', [SubscriptionController::class, 'show']);
-            Route::post('buy', [SubscriptionController::class, 'buy']);
-            Route::get('me', [SubscriptionController::class, 'mySubscription']);
-        });
+    Route::middleware(['auth:sanctum', 'check.active'])->prefix('tokens')->group(function () {
+        Route::get('/types', [TokenController::class, 'types']);
+        Route::post('/quote', [TokenController::class, 'quote']);
+        Route::get('/wallet', [TokenController::class, 'wallet']);
+        Route::get('/transactions', [TokenController::class, 'transactions']);
+        Route::get('/purchases', [TokenController::class, 'purchases']);
+        Route::post('/purchases', [TokenController::class, 'purchase']);
+        Route::post('/purchases/{purchaseId}/cancel', [TokenController::class, 'cancelPurchase']);
+        Route::post('/purchases/{purchaseId}/confirm', [TokenController::class, 'confirmPurchase']);
+        Route::put('/types/{code}', [TokenController::class, 'updateType']);
+        Route::post('/wallet/adjust', [TokenController::class, 'adjustWallet']);
     });
 });

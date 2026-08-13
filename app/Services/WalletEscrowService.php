@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AdvertSubmission;
 use App\Models\CreditHold;
 use App\Models\CreditPlan;
 use App\Models\Wallet;
@@ -11,97 +12,112 @@ use Illuminate\Support\Facades\DB;
 class WalletEscrowService
 {
     /**
-     * Lock credits when a campaign starts.
+     * Lock campaign credits when a submission starts.
      */
-    public function lockCreditsForCampaign(string $userId, string $campaignId, float $amountToLock): CreditHold
+    public function lockCreditsForCampaign(string $userId, string $submissionId, float $amountToLock): CreditHold
     {
-        return DB::transaction(function () use ($userId, $campaignId, $amountToLock) {
-            // lockForUpdate() prevents any other process from modifying this wallet until this transaction finishes
+        return DB::transaction(function () use ($userId, $submissionId, $amountToLock) {
             $wallet = Wallet::where('user_id', $userId)->lockForUpdate()->firstOrFail();
 
             if ($wallet->balance < $amountToLock) {
-                throw new Exception('Insufficient available balance to launch this campaign.');
+                throw new Exception('Insufficient available campaign credit balance to launch this advert.');
             }
 
-            // Move balance to locked
             $wallet->balance -= $amountToLock;
             $wallet->locked_balance += $amountToLock;
             $wallet->save();
 
-            // Create the Hold record
             return CreditHold::create([
                 'wallet_id' => $wallet->id,
-                'advert_submission_id' => $campaignId,
+                'advert_submission_id' => $submissionId,
                 'amount_locked' => $amountToLock,
-                'status' => 'ACTIVE'
+                'status' => 'ACTIVE',
             ]);
         });
     }
 
     /**
-     * Settle credits when a campaign finishes (full or partial completion).
+     * Settle a specific credit hold when a campaign finishes.
      */
-    public function settleCampaignHold(string $holdId, float $actualAmountSpent)
+    public function settleCampaignHold(string $holdId, float $actualAmountSpent): CreditHold
     {
         return DB::transaction(function () use ($holdId, $actualAmountSpent) {
             $hold = CreditHold::lockForUpdate()->findOrFail($holdId);
-            $wallet = Wallet::where('id', $hold->wallet_id)->lockForUpdate()->firstOrFail();
+
+            return $this->settleLockedHold($hold, $actualAmountSpent);
+        });
+    }
+
+    /**
+     * Settle the active campaign-credit hold for a submission.
+     */
+    public function settleCampaignHoldBySubmission(string $submissionId, float $actualAmountSpent): ?CreditHold
+    {
+        return DB::transaction(function () use ($submissionId, $actualAmountSpent) {
+            $hold = CreditHold::where('advert_submission_id', $submissionId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$hold) {
+                return null;
+            }
 
             if ($hold->status !== 'ACTIVE') {
-                throw new Exception('This hold has already been processed.');
+                return $hold;
             }
 
-            $amountToRelease = $hold->amount_locked - $actualAmountSpent;
+            return $this->settleLockedHold($hold, $actualAmountSpent);
+        });
+    }
 
-            // Remove the total locked amount from the wallet's escrow pool
-            $wallet->locked_balance -= $hold->amount_locked;
+    /**
+     * Release campaign credits when a submission is rejected/cancelled before publication.
+     */
+    public function cancelCampaignHoldBySubmission(string $submissionId, string $reason = 'Advert submission cancelled'): ?CreditHold
+    {
+        return DB::transaction(function () use ($submissionId, $reason) {
+            $hold = CreditHold::where('advert_submission_id', $submissionId)
+                ->lockForUpdate()
+                ->first();
 
-            // If there's leftover credit, refund it to the available balance
-            if ($amountToRelease > 0) {
-                $wallet->balance += $amountToRelease;
-                $hold->status = 'PARTIALLY_SETTLED';
-            } else {
-                $hold->status = 'SETTLED';
+            if (!$hold || $hold->status !== 'ACTIVE') {
+                return $hold;
             }
 
+            $wallet = Wallet::whereKey($hold->wallet_id)->lockForUpdate()->firstOrFail();
+            $amount = (float) $hold->amount_locked;
+
+            $wallet->locked_balance -= $amount;
+            $wallet->balance += $amount;
             $wallet->save();
 
-            // Record the actual spend in the immutable ledger
-            if ($actualAmountSpent > 0) {
-                $wallet->transactions()->create([
-                    'type' => 'spend',
-                    'amount' => $actualAmountSpent,
-                    'description' => "Campaign completion deduction",
-                    'reference_id' => $hold->campaign_id,
-                    'reference_type' => 'App\Models\Campaign', // Adjust to your actual Campaign model namespace
-                ]);
-            }
+            $wallet->transactions()->create([
+                'type' => 'refund',
+                'amount' => $amount,
+                'description' => $reason,
+                'reference_id' => $hold->advert_submission_id,
+                'reference_type' => AdvertSubmission::class,
+            ]);
 
-            // Update the hold record
-            $hold->amount_spent = $actualAmountSpent;
-            $hold->amount_released = $amountToRelease;
+            $hold->amount_released = $amount;
+            $hold->status = 'CANCELLED';
             $hold->save();
 
             return $hold;
         });
     }
 
-
     public function fundWalletFromPlan(string $userId, string $planId, string $paymentReference)
     {
         return DB::transaction(function () use ($userId, $planId, $paymentReference) {
             $plan = CreditPlan::where('is_active', true)->findOrFail($planId);
 
-            // Lock the wallet for updating
             $wallet = Wallet::where('user_id', $userId)->lockForUpdate()->firstOrFail();
 
             $totalCreditsToAdd = $plan->total_credits;
-
-            // 1. Update the available balance
             $wallet->balance += $totalCreditsToAdd;
             $wallet->save();
 
-            // 2. Log the immutable transaction
             $wallet->transactions()->create([
                 'type' => 'deposit',
                 'amount' => $totalCreditsToAdd,
@@ -112,5 +128,55 @@ class WalletEscrowService
 
             return $wallet;
         });
+    }
+
+    private function settleLockedHold(CreditHold $hold, float $actualAmountSpent): CreditHold
+    {
+        if ($hold->status !== 'ACTIVE') {
+            throw new Exception('This campaign credit hold has already been processed.');
+        }
+
+        $locked = (float) $hold->amount_locked;
+        if ($actualAmountSpent < 0 || $actualAmountSpent > $locked) {
+            throw new Exception('Actual campaign credit spend must be between zero and the locked amount.');
+        }
+
+        $wallet = Wallet::whereKey($hold->wallet_id)->lockForUpdate()->firstOrFail();
+        $amountToRelease = $locked - $actualAmountSpent;
+
+        $wallet->locked_balance -= $locked;
+
+        if ($amountToRelease > 0) {
+            $wallet->balance += $amountToRelease;
+        }
+
+        $wallet->save();
+
+        if ($actualAmountSpent > 0) {
+            $wallet->transactions()->create([
+                'type' => 'spend',
+                'amount' => $actualAmountSpent,
+                'description' => 'Campaign completion deduction',
+                'reference_id' => $hold->advert_submission_id,
+                'reference_type' => AdvertSubmission::class,
+            ]);
+        }
+
+        if ($amountToRelease > 0) {
+            $wallet->transactions()->create([
+                'type' => 'refund',
+                'amount' => $amountToRelease,
+                'description' => 'Unused campaign credits released after settlement',
+                'reference_id' => $hold->advert_submission_id,
+                'reference_type' => AdvertSubmission::class,
+            ]);
+        }
+
+        $hold->amount_spent = $actualAmountSpent;
+        $hold->amount_released = $amountToRelease;
+        $hold->status = $amountToRelease > 0 ? 'PARTIALLY_SETTLED' : 'SETTLED';
+        $hold->save();
+
+        return $hold;
     }
 }

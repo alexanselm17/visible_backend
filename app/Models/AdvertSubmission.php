@@ -17,15 +17,21 @@ class AdvertSubmission extends Model
         'description',
         'target_audience',
         'type',
+        'token_type_id',
+        'tokens_reserved',
+        'tokens_spent',
+        'video_duration_seconds',
+        'final_video_duration_seconds',
+        'tokens_refunded_at',
         'final_image_path',
         'final_video_path',
+        'final_thumbnail_path',
         'status',
         'designed_by',
         'designed_at',
         'reviewed_by',
         'reviewed_at',
         'rejection_reason',
-
     ];
 
     protected $keyType = 'string';
@@ -34,6 +40,11 @@ class AdvertSubmission extends Model
     protected $casts = [
         'target_audience' => 'array',
         'capital_invested' => 'decimal:2',
+        'tokens_reserved' => 'integer',
+        'tokens_spent' => 'integer',
+        'video_duration_seconds' => 'integer',
+        'final_video_duration_seconds' => 'integer',
+        'tokens_refunded_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -42,7 +53,6 @@ class AdvertSubmission extends Model
         'final_image_url',
         'final_video_url',
         'final_thumbnail_url',
-
     ];
 
     protected static function boot()
@@ -104,5 +114,15 @@ class AdvertSubmission extends Model
     public function designer()
     {
         return $this->belongsTo(User::class, 'designed_by');
+    }
+
+    public function tokenType()
+    {
+        return $this->belongsTo(TokenType::class, 'token_type_id');
+    }
+
+    public function tokenHold()
+    {
+        return $this->hasOne(TokenHold::class, 'advert_submission_id');
     }
 }
