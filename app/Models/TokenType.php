@@ -22,6 +22,7 @@ class TokenType extends Model
         'unit_price',
         'currency',
         'seconds_per_token',
+        'people_per_token',
         'max_video_duration_seconds',
         'description',
         'is_active',
@@ -34,6 +35,7 @@ class TokenType extends Model
     protected $casts = [
         'unit_price' => 'decimal:2',
         'seconds_per_token' => 'integer',
+        'people_per_token' => 'integer',
         'max_video_duration_seconds' => 'integer',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
