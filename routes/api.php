@@ -4,10 +4,10 @@ use App\Http\Controllers\AdminFraudController;
 use App\Http\Controllers\Api\CampaignOwner\AdvertSubmissionController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
-use App\Http\Controllers\Api\CampaignOwner\TokenizedAdvertSubmissionController;
+use App\Http\Controllers\Api\CampaignOwner\TokenOnlyAdvertSubmissionController;
 use App\Http\Controllers\Api\Image\ImageManipulationController;
-use App\Http\Controllers\Api\Plan\CreditPlanController;
 use App\Http\Controllers\Api\Tokens\TokenController;
+use App\Http\Controllers\Api\Tokens\TokenUsageController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
@@ -25,8 +25,12 @@ Route::group(['prefix' => 'v1'], function () {
 
     Route::get('/download/advert/{path}', function ($path) {
         $fullPath = public_path('storage/' . $path);
-        if (!file_exists($fullPath)) return response()->json(['error' => 'File not found.'], 404);
+        if (!file_exists($fullPath)) {
+            return response()->json(['error' => 'File not found.'], 404);
+        }
+
         $filename = basename($path);
+
         return response()->make(file_get_contents($fullPath), 200, [
             'Content-Type' => 'application/octet-stream',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
@@ -107,16 +111,23 @@ Route::group(['prefix' => 'v1'], function () {
 
     Route::prefix('campaign-owner')->group(function () {
         Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
-        Route::post('/campaign/submission', [TokenizedAdvertSubmissionController::class, 'submit'])->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
+        Route::post('/campaign/submission', [TokenOnlyAdvertSubmissionController::class, 'submit'])
+            ->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
         Route::get('/show/{userId}', [CampaignOwnerAuthController::class, 'show']);
         Route::get('/{user_id}/advert-submissions', [AdvertSubmissionController::class, 'show']);
         Route::get('/submissions', [AdvertSubmissionController::class, 'indexAll']);
-        Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])->middleware(['auth:sanctum', 'check.active']);
-        Route::get('/dashboard/{userId}', [TokenizedAdvertSubmissionController::class, 'dashboard'])->middleware(['auth:sanctum']);
-        Route::post('/submissions/{submissionId}/final', [TokenizedAdvertSubmissionController::class, 'uploadFinalDesign'])->middleware(['auth:sanctum', 'check.active']);
-        Route::post('/submissions/{submissionId}/approve', [TokenizedAdvertSubmissionController::class, 'approve'])->middleware(['auth:sanctum', 'check.active']);
-        Route::post('/submissions/{submissionId}/reject', [TokenizedAdvertSubmissionController::class, 'reject'])->middleware(['auth:sanctum', 'check.active']);
-        Route::post('/submissions/{submissionId}/rollout', [TokenizedAdvertSubmissionController::class, 'rolloutSubmission'])->middleware(['auth:sanctum', 'check.active']);
+        Route::get('/list', [CampaignOwnerAuthController::class, 'campaignOwners'])
+            ->middleware(['auth:sanctum', 'check.active']);
+        Route::get('/dashboard/{userId}', [TokenOnlyAdvertSubmissionController::class, 'dashboard'])
+            ->middleware(['auth:sanctum']);
+        Route::post('/submissions/{submissionId}/final', [TokenOnlyAdvertSubmissionController::class, 'uploadFinalDesign'])
+            ->middleware(['auth:sanctum', 'check.active']);
+        Route::post('/submissions/{submissionId}/approve', [TokenOnlyAdvertSubmissionController::class, 'approve'])
+            ->middleware(['auth:sanctum', 'check.active']);
+        Route::post('/submissions/{submissionId}/reject', [TokenOnlyAdvertSubmissionController::class, 'reject'])
+            ->middleware(['auth:sanctum', 'check.active']);
+        Route::post('/submissions/{submissionId}/rollout', [TokenOnlyAdvertSubmissionController::class, 'rolloutSubmission'])
+            ->middleware(['auth:sanctum', 'check.active']);
         Route::get('/submissions/pending', [AdvertSubmissionController::class, 'pendingDesign']);
         Route::post('/{profileId}/logos', [CampaignOwnerProfileController::class, 'uploadLogo']);
         Route::get('/{profileId}/logos', [CampaignOwnerProfileController::class, 'listLogos']);
@@ -130,15 +141,10 @@ Route::group(['prefix' => 'v1'], function () {
         Route::get('/download/{filename}', [ImageManipulationController::class, 'downloadImage']);
     });
 
-    Route::middleware(['auth:sanctum'])->group(function () {
-        Route::group(['prefix' => 'plans'], function () {
-            Route::get('/all', [CreditPlanController::class, 'index']);
-        });
-    });
-
     Route::middleware(['auth:sanctum', 'check.active'])->prefix('tokens')->group(function () {
         Route::get('/types', [TokenController::class, 'types']);
         Route::post('/quote', [TokenController::class, 'quote']);
+        Route::post('/usage-quote', [TokenUsageController::class, 'quote']);
         Route::get('/wallet', [TokenController::class, 'wallet']);
         Route::get('/transactions', [TokenController::class, 'transactions']);
         Route::get('/purchases', [TokenController::class, 'purchases']);
