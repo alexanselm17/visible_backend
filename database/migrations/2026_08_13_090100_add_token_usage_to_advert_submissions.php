@@ -8,6 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasColumn('advert_submissions', 'type')) {
+            Schema::table('advert_submissions', function (Blueprint $table) {
+                $table->string('type', 20)->nullable()->after('target_audience');
+            });
+        }
+
         Schema::table('advert_submissions', function (Blueprint $table) {
             $table->uuid('token_type_id')->nullable()->after('type')->index();
             $table->unsignedInteger('tokens_reserved')->default(0)->after('token_type_id');
