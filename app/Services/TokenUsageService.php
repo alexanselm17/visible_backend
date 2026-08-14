@@ -13,11 +13,12 @@ class TokenUsageService
      * Calculate the total token cost of an advert.
      *
      * Formula:
-     *   media_units × reach_units = tokens_required
+     *   submission_tokens + reach_tokens = tokens_required
      *
-     * VIDEO media_units = ceil(video_seconds / seconds_per_token)
-     * IMAGE/TEXT media_units = 1
-     * reach_units = ceil(target_reach / people_per_token)
+     * VIDEO submission_tokens = 5
+     * IMAGE submission_tokens = 3
+     * TEXT submission_tokens = 1
+     * reach_tokens = ceil(target_reach / people_per_token)
      */
     public function quote(
         TokenType $tokenType,
@@ -39,11 +40,11 @@ class TokenUsageService
             throw new RuntimeException("{$tokenType->code} people-per-token pricing is not configured.");
         }
 
-        $mediaUnits = 1;
+        $submissionTokens = $this->submissionTokensFor($tokenType);
         $secondsPerToken = null;
 
         if ($tokenType->media_type === TokenType::VIDEO) {
-            if (!$videoDurationSeconds || $videoDurationSeconds < 1) {
+            if (! $videoDurationSeconds || $videoDurationSeconds < 1) {
                 throw ValidationException::withMessages([
                     'video_duration_seconds' => 'Video duration is required for a video advert.',
                 ]);
@@ -60,16 +61,10 @@ class TokenUsageService
 
             $secondsPerToken = $secondsPerTokenOverride
                 ?: (int) $tokenType->seconds_per_token;
-
-            if ($secondsPerToken < 1) {
-                throw new RuntimeException('Gold token video-duration pricing is not configured.');
-            }
-
-            $mediaUnits = (int) ceil($videoDurationSeconds / $secondsPerToken);
         }
 
         $reachUnits = (int) ceil($targetReach / $peoplePerToken);
-        $tokensRequired = $mediaUnits * $reachUnits;
+        $tokensRequired = $submissionTokens + $reachUnits;
 
         return [
             'token_type' => $tokenType->code,
@@ -80,7 +75,9 @@ class TokenUsageService
                 : null,
             'seconds_per_token' => $secondsPerToken,
             'people_per_token' => $peoplePerToken,
-            'media_units' => $mediaUnits,
+            'submission_tokens' => $submissionTokens,
+            'reach_tokens' => $reachUnits,
+            'media_units' => $submissionTokens,
             'reach_units' => $reachUnits,
             'tokens_required' => $tokensRequired,
         ];
@@ -113,7 +110,7 @@ class TokenUsageService
     ): array {
         $submission->loadMissing('tokenType');
 
-        if (!$submission->tokenType) {
+        if (! $submission->tokenType) {
             throw new RuntimeException('Token type is missing from this advert submission.');
         }
 
@@ -134,5 +131,15 @@ class TokenUsageService
                 ? (int) $submission->people_per_token_snapshot
                 : null
         );
+    }
+
+    private function submissionTokensFor(TokenType $tokenType): int
+    {
+        return match ($tokenType->media_type) {
+            TokenType::VIDEO => 5,
+            TokenType::IMAGE => 3,
+            TokenType::TEXT => 1,
+            default => throw new RuntimeException("Unsupported media type: {$tokenType->media_type}"),
+        };
     }
 }
