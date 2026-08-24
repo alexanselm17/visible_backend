@@ -111,8 +111,9 @@ Route::group(['prefix' => 'v1'], function () {
 
     Route::prefix('campaign-owner')->group(function () {
         Route::post('/register', [CampaignOwnerAuthController::class, 'register']);
-        Route::get('/wallet', [TokenController::class, 'wallet'])
-            ->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
+        Route::get('/{userId}/wallet', [TokenController::class, 'campaignOwnerWallet'])
+            ->middleware(['auth:sanctum', 'check.active', 'campaign_owner'])
+            ->whereUuid('userId');
         Route::post('/campaign/submission', [TokenOnlyAdvertSubmissionController::class, 'submit'])
             ->middleware(['auth:sanctum', 'check.active', 'campaign_owner']);
         Route::get('/show/{userId}', [CampaignOwnerAuthController::class, 'show']);

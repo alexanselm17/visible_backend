@@ -60,6 +60,24 @@ class TokenController extends Controller
         ]);
     }
 
+    public function campaignOwnerWallet(
+        Request $request,
+        TokenService $tokenService,
+        string $userId
+    ): JsonResponse {
+        if ((string) $request->user()->id !== $userId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'You are not authorized to view this campaign owner wallet.',
+            ], 403);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'data' => $tokenService->walletSummary($userId),
+        ]);
+    }
+
     public function transactions(Request $request, TokenService $tokenService): JsonResponse
     {
         $perPage = max(1, min(100, (int) $request->query('per_page', 20)));

@@ -73,7 +73,7 @@ class CampaignOwnerWalletEndpointTest extends TestCase
 
         $response = $this->withoutMiddleware()
             ->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/campaign-owner/wallet');
+            ->getJson("/api/v1/campaign-owner/{$userId}/wallet");
 
         $response
             ->assertOk()
@@ -85,6 +85,21 @@ class CampaignOwnerWalletEndpointTest extends TestCase
             ->assertJsonPath('data.balances.0.total_tokens', 16)
             ->assertJsonPath('data.balances.1.remaining_tokens', 0)
             ->assertJsonPath('data.balances.2.remaining_tokens', 0);
+    }
+
+    public function test_campaign_owner_cannot_get_another_owners_wallet(): void
+    {
+        $user = new User;
+        $user->id = '73c1ce9d-cfe4-4d34-94d8-08d5e0f7de17';
+
+        $response = $this->withoutMiddleware()
+            ->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/campaign-owner/11111111-1111-4111-8111-111111111111/wallet');
+
+        $response
+            ->assertForbidden()
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('message', 'You are not authorized to view this campaign owner wallet.');
     }
 
     private function tokenType(
