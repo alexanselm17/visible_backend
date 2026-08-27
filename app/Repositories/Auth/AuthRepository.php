@@ -172,7 +172,7 @@ class AuthRepository implements AuthRepositoryInterface
             return response()->json([
                 'ok' => false,
                 'status' => 'error',
-                'message' => 'An error occurred during sign up. Please try again later.',
+                'message' => $th->getMessage(),
             ], 500);
         }
     }
