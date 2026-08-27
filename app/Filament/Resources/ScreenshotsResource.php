@@ -163,13 +163,6 @@ class ScreenshotsResource extends Resource
                         default => 'gray',
                     }),
 
-                TextColumn::make('advert.reward')
-                    ->label('Reward')
-                    ->money('USD')
-                    ->sortable()
-                    ->alignment('right')
-                    ->color('success'),
-
                 TextColumn::make('created_at')
                     ->label('Uploaded')
                     ->dateTime()

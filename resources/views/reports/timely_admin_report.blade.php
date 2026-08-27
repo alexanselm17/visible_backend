@@ -115,7 +115,6 @@
                 <tr>
                     <th>#</th>
                     <th>Name</th>
-                    <th>Total Rewards</th>
                     <th>Total Views </th>
                 </tr>
             </thead>
@@ -124,7 +123,6 @@
                 <tr>
                     <td>{{ $index + 1 }}</td>
                     <td>{{ $campaignReport['campaign']['name'] }}</td>
-                    <td>{{ $campaignReport['total_reward_awarded'] }}</td>
                     <td>{{ $campaignReport['total_views_all_users'] }}</td>
                 </tr>
                 @endforeach
@@ -225,7 +223,6 @@
                     <th>Campaign</th>
                     <th>Phone</th>
                     <th>Views</th>
-                    <th>Rewards(Kes.)</th>
                 </tr>
             </thead>
             <tbody>
@@ -236,7 +233,6 @@
                     <td>{{ $complete['campaign_name'] }}</td>
                     <td>{{ $complete['phone'] }}</td>
                     <td>{{ $complete['views'] }}</td>
-                    <td>{{ $complete['reward'] }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -250,7 +246,8 @@
         <h2>Incompletes: {{ number_format($summary['total_incomplete'] ?? 0) }}</h2>
         <h2>Still Ongoing: {{ number_format($summary['total_ongoing'] ?? 0) }}</h2>
         <h2>Total Views (All Users): {{ number_format($summary['total_views_all_users']?? 0) }}</h2>
-        <h2>Total Reward Awarded: Ksh. {{ number_format($summary['total_invoices'] ?? 0, 2) }}</h2>
+        <h2>Performance Earnings: Ksh. {{ number_format($summary['performance_earnings'] ?? 0, 2) }}</h2>
+        <h2>Performance Payments: Ksh. {{ number_format($summary['performance_payments'] ?? 0, 2) }}</h2>
     </div>
 </div>
 

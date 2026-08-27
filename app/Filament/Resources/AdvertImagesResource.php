@@ -67,10 +67,6 @@ class AdvertImagesResource extends Resource
                                     ->required()
                                     ->numeric()
                                     ->prefix('$'),
-                                TextInput::make('reward')
-                                    ->required()
-                                    ->numeric()
-                                    ->prefix('$'),
                                 DatePicker::make('valid_until')
                                     ->required()
                                     ->minDate(now()),
@@ -99,7 +95,7 @@ class AdvertImagesResource extends Resource
                             ->searchable()
                             ->placeholder('Select category'),
 
-                        Forms\Components\Fieldset::make('Investment & Rewards')
+                        Forms\Components\Fieldset::make('Investment & Capacity')
                             ->schema([
                                 TextInput::make('capital_invested')
                                     ->required()
@@ -115,15 +111,8 @@ class AdvertImagesResource extends Resource
                                     ->minValue(1)
                                     ->placeholder('100')
                                     ->helperText('Maximum number of participants'),
-
-                                TextInput::make('reward')
-                                    ->required()
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->placeholder('100')
-                                    ->helperText('Reward per participant (KSH)'),
                             ])
-                            ->columns(3),
+                            ->columns(2),
 
                         // Combined Date + Time fields
                         Forms\Components\Fieldset::make('Valid Until')
@@ -372,12 +361,6 @@ class AdvertImagesResource extends Resource
                     ->badge()
                     ->color('gray'),
 
-                TextColumn::make('invoices_count')
-                    ->counts('invoices')
-                    ->label('Invoices')
-                    ->alignment('center')
-                    ->badge()
-                    ->color('success'),
             ])
             ->filters([
                 SelectFilter::make('campaign_id')
@@ -450,7 +433,6 @@ class AdvertImagesResource extends Resource
     {
         return [
             RelationManagers\ScreenshotsRelationManager::class,
-            RelationManagers\InvoicesRelationManager::class,
         ];
     }
 

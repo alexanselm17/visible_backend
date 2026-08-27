@@ -2,27 +2,25 @@
 
 namespace App\Http\Controllers\Api\CampaignOwner;
 
-use App\Models\AdvertSubmission;
-use App\Models\AdvertSubmissionMedia;
 use App\Enums\AdvertSubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\NotificationController;
-use App\Http\Requests\CampaignOwner\SubmitAdvertRequest;
-use App\Models\Campaign;
-use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Illuminate\Http\Request;
-use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\CampaignOwner\RolloutSubmissionRequest;
+use App\Http\Requests\CampaignOwner\SubmitAdvertRequest;
+use App\Http\Requests\CampaignOwner\UploadFinalDesignRequest;
 use App\Http\Requests\RejectSubmissionRequest;
 use App\Models\AdvertImages;
+use App\Models\AdvertSubmission;
+use App\Models\AdvertSubmissionMedia;
+use App\Models\Campaign;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AdvertSubmissionController extends Controller
 {
-
     public function submit(SubmitAdvertRequest $request, \App\Services\WalletEscrowService $walletService)
     {
         try {
@@ -32,10 +30,10 @@ class AdvertSubmissionController extends Controller
                     ->orderBy('created_at', 'asc')
                     ->first();
 
-                if (!$campaign) {
+                if (! $campaign) {
                     return response()->json([
                         'ok' => false,
-                        'message' => 'No campaign found for this user.'
+                        'message' => 'No campaign found for this user.',
                     ], 404);
                 }
 
@@ -43,7 +41,7 @@ class AdvertSubmissionController extends Controller
                 if ($creditsToLock <= 0) {
                     return response()->json([
                         'ok' => false,
-                        'message' => 'You must specify a valid amount of credits to use.'
+                        'message' => 'You must specify a valid amount of credits to use.',
                     ], 422);
                 }
 
@@ -52,7 +50,7 @@ class AdvertSubmissionController extends Controller
 
                 $hasImages = $request->hasFile('images');
                 $hasVideos = $request->hasFile('videos');
-                if (!$hasImages && !$hasVideos) {
+                if (! $hasImages && ! $hasVideos) {
                     return response()->json([
                         'ok' => false,
                         'message' => 'Upload at least one image or video.',
@@ -84,7 +82,7 @@ class AdvertSubmissionController extends Controller
                     return response()->json([
                         'ok' => false,
                         'message' => 'Insufficient wallet balance to launch this advert. Please top up your credits.',
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ], 402);
                 }
 
@@ -95,14 +93,14 @@ class AdvertSubmissionController extends Controller
                     foreach ($request->file('images') as $img) {
                         $original = $img->getClientOriginalName();
                         $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $original);
-                        $name = time() . '_' . Str::random(6) . '_' . $safe;
+                        $name = time().'_'.Str::random(6).'_'.$safe;
 
                         $img->move(public_path('storage/submissions/original/images'), $name);
 
                         AdvertSubmissionMedia::create([
                             'submission_id' => $submission->id,
                             'type' => 'IMAGE',
-                            'path' => 'submissions/original/images/' . $name,
+                            'path' => 'submissions/original/images/'.$name,
                             'original_name' => $original,
                             'sort_order' => $sort++,
                         ]);
@@ -114,14 +112,14 @@ class AdvertSubmissionController extends Controller
                     foreach ($request->file('videos') as $vid) {
                         $original = $vid->getClientOriginalName();
                         $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $original);
-                        $name = time() . '_' . Str::random(6) . '_' . $safe;
+                        $name = time().'_'.Str::random(6).'_'.$safe;
 
                         $vid->move(public_path('storage/submissions/original/videos'), $name);
 
                         AdvertSubmissionMedia::create([
                             'submission_id' => $submission->id,
                             'type' => 'VIDEO',
-                            'path' => 'submissions/original/videos/' . $name,
+                            'path' => 'submissions/original/videos/'.$name,
                             'original_name' => $original,
                             'sort_order' => $sort++,
                         ]);
@@ -130,12 +128,12 @@ class AdvertSubmissionController extends Controller
 
                 $submission->load(['campaign', 'user', 'media']);
 
-                // notifications 
+                // notifications
                 $user = User::find($request->user_id);
                 DB::afterCommit(function () use ($campaign, $submission, $user) {
                     app(NotificationController::class)->notifyRoles(new Request([
                         'roles' => ['admin'],
-                        'title' => 'New Advert Submission from ' . $user->fullname . ' (Admin Review)',
+                        'title' => 'New Advert Submission from '.$user->fullname.' (Admin Review)',
                         'message' => "Please review the submission for campaign: {$campaign->name}.",
                         'type' => 'info',
                         'send_push' => true,
@@ -149,7 +147,7 @@ class AdvertSubmissionController extends Controller
                     'data' => [
                         'submission' => $submission,
                         'campaign' => $campaign,
-                    ]
+                    ],
                 ], 201);
             });
         } catch (\Throwable $th) {
@@ -174,7 +172,7 @@ class AdvertSubmissionController extends Controller
                 ], 200);
             }
 
-            $status  = $request->query('status');
+            $status = $request->query('status');
             $perPage = max(1, min(100, (int) $request->query('per_page', 10)));
 
             $query = AdvertSubmission::query()
@@ -186,7 +184,7 @@ class AdvertSubmissionController extends Controller
                 ])
                 ->orderBy('created_at', 'desc');
 
-            if (!empty($status)) {
+            if (! empty($status)) {
                 $query->where('status', $status);
             }
 
@@ -200,7 +198,7 @@ class AdvertSubmissionController extends Controller
                     'last_page' => $submissions->lastPage(),
                     'per_page' => $submissions->perPage(),
                     'total' => $submissions->total(),
-                ]
+                ],
             ], 200);
         } catch (\Throwable $th) {
             return response()->json([
@@ -214,7 +212,7 @@ class AdvertSubmissionController extends Controller
     public function indexAll(Request $request)
     {
         try {
-            $status  = $request->query('status');
+            $status = $request->query('status');
             $perPage = (int) $request->query('per_page', 15);
             $perPage = max(1, min(100, $perPage));
 
@@ -226,7 +224,7 @@ class AdvertSubmissionController extends Controller
                 ])
                 ->orderBy('created_at', 'desc');
 
-            if (!empty($status)) {
+            if (! empty($status)) {
                 $query->where('status', $status);
             }
 
@@ -235,11 +233,11 @@ class AdvertSubmissionController extends Controller
             // add absolute URLs (optional but useful)
             $items = collect($submissions->items())->map(function ($s) {
                 $s->original_image_url = $s->original_image_path
-                    ? asset('storage/' . $s->original_image_path)
+                    ? asset('storage/'.$s->original_image_path)
                     : null;
 
                 $s->original_video_url = $s->original_video_path
-                    ? asset('storage/' . $s->original_video_path)
+                    ? asset('storage/'.$s->original_video_path)
                     : null;
 
                 return $s;
@@ -250,9 +248,9 @@ class AdvertSubmissionController extends Controller
                 'data' => $items,
                 'meta' => [
                     'current_page' => $submissions->currentPage(),
-                    'last_page'    => $submissions->lastPage(),
-                    'per_page'     => $submissions->perPage(),
-                    'total'        => $submissions->total(),
+                    'last_page' => $submissions->lastPage(),
+                    'per_page' => $submissions->perPage(),
+                    'total' => $submissions->total(),
                 ],
             ], 200);
         } catch (\Throwable $th) {
@@ -263,8 +261,6 @@ class AdvertSubmissionController extends Controller
             ], 500);
         }
     }
-
-
 
     public function uploadFinalDesign(UploadFinalDesignRequest $request, string $submissionId)
     {
@@ -278,7 +274,7 @@ class AdvertSubmissionController extends Controller
                 ], 422);
             }
 
-            if (!$request->hasFile('final_image') && !$request->hasFile('final_video')) {
+            if (! $request->hasFile('final_image') && ! $request->hasFile('final_video')) {
                 return response()->json([
                     'ok' => false,
                     'message' => 'Please upload at least final_image or final_video.',
@@ -287,22 +283,22 @@ class AdvertSubmissionController extends Controller
 
             if ($request->hasFile('final_image')) {
                 $img = $request->file('final_image');
-                $imgName = time() . '_' . Str::random(8) . '.' . $img->getClientOriginalExtension();
+                $imgName = time().'_'.Str::random(8).'.'.$img->getClientOriginalExtension();
                 $img->move(public_path('storage/submissions/final'), $imgName);
-                $submission->final_image_path = 'submissions/final/' . $imgName;
+                $submission->final_image_path = 'submissions/final/'.$imgName;
             }
 
             if ($request->hasFile('final_video')) {
                 $vid = $request->file('final_video');
-                $vidName = time() . '_' . Str::random(8) . '.' . $vid->getClientOriginalExtension();
+                $vidName = time().'_'.Str::random(8).'.'.$vid->getClientOriginalExtension();
                 $vid->move(public_path('storage/submissions/final'), $vidName);
-                $submission->final_video_path = 'submissions/final/' . $vidName;
+                $submission->final_video_path = 'submissions/final/'.$vidName;
 
                 // ✅ required thumbnail
                 $thumb = $request->file('thumbnail_image');
-                $thumbName = time() . '_' . Str::random(8) . '.' . $thumb->getClientOriginalExtension();
+                $thumbName = time().'_'.Str::random(8).'.'.$thumb->getClientOriginalExtension();
                 $thumb->move(public_path('storage/submissions/final/thumbnails'), $thumbName);
-                $submission->final_thumbnail_path = 'submissions/final/thumbnails/' . $thumbName;
+                $submission->final_thumbnail_path = 'submissions/final/thumbnails/'.$thumbName;
             }
 
             if ($request->filled('designer_id')) {
@@ -325,7 +321,7 @@ class AdvertSubmissionController extends Controller
                         'send_push' => true,
                         'data' => [
                             'submission_id' => $submission->id,
-                            'action_type' => 'design_done'
+                            'action_type' => 'design_done',
                         ],
                     ]));
 
@@ -339,8 +335,8 @@ class AdvertSubmissionController extends Controller
                 }
             });
 
-            $submission->final_image_url = $submission->final_image_path ? asset('storage/' . $submission->final_image_path) : null;
-            $submission->final_video_url = $submission->final_video_path ? asset('storage/' . $submission->final_video_path) : null;
+            $submission->final_image_url = $submission->final_image_path ? asset('storage/'.$submission->final_image_path) : null;
+            $submission->final_video_url = $submission->final_video_path ? asset('storage/'.$submission->final_video_path) : null;
 
             return response()->json([
                 'ok' => true,
@@ -436,9 +432,8 @@ class AdvertSubmissionController extends Controller
                 app(NotificationController::class)->notifyUser(new Request([
                     'userId' => [$submission->submitted_by],
                     'title' => 'Submission Rejected',
-                    'message' =>
-                    "Your submission for '{$submission->campaign->name}' was rejected.\n"
-                        . "Reason: {$submission->rejection_reason}",
+                    'message' => "Your submission for '{$submission->campaign->name}' was rejected.\n"
+                        ."Reason: {$submission->rejection_reason}",
                     'type' => 'warning',
                     'send_push' => true,
                     'data' => [
@@ -466,8 +461,6 @@ class AdvertSubmissionController extends Controller
         }
     }
 
-
-
     public function rolloutSubmission(RolloutSubmissionRequest $request, string $submissionId)
     {
         try {
@@ -494,45 +487,34 @@ class AdvertSubmissionController extends Controller
 
                 $campaign = $submission->campaign;
 
-
-                $reward = $request->filled('reward') ? $request->reward : $campaign->reward;
-
-                if ($reward <= 0) {
-                    return response()->json([
-                        'ok' => false,
-                        'message' => 'Reward must be greater than zero to calculate campaign capacity.',
-                    ], 422);
-                }
-
                 $capitalInvested = (float) $submission->capital_invested;
                 $costPerCredit = 500;
                 $capacity = floor($capitalInvested / $costPerCredit);
 
                 // Create advert post (AdvertImages)
-                $advert = new AdvertImages();
-                $advert->campaign_id      = $campaign->id;
-                $advert->submission_id    = $submission->id;
+                $advert = new AdvertImages;
+                $advert->campaign_id = $campaign->id;
+                $advert->submission_id = $submission->id;
 
                 // Final designed media
-                $advert->image_path       = $submission->final_image_path;
-                $advert->video_path       = $submission->final_video_path;
+                $advert->image_path = $submission->final_image_path;
+                $advert->video_path = $submission->final_video_path;
 
                 // From submission
-                $advert->name             = $submission->name;
-                $advert->target_audience  = $submission->target_audience;
-                $advert->type             = $submission->type;
+                $advert->name = $submission->name;
+                $advert->target_audience = $submission->target_audience;
+                $advert->type = $submission->type;
 
                 // From rollout request & calculated variables
-                $advert->category         = $request->category;
-                $advert->badge            = $request->badge;
-                $advert->valid_until      = $request->valid_until;
-                $advert->reward           = $reward;
-                $advert->description      = $request->description;
+                $advert->category = $request->category;
+                $advert->badge = $request->badge;
+                $advert->valid_until = $request->valid_until;
+                $advert->description = $request->description;
 
                 // Injected dynamically from the submission and calculations
                 $advert->capital_invested = $capitalInvested;
-                $advert->capacity         = (int) $capacity;
-                $advert->selling_price    = 0;
+                $advert->capacity = (int) $capacity;
+                $advert->selling_price = 0;
 
                 $advert->save();
 
@@ -543,7 +525,7 @@ class AdvertSubmissionController extends Controller
                 DB::afterCommit(function () use ($submission, $advert) {
                     // Notify users
                     $title = '📢 New Product posted!';
-                    $body  = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status and earn Ksh. {$advert->reward}";
+                    $body = "🔥 {$advert->name} is now live. Post it to your WhatsApp Status to grow your performance earnings.";
 
                     app(NotificationController::class)->notifyUser(new Request([
                         'userId' => [$submission->submitted_by],
@@ -656,11 +638,11 @@ class AdvertSubmissionController extends Controller
          */
         $advertStats = DB::table('advert_images')
             ->whereIn('campaign_id', $campaignIds)
-            ->selectRaw("
+            ->selectRaw('
                 COUNT(*) as total_adverts,
                 SUM(CASE WHEN valid_until IS NOT NULL AND valid_until >= NOW() THEN 1 ELSE 0 END) as active_adverts,
                 SUM(CASE WHEN valid_until IS NULL OR valid_until < NOW() THEN 1 ELSE 0 END) as inactive_adverts
-            ")
+            ')
             ->first();
 
         /**
@@ -686,14 +668,14 @@ class AdvertSubmissionController extends Controller
             ->whereIn('a.campaign_id', $campaignIds)
             ->whereNotNull('a.valid_until')
             ->where('a.valid_until', '>=', now())
-            ->selectRaw("
+            ->selectRaw('
                 a.id,
                 a.name,
                 a.campaign_id,
                 COUNT(sc.id) as screenshots_count,
                 COUNT(DISTINCT sc.processed_by) as unique_posters,
                 SUM(sc.views) as total_views
-            ")
+            ')
             ->groupBy('a.id', 'a.name', 'a.campaign_id')
             ->orderByDesc('total_views')
             ->limit(5)
@@ -724,16 +706,15 @@ class AdvertSubmissionController extends Controller
                 'a.image_path as advert_image_path',
                 'a.valid_until',
                 'a.capacity',
-                'a.reward',
             ])
             ->map(function ($row) {
-                $row->final_image_url = $row->final_image_path ? asset('storage/' . $row->final_image_path) : null;
-                $row->final_video_url = $row->final_video_path ? asset('storage/' . $row->final_video_path) : null;
-                $row->advert_image_url = $row->advert_image_path ? asset('storage/' . $row->advert_image_path) : null;
+                $row->final_image_url = $row->final_image_path ? asset('storage/'.$row->final_image_path) : null;
+                $row->final_video_url = $row->final_video_path ? asset('storage/'.$row->final_video_path) : null;
+                $row->advert_image_url = $row->advert_image_path ? asset('storage/'.$row->advert_image_path) : null;
                 $row->advert_is_active = $row->valid_until ? (now()->lte(\Carbon\Carbon::parse($row->valid_until))) : false;
+
                 return $row;
             });
-
 
         return response()->json([
             'ok' => true,

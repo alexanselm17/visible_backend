@@ -71,7 +71,6 @@ class CreateAdvertImages extends CreateRecord
             'description' => $data['description'] ?? '',
             'category' => $data['category'] ?? '',
             'badge' => $data['badge'] ?? [],
-            'reward' => $data['reward'] ?? '',
             'capacity' => $data['capacity'] ?? '',
             'valid_until' => $data['valid_until'] ?? '',
             'selling_price' => '0',

@@ -78,12 +78,6 @@ class CampaignResource extends Resource
                     ->color('purple')
                     ->getStateUsing(fn ($record) => number_format($record->total_views ?? 0)),
 
-                TextColumn::make('total_rewards_distributed')
-                    ->label('Rewards Paid')
-                    ->money('KSH')
-                    ->color('success')
-                    ->getStateUsing(fn ($record) => $record->total_rewards_distributed ?? 0),
-
                 BadgeColumn::make('is_active')
                     ->label('Status')
                     ->getStateUsing(fn ($record) => $record->is_active ? 'Active' : 'Expired')

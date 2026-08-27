@@ -172,7 +172,6 @@
               <th>Campaign</th>
               <th>Phone</th>
               <th>Views</th>
-              <th>Rewards (KES)</th>
             </tr>
           </thead>
           <tbody>
@@ -183,7 +182,6 @@
               <td>{{ $complete['campaign_name'] }}</td>
               <td>{{ $complete['phone'] }}</td>
               <td>{{ $complete['views'] }}</td>
-              <td>{{ $complete['reward'] }}</td>
             </tr>
             @endforeach
           </tbody>
@@ -192,7 +190,7 @@
     </div>
 
     <div class="content">
-      <h2>Account Activity</h2>
+      <h2>Performance Earnings Activity</h2>
       <div class="table-wrapper">
         <table>
           <thead>
@@ -200,20 +198,18 @@
               <th>#</th>
               <th>Type</th>
               <th>Amount</th>
-              <th>Balance</th>
-              <th>References</th>
-              <th>Campaign</th>
+              <th>Description</th>
+              <th>Date</th>
             </tr>
           </thead>
           <tbody>
-            @foreach($invoicingActivity as $index => $billing)
+            @foreach($accountActivity as $index => $billing)
             <tr>
               <td>{{ $index + 1 }}</td>
               <td>{{ $billing['type'] }}</td>
               <td>{{ $billing['amount'] }}</td>
-              <td>{{ $billing['customer_balance'] }}</td>
-              <td>{{ $billing['reference'] ?? 'N/A' }}</td>
-              <td>{{ $billing['advert_name'] ?? 'N/A' }}</td>
+              <td>{{ $billing['description'] ?? 'N/A' }}</td>
+              <td>{{ \Carbon\Carbon::parse($billing['processed_at'])->toDayDateTimeString() }}</td>
             </tr>
             @endforeach
           </tbody>
@@ -225,11 +221,9 @@
       <h2>Completed:  {{ number_format($summary['total_completed'] ?? 0) }}</h2>
       <h2>Incompletes:  {{ number_format($summary['total_incomplete'] ?? 0) }}</h2>
       <h2>Still Ongoing:  {{ number_format($summary['total_ongoing'] ?? 0) }}</h2>
-      <h2>Total Reward: {{ number_format($total_reward ?? 0) }}</h2>
-      <h2>Total Payment: {{ number_format(($total_reward - $total_payment) ?? 0) }}</h2>
-      <h2>Pending Payments: Ksh.{{ number_format($accountBalance ?? 0) }}</h2>
+      <h2>Paid in Period: Ksh. {{ number_format($totalPayment ?? 0, 2) }}</h2>
       <h2>Total Views: {{ number_format($summary['total_views_all_users'] ?? 0) }}</h2>
-      <h2>Account Balance (Curr): Ksh. {{ number_format($accountBalance ?? 0, 2) }}</h2>
+      <h2>Outstanding Performance Balance: Ksh. {{ number_format($accountBalance ?? 0, 2) }}</h2>
     </div>
 
     <div class="footer">

@@ -3,11 +3,12 @@
 namespace App\Filament\Widgets;
 
 use App\Models\AdvertImages;
+use App\Models\RewardLedgerEntry;
 use Filament\Widgets\LineChartWidget;
 
 class RevenueChart extends LineChartWidget
 {
-    protected static ?string $heading = 'Revenue vs Rewards Distributed (Last 7 Days)';
+    protected static ?string $heading = 'Investment vs Performance Earnings (Last 7 Days)';
 
     protected static ?int $sort = 5;
 
@@ -25,14 +26,9 @@ class RevenueChart extends LineChartWidget
             $dailyRevenue = AdvertImages::whereDate('created_at', $date)
                 ->sum('capital_invested');
 
-            // Calculate daily rewards distributed
-            $dailyRewards = AdvertImages::whereHas('screenshots', function ($query) use ($date) {
-                $query->whereDate('created_at', $date);
-            })->with(['screenshots' => function ($query) use ($date) {
-                $query->whereDate('created_at', $date);
-            }])->get()->sum(function ($advert) {
-                return $advert->screenshots->count() * $advert->reward;
-            });
+            $dailyRewards = RewardLedgerEntry::where('type', RewardLedgerEntry::EARNING)
+                ->whereDate('created_at', $date)
+                ->sum('amount_minor') / 100;
 
             $revenue[] = (float) $dailyRevenue;
             $rewards[] = (float) $dailyRewards;
@@ -47,7 +43,7 @@ class RevenueChart extends LineChartWidget
                     'backgroundColor' => 'rgba(16, 185, 129, 0.1)',
                 ],
                 [
-                    'label' => 'Rewards Distributed ($)',
+                    'label' => 'Performance Earnings (KSh)',
                     'data' => $rewards,
                     'borderColor' => '#ef4444',
                     'backgroundColor' => 'rgba(239, 68, 68, 0.1)',

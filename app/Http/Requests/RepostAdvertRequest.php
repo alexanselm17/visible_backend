@@ -18,7 +18,6 @@ class RepostAdvertRequest extends FormRequest
 
             'name' => ['nullable', 'string', 'max:255'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
-            'reward' => ['nullable', 'numeric', 'min:0'],
             'capacity' => ['nullable', 'integer', 'min:0'],
             'valid_until' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],

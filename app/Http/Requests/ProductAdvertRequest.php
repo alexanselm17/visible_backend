@@ -34,7 +34,6 @@ class ProductAdvertRequest extends FormRequest
             'badge.*' => 'string',
             'capital_invested' => 'required|numeric|min:0',
             'valid_until' => ['required', 'date', "before_or_equal:$minDateTime"],
-            'reward' => 'required|numeric|min:0',
             'capacity' => 'required|integer|min:1',
             'type' => ['required', 'string', 'in:ads,image'],
         ];

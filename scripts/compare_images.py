@@ -3,8 +3,10 @@ import sys
 import os
 import base64
 
-# Get API key from environment variables for security
-openai.api_key = "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"
+# Get the API key from the environment so credentials are never committed.
+openai.api_key = os.environ.get("OPENAI_API_KEY")
+if not openai.api_key:
+    raise RuntimeError("OPENAI_API_KEY is not configured")
 
 advert_path = sys.argv[1]
 screenshot_path = sys.argv[2]

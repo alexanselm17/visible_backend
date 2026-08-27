@@ -18,9 +18,8 @@ class DatabaseSeeder extends Seeder
             CountiesSeeder::class,
             PermissionSeeder::class,
             Roleseeder::class,
-            SysMetaSeeder::class
-            
-
+            SysMetaSeeder::class,
+            PerformanceRewardPlanSeeder::class,
         ]);
     }
 }

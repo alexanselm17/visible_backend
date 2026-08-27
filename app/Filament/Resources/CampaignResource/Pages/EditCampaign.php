@@ -25,7 +25,6 @@ class EditCampaign extends EditRecord
             $request->merge([
                 'name' => $data['name'],
                 'capital_invested' => $data['capital_invested'],
-                'reward' => $data['reward'],
                 'capacity' => $data['capacity'],
                 'valid_until' => $validUntil,
             ]);

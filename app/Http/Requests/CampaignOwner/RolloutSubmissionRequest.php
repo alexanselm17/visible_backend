@@ -14,12 +14,11 @@ class RolloutSubmissionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category'        => 'nullable|string|max:100',
+            'category' => 'nullable|string|max:100',
             'badge' => 'required|array',
             'badge.*' => 'string',
-            'valid_until'     => 'required|date',
-            'reward'          => 'required|numeric|min:0',
-            'description'     => 'required|string',
+            'valid_until' => 'required|date',
+            'description' => 'required|string',
         ];
     }
 }

@@ -15,7 +15,6 @@ class Campaign extends Model
         'name',
         'owner_id',
 
-
     ];
 
     protected $keyType = 'string';
@@ -52,20 +51,6 @@ class Campaign extends Model
         return $this->adverts->sum(function ($advert) {
             return $advert->screenshots->sum('views');
         });
-    }
-
-    // Helper method to calculate total rewards distributed
-    public function getTotalRewardsDistributedAttribute()
-    {
-        return $this->adverts->sum(function ($advert) {
-            return $advert->screenshots->count() * $advert->reward;
-        });
-    }
-
-    // Helper method to calculate remaining budget
-    public function getRemainingBudgetAttribute()
-    {
-        return $this->capital_invested - $this->total_rewards_distributed;
     }
 
     // Check if campaign is active

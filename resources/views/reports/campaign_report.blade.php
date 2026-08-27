@@ -177,7 +177,6 @@
                         <th>Fullname</th>
                         <th>Phone</th>
                         <th>Views</th>
-                        <th>Rewards(Kes.)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -187,7 +186,6 @@
                         <td>{{ $complete['full_name'] }}</td>
                         <td>{{ $complete['phone'] }}</td>
                         <td>{{ $complete['views'] }}</td>
-                        <td>{{ $complete['reward'] }}</td>
 
                       
                     </tr>
@@ -204,7 +202,6 @@
             <h2>Still Ongoing: {{ number_format($ongoing_count ?? 0) }}</h2>
             <h2>Unused Slots: {{ number_format($unused_slots ?? 0) }}</h2>
             <h2>Total Views (All Users): {{ number_format($total_views_all_users ?? 0) }}</h2>
-            <h2>Total Reward Awarded: Ksh. {{ number_format($total_reward_awarded ?? 0, 2) }}</h2>
         </div>
     </div>
 

@@ -37,11 +37,7 @@ interface ProductRepositoryInterface
 
     public function getCampaignTimelyPersional(Request $request);
 
-    public function getExcellFileForPayment(Request $request);
-
     public function updateCampaign(Request $request, $id);
 
     public function updateAdvertProduct(ProductAdvertRequest $request, $advertId);
-
-    public function uploadPaymentExcell(Request $request);
 }

@@ -15,7 +15,6 @@ class AdvertImages extends Model
         'name',
         'selling_price',
         'campaign_id',
-        'reward',
         'description',
         'badge',
         'capital_invested',
@@ -34,7 +33,6 @@ class AdvertImages extends Model
     protected $casts = [
         'badge' => 'array',
         'selling_price' => 'decimal:2',
-        'reward' => 'decimal:2',
         'target_audience' => 'array',
     ];
 
@@ -59,21 +57,10 @@ class AdvertImages extends Model
         return $this->hasMany(Screenshots::class, 'advert_id');
     }
 
-    public function invoices()
-    {
-        return $this->hasMany(Invoice::class, 'advert_id');
-    }
-
     // Helper method to get total views for this advert
     public function getTotalViewsAttribute()
     {
         return $this->screenshots->sum('views');
-    }
-
-    // Helper method to get total rewards distributed for this advert
-    public function getTotalRewardsDistributedAttribute()
-    {
-        return $this->screenshots->count() * $this->reward;
     }
 
     // Helper method to get unique users who submitted screenshots

@@ -4,13 +4,13 @@ namespace App\Filament\Widgets;
 
 use App\Models\AdvertImages;
 use App\Models\Campaign;
-use App\Models\Invoice;
+use App\Models\RewardLedgerEntry;
+use App\Models\RewardPayout;
 use App\Models\Screenshots;
 use App\Models\User;
 use Carbon\Carbon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\DB;
 
 class CampaignCardsWidget extends StatsOverviewWidget
 {
@@ -40,40 +40,13 @@ class CampaignCardsWidget extends StatsOverviewWidget
         $activePercentage = $totalUsers > 0 ? round(($activeUsers / $totalUsers) * 100, 1) : 0;
         $inactivePercentage = $totalUsers > 0 ? round(($inactiveUsers / $totalUsers) * 100, 1) : 0;
 
-        // New payment-related statistics based on your function
-        $campaigns = Campaign::with([
-            'adverts.screenshots',
-            'adverts.invoices' => function ($q) use ($start, $end) {
-                $q->whereBetween('created_at', [$start, $end]);
-            },
-        ])
+        $performanceEarnings = RewardLedgerEntry::where('type', RewardLedgerEntry::EARNING)
             ->whereBetween('created_at', [$start, $end])
-            ->get();
-
-        // Collect campaign IDs
-        $campaignIds = $campaigns->pluck('id');
-        $advertCampaigns = AdvertImages::whereIn('campaign_id', $campaignIds)->get();
-
-        $rewardAssigned = 0;
-
-        // Calculate reward assigned
-        $campaigns->each(function ($campaign) use (&$rewardAssigned) {
-            $comp = $campaign->adverts->filter(fn ($ad) => $ad->invoices->isNotEmpty())->count();
-            $compReward = $comp * ($campaign->reward ?? 0);
-            $rewardAssigned += $compReward;
-        });
-
-        // Calculate total payment done
-        $paymentDone = Invoice::whereBetween('created_at', [$start, $end])
-            ->where('type', 'Payment')
-            ->sum('amount');
-
-        // Calculate pending payments
-        $latestInvoiceIds = Invoice::select(DB::raw('MAX(id) as id'))
-            ->groupBy('processed_by');
-
-        $totalBalance = Invoice::whereIn('id', $latestInvoiceIds)
-            ->sum('customer_balance');
+            ->sum('amount_minor') / 100;
+        $paymentDone = RewardPayout::where('status', RewardPayout::PAID)
+            ->whereBetween('paid_at', [$start, $end])
+            ->sum('amount_minor') / 100;
+        $totalBalance = RewardLedgerEntry::sum('amount_minor') / 100;
 
         return [
             Stat::make('Total Users', number_format($totalUsers))
@@ -129,9 +102,9 @@ class CampaignCardsWidget extends StatsOverviewWidget
                 ->color('success'),
 
             // New payment-related statistics
-            Stat::make('Rewards Assigned', 'KSh '.number_format($rewardAssigned, 2))
+            Stat::make('Performance Earnings', 'KSh '.number_format($performanceEarnings, 2))
                 ->icon('heroicon-o-gift')
-                ->description('Total rewards allocated')
+                ->description('Locked multiplier earnings')
                 ->descriptionIcon('heroicon-m-star')
                 ->color('warning'),
 

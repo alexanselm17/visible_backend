@@ -36,7 +36,7 @@ class TokenOnlyAdvertSubmissionController extends Controller
                 $userId = $request->user()->id;
                 $campaign = Campaign::where('owner_id', $userId)->oldest()->first();
 
-                if (!$campaign) {
+                if (! $campaign) {
                     throw ValidationException::withMessages([
                         'campaign' => 'No campaign found for this campaign owner.',
                     ]);
@@ -176,13 +176,13 @@ class TokenOnlyAdvertSubmissionController extends Controller
                     ]);
                 }
 
-                if ($submission->type === TokenType::IMAGE && !$request->hasFile('final_image')) {
+                if ($submission->type === TokenType::IMAGE && ! $request->hasFile('final_image')) {
                     throw ValidationException::withMessages([
                         'final_image' => 'An image campaign requires a final image.',
                     ]);
                 }
 
-                if ($submission->type === TokenType::VIDEO && !$request->hasFile('final_video')) {
+                if ($submission->type === TokenType::VIDEO && ! $request->hasFile('final_video')) {
                     throw ValidationException::withMessages([
                         'final_video' => 'A video campaign requires a final video.',
                     ]);
@@ -242,9 +242,11 @@ class TokenOnlyAdvertSubmissionController extends Controller
             ]);
         } catch (ValidationException $e) {
             $this->cleanup($storedFiles);
+
             return response()->json(['ok' => false, 'errors' => $e->errors()], 422);
         } catch (Throwable $e) {
             $this->cleanup($storedFiles);
+
             return response()->json([
                 'ok' => false,
                 'message' => 'Failed to upload final design.',
@@ -317,22 +319,12 @@ class TokenOnlyAdvertSubmissionController extends Controller
                     ]);
                 }
 
-                if ($submission->type === TokenType::IMAGE && !$submission->final_image_path) {
+                if ($submission->type === TokenType::IMAGE && ! $submission->final_image_path) {
                     throw ValidationException::withMessages(['media' => 'Final image is missing.']);
                 }
 
-                if ($submission->type === TokenType::VIDEO && !$submission->final_video_path) {
+                if ($submission->type === TokenType::VIDEO && ! $submission->final_video_path) {
                     throw ValidationException::withMessages(['media' => 'Final video is missing.']);
-                }
-
-                $reward = $request->filled('reward')
-                    ? (float) $request->reward
-                    : (float) $submission->campaign->reward;
-
-                if ($reward <= 0) {
-                    throw ValidationException::withMessages([
-                        'reward' => 'Reward must be greater than zero.',
-                    ]);
                 }
 
                 $finalQuote = $usage->forSubmission($submission);
@@ -342,7 +334,7 @@ class TokenOnlyAdvertSubmissionController extends Controller
                     $finalQuote['tokens_required']
                 );
 
-                $advert = new AdvertImages();
+                $advert = new AdvertImages;
                 $advert->campaign_id = $submission->campaign_id;
                 $advert->submission_id = $submission->id;
                 $advert->image_path = $submission->final_image_path;
@@ -353,7 +345,6 @@ class TokenOnlyAdvertSubmissionController extends Controller
                 $advert->category = $request->category ?: 'General';
                 $advert->badge = $request->badge;
                 $advert->valid_until = $request->valid_until;
-                $advert->reward = $reward;
                 $advert->description = $request->description;
                 // Legacy DB column retained for schema compatibility; credits are not used.
                 $advert->capital_invested = 0;
@@ -445,25 +436,25 @@ class TokenOnlyAdvertSubmissionController extends Controller
 
     private function storeFile($file, string $folder, array &$storedFiles): string
     {
-        $directory = public_path('storage/' . $folder);
-        if (!is_dir($directory)) {
+        $directory = public_path('storage/'.$folder);
+        if (! is_dir($directory)) {
             mkdir($directory, 0755, true);
         }
 
         $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
-        $name = time() . '_' . Str::random(8) . '_' . $safe;
+        $name = time().'_'.Str::random(8).'_'.$safe;
         $file->move($directory, $name);
 
-        $storedFiles[] = $directory . DIRECTORY_SEPARATOR . $name;
+        $storedFiles[] = $directory.DIRECTORY_SEPARATOR.$name;
 
-        return $folder . '/' . $name;
+        return $folder.'/'.$name;
     }
 
     private function manager(Request $request): void
     {
         $user = $request->user();
 
-        if (!$user || (!$user->isAdmin() && !$user->isDeveloper() && !$user->isManager())) {
+        if (! $user || (! $user->isAdmin() && ! $user->isDeveloper() && ! $user->isManager())) {
             abort(403, 'Not authorized to manage campaign submissions.');
         }
     }
@@ -472,11 +463,11 @@ class TokenOnlyAdvertSubmissionController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (
-            !$user->hasRole('designer')
-            && !$user->isAdmin()
-            && !$user->isDeveloper()
-            && !$user->isManager()
+        if (! $user || (
+            ! $user->hasRole('designer')
+            && ! $user->isAdmin()
+            && ! $user->isDeveloper()
+            && ! $user->isManager()
         )) {
             abort(403, 'Not authorized to upload final designs.');
         }

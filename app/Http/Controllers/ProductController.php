@@ -24,10 +24,6 @@ class ProductController extends Controller
             'updateCampaign',
         ]);
 
-        $this->middleware(['auth:api', 'permission:payment_operations'])->only([
-            'uploadPaymentExcell',
-        ]);
-
         $this->productRepository = $productRepository;
     }
 
@@ -50,7 +46,6 @@ class ProductController extends Controller
     {
         return $this->productRepository->uploadAdvertProducts($request, $campaignId);
     }
-
 
     public function repostAdvertProducts(RepostAdvertRequest $request)
     {
@@ -97,11 +92,6 @@ class ProductController extends Controller
         return $this->productRepository->getCampaignTimelyPersional($request);
     }
 
-    public function getExcellFileForPayment(Request $request)
-    {
-        return $this->productRepository->getExcellFileForPayment($request);
-    }
-
     // public function updateAdvertProduct(ProductAdvertRequest $request, $advertId){
     //     return $this->productRepository->updateAdvertProduct($request,$advertId);
     // }
@@ -109,11 +99,6 @@ class ProductController extends Controller
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         return $this->productRepository->getAdvertCampaignsFraud($request, $campaignId);
-    }
-
-    public function uploadPaymentExcell(Request $request)
-    {
-        return $this->productRepository->uploadPaymentExcell($request);
     }
 
     public function getAdvertCampaigns(Request $request, $campaignId)

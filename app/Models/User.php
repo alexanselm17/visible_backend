@@ -174,12 +174,12 @@ class User extends Authenticatable implements FilamentUser
 
     public function hasAnyPermission(array $permissions)
     {
-        return collect($permissions)->some(fn($permission) => $this->hasPermission($permission));
+        return collect($permissions)->some(fn ($permission) => $this->hasPermission($permission));
     }
 
     public function hasAllPermissions(array $permissions)
     {
-        return collect($permissions)->every(fn($permission) => $this->hasPermission($permission));
+        return collect($permissions)->every(fn ($permission) => $this->hasPermission($permission));
     }
 
     /**
@@ -269,7 +269,6 @@ class User extends Authenticatable implements FilamentUser
             ->latestOfMany('flagged_at'); // or latestOfMany() if using id
     }
 
-
     public function campaignOwnerProfile()
     {
         return $this->hasOne(\App\Models\CampaignOwnerProfile::class, 'user_id');
@@ -287,5 +286,15 @@ class User extends Authenticatable implements FilamentUser
             ->where('starts_at', '<=', now())
             ->where('ends_at', '>=', now())
             ->latest('starts_at');
+    }
+
+    public function rewardPeriods()
+    {
+        return $this->hasMany(RewardPeriod::class);
+    }
+
+    public function rewardPayoutPreferences()
+    {
+        return $this->hasMany(RewardPayoutPreference::class);
     }
 }

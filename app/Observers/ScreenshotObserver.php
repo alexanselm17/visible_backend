@@ -94,7 +94,7 @@ class ScreenshotObserver
             $firebase = new FirebaseService;
 
             $title = 'Campaign Completed! 🎉';
-            $message = "Congratulations! You've successfully uploaded all screenshots for '{$advert->name}'. Your reward is being processed.";
+            $message = "Congratulations! You've successfully uploaded all screenshots for '{$advert->name}'. Your performance has been added to the current earning period.";
 
             if (! empty($user->fcm_token)) {
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
@@ -108,7 +108,6 @@ class ScreenshotObserver
                 'data' => [
                     'advert_id' => $advert->id,
                     'advert_name' => $advert->name,
-                    'reward' => $advert->reward,
                     'action' => 'campaign_completed',
                     'required_screenshots' => self::REQUIRED_SCREENSHOTS,
                 ],

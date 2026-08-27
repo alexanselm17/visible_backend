@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerAuthController;
 use App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController;
 use App\Http\Controllers\Api\CampaignOwner\TokenOnlyAdvertSubmissionController;
 use App\Http\Controllers\Api\Image\ImageManipulationController;
+use App\Http\Controllers\Api\Rewards\RewardAdminController;
+use App\Http\Controllers\Api\Rewards\RewardController;
 use App\Http\Controllers\Api\Tokens\TokenController;
 use App\Http\Controllers\Api\Tokens\TokenUsageController;
 use App\Http\Controllers\AuthController;
@@ -24,8 +26,8 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
     Route::get('/download/advert/{path}', function ($path) {
-        $fullPath = public_path('storage/' . $path);
-        if (!file_exists($fullPath)) {
+        $fullPath = public_path('storage/'.$path);
+        if (! file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
 
@@ -33,7 +35,7 @@ Route::group(['prefix' => 'v1'], function () {
 
         return response()->make(file_get_contents($fullPath), 200, [
             'Content-Type' => 'application/octet-stream',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Content-Transfer-Encoding' => 'binary',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
@@ -68,12 +70,7 @@ Route::group(['prefix' => 'v1'], function () {
         Route::get('/campaign_report', [ProductController::class, 'getCampaignReports']);
         Route::get('/timely_campaign_report', [ProductController::class, 'getCampaignTimelyReports']);
         Route::get('/timely_individual_campaign_report', [ProductController::class, 'getCampaignTimelyPersionalReports']);
-        Route::get('/excell_payment', [ProductController::class, 'getExcellFileForPayment']);
         Route::get('/timely_response', [ProductController::class, 'getCampaignTimelyPersional']);
-    });
-
-    Route::group(['prefix' => 'campaign'], function () {
-        Route::post('/payment', [ProductController::class, 'uploadPaymentExcell']);
     });
 
     Route::middleware(['auth:sanctum', 'check.active'])->group(function () {
@@ -156,5 +153,23 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('/purchases/{purchaseId}/confirm', [TokenController::class, 'confirmPurchase']);
         Route::put('/types/{code}', [TokenController::class, 'updateType']);
         Route::post('/wallet/adjust', [TokenController::class, 'adjustWallet']);
+    });
+
+    Route::middleware(['auth:sanctum', 'check.active'])->prefix('rewards')->group(function () {
+        Route::get('/summary', [RewardController::class, 'summary']);
+        Route::put('/payout-frequency', [RewardController::class, 'updatePayoutFrequency']);
+
+        Route::prefix('admin')->group(function () {
+            Route::get('/plans', [RewardAdminController::class, 'plans']);
+            Route::post('/plans', [RewardAdminController::class, 'storePlan']);
+            Route::post('/plans/{planId}/activate', [RewardAdminController::class, 'activatePlan'])
+                ->whereUuid('planId');
+            Route::post('/periods/close', [RewardAdminController::class, 'closeEndedPeriods']);
+            Route::get('/payouts', [RewardAdminController::class, 'payouts']);
+            Route::post('/payouts/{payoutId}/confirm', [RewardAdminController::class, 'confirmPayout'])
+                ->whereUuid('payoutId');
+            Route::post('/payouts/{payoutId}/fail', [RewardAdminController::class, 'failPayout'])
+                ->whereUuid('payoutId');
+        });
     });
 });
