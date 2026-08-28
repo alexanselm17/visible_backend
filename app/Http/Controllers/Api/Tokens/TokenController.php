@@ -52,11 +52,11 @@ class TokenController extends Controller
         ]);
     }
 
-    public function wallet(Request $request, TokenService $tokenService, $userId): JsonResponse
+    public function wallet(Request $request, TokenService $tokenService): JsonResponse
     {
         return response()->json([
             'ok' => true,
-            'data' => $tokenService->walletSummary($userId),
+            'data' => $tokenService->walletSummary($request->user()->id),
         ]);
     }
 

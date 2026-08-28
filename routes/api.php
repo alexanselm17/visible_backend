@@ -26,7 +26,7 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
     Route::get('/download/advert/{path}', function ($path) {
-        $fullPath = public_path('storage/' . $path);
+        $fullPath = public_path('storage/'.$path);
         if (! file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
@@ -35,7 +35,7 @@ Route::group(['prefix' => 'v1'], function () {
 
         return response()->make(file_get_contents($fullPath), 200, [
             'Content-Type' => 'application/octet-stream',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Content-Transfer-Encoding' => 'binary',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
@@ -145,7 +145,7 @@ Route::group(['prefix' => 'v1'], function () {
         Route::get('/types', [TokenController::class, 'types']);
         Route::post('/quote', [TokenController::class, 'quote']);
         Route::post('/usage-quote', [TokenUsageController::class, 'quote']);
-        Route::get('/tokens/wallet/{userId}', [TokenController::class, 'wallet']);
+        Route::get('/wallet', [TokenController::class, 'wallet']);
         Route::get('/transactions', [TokenController::class, 'transactions']);
         Route::get('/purchases', [TokenController::class, 'purchases']);
         Route::post('/purchases', [TokenController::class, 'purchase']);
