@@ -52,11 +52,11 @@ class TokenController extends Controller
         ]);
     }
 
-    public function wallet(Request $request, TokenService $tokenService): JsonResponse
+    public function wallet(Request $request, TokenService $tokenService, $userId): JsonResponse
     {
         return response()->json([
             'ok' => true,
-            'data' => $tokenService->walletSummary($request->user()->id),
+            'data' => $tokenService->walletSummary($userId),
         ]);
     }
 
@@ -257,7 +257,7 @@ class TokenController extends Controller
             TokenType::SILVER,
         ])->pluck('unit_price', 'code');
 
-        if ($prices->count() !== 3 || $prices->contains(fn ($price) => $price === null)) {
+        if ($prices->count() !== 3 || $prices->contains(fn($price) => $price === null)) {
             return;
         }
 
