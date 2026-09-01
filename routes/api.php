@@ -137,7 +137,8 @@ Route::group(['prefix' => 'v1'], function () {
 
     Route::prefix('image')->group(function () {
         Route::post('/stamp', [ImageManipulationController::class, 'encodeImage']);
-        Route::post('/decode', [ImageManipulationController::class, 'decodeScreenshot']);
+        Route::post('/decode', [ImageManipulationController::class, 'decodeScreenshot'])
+            ->middleware(['auth:sanctum', 'check.active']);
         Route::get('/download/{filename}', [ImageManipulationController::class, 'downloadImage']);
         Route::get('/advert/{advertId}/download', [ImageManipulationController::class, 'downloadPersonalizedAdvert'])
             ->middleware(['auth:sanctum', 'check.active'])

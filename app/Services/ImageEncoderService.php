@@ -21,14 +21,14 @@ class ImageEncoderService
      */
     public function encode(
         string $mainImagePath,
-        string $identifier,
+        string $qrContent,
         ?string $footerImagePath = null,
         ?string $headerText = null,
         ?string $captionText = null
     ): array {
-        if (! preg_match('/^\d{10}$/', $identifier)) {
+        if ($qrContent === '' || strlen($qrContent) > 2048) {
             throw ValidationException::withMessages([
-                'identifier' => 'Your account must have a valid 10-digit QR identifier.',
+                'qr_content' => 'The QR content must be between 1 and 2,048 characters.',
             ]);
         }
 
@@ -50,7 +50,7 @@ class ImageEncoderService
             $manager,
             $canvas,
             $templatePath,
-            $identifier,
+            $qrContent,
             $headerText ?: self::DEFAULT_HEADER,
             $canvasWidth
         );
@@ -82,8 +82,8 @@ class ImageEncoderService
             throw new RuntimeException('The encoded image directory could not be created.');
         }
 
-        $filename = 'stamped_' . Str::uuid() . '.png';
-        $savePath = $saveDirectory . '/' . $filename;
+        $filename = 'stamped_'.Str::uuid().'.png';
+        $savePath = $saveDirectory.'/'.$filename;
         $canvas->toPng()->save($savePath);
 
         return [
@@ -96,22 +96,22 @@ class ImageEncoderService
         ImageManager $manager,
         Image $canvas,
         string $templatePath,
-        string $identifier,
+        string $qrContent,
         string $headerText,
         int $canvasWidth
     ): int {
         $header = $manager->read($templatePath);
-        $header->scaleDown(width: 920);
+        $header->scale(width: 920);
 
         $headerWidth = $header->width();
         $headerHeight = $header->height();
         $sideCircleWidth = $headerHeight;
-        $qrSize = (int) round($sideCircleWidth * 0.60);
+        $qrSize = (int) round($sideCircleWidth * 0.82);
         $qrCodeImage = (string) QrCode::format('png')
             ->size($qrSize)
             ->margin(1)
             ->errorCorrection('H')
-            ->generate($identifier);
+            ->generate($qrContent);
 
         $header->place(
             $manager->read($qrCodeImage),
@@ -236,7 +236,7 @@ class ImageEncoderService
     private function fontPath(string ...$filenames): ?string
     {
         foreach ($filenames as $filename) {
-            $path = public_path('fonts/' . $filename);
+            $path = public_path('fonts/'.$filename);
             if (is_file($path)) {
                 return $path;
             }

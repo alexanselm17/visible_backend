@@ -12,6 +12,8 @@ use App\Models\RewardLedgerEntry;
 use App\Models\RewardPayout;
 use App\Models\Screenshots;
 use App\Models\User;
+use App\Services\AdvertQrCodeService;
+use App\Services\ImageDecoderService;
 use App\Services\RewardPeriodService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -498,21 +500,27 @@ class ProductRepository implements ProductRepositoryInterface
             ]);
 
             $userId = (string) $request->user()->id;
-            $user = \App\Models\User::findOrFail($userId);
-            $expectedIdentifier = (string) $user->my_code;
+            $user = User::findOrFail($userId);
+            $advert = AdvertImages::find($advert_id);
 
-            // 2. Use the shared Service to decode the screenshot
-            $decoderService = new \App\Services\ImageDecoderService;
-            $decodedText = $decoderService->decode($request->file('screenshot'));
+            if (! $advert) {
+                DB::rollBack();
 
-            if (! $decodedText || trim($decodedText) !== trim($expectedIdentifier)) {
+                return response()->json(['message' => 'Advert not found.'], 404);
+            }
+
+            $decodedText = app(ImageDecoderService::class)->decode($request->file('screenshot'));
+            $verifiedQr = $decodedText
+                ? app(AdvertQrCodeService::class)->verify($decodedText, $user, $advert)
+                : null;
+
+            if (! $verifiedQr) {
                 DB::rollBack();
 
                 return response()->json([
                     'ok' => false,
                     'status' => 'failed',
-                    'message' => 'Verification failed. The QR code does not match your account or is missing.',
-                    'raw_output' => $decodedText,
+                    'message' => 'Verification failed. The QR code is missing or does not match this account and advert.',
                 ], 422);
             }
 
@@ -520,8 +528,6 @@ class ProductRepository implements ProductRepositoryInterface
                 ->where('advert_images.id', $advert_id)
                 ->select('campaigns.*')
                 ->first();
-
-            $advert = AdvertImages::where('id', $advert_id)->first();
 
             if (! $campaign) {
                 DB::rollBack();
@@ -553,11 +559,6 @@ class ProductRepository implements ProductRepositoryInterface
                         'message' => 'This campaign has reached full capacity. Thank you for your interest.',
                     ], 400);
                 }
-            }
-
-            $advert = AdvertImages::find($advert_id);
-            if (! $advert) {
-                return response()->json(['message' => '❌ Advert not found.'], 404);
             }
 
             $advertPath = public_path('storage/'.$advert->image_path);
@@ -749,6 +750,10 @@ class ProductRepository implements ProductRepositoryInterface
                 'message' => $message,
                 'views' => $verifiedViews,
                 'path' => 'screenshots/'.$filename,
+                'qr' => [
+                    'identifier' => $verifiedQr->identifier_snapshot,
+                    'advert_id' => $verifiedQr->advert_id,
+                ],
             ]);
         } catch (\Throwable $th) {
             DB::rollBack();

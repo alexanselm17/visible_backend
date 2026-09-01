@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\Image;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdvertImages;
+use App\Services\AdvertQrCodeService;
+use App\Services\ImageDecoderService;
 use App\Services\ImageEncoderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -250,7 +252,8 @@ class ImageManipulationController extends Controller
     public function downloadPersonalizedAdvert(
         Request $request,
         string $advertId,
-        ImageEncoderService $encoder
+        ImageEncoderService $encoder,
+        AdvertQrCodeService $qrCodes
     ) {
         $advert = AdvertImages::findOrFail($advertId);
         $identifier = trim((string) $request->user()?->my_code);
@@ -274,7 +277,8 @@ class ImageManipulationController extends Controller
             ], 404);
         }
 
-        $encoded = $encoder->encode($sourcePath, $identifier);
+        $qrUrl = $qrCodes->issue($request->user(), $advert);
+        $encoded = $encoder->encode($sourcePath, $qrUrl);
         $downloadName = Str::slug((string) $advert->name ?: 'advert').'-personalized.png';
 
         $response = response()->download($encoded['path'], $downloadName, [
@@ -287,26 +291,31 @@ class ImageManipulationController extends Controller
         return $response->deleteFileAfterSend(true);
     }
 
-    public function decodeScreenshot(Request $request, \App\Services\ImageDecoderService $decoder)
-    {
+    public function decodeScreenshot(
+        Request $request,
+        ImageDecoderService $decoder,
+        AdvertQrCodeService $qrCodes
+    ) {
         $request->validate([
             'screenshot' => 'required|image|max:10240',
+            'advert_id' => 'required|uuid|exists:advert_images,id',
         ]);
 
-        $uploadedFile = $request->file('screenshot');
-        $text = $decoder->decode($uploadedFile);
+        $advert = AdvertImages::findOrFail($request->input('advert_id'));
+        $text = $decoder->decode($request->file('screenshot'));
+        $verified = $text ? $qrCodes->verify($text, $request->user(), $advert) : null;
 
-        if ($text && preg_match('/^\d{10}$/', $text)) {
+        if ($verified) {
             return response()->json([
                 'message' => 'Screenshot verified successfully!',
-                'identifier' => $text
+                'identifier' => $verified->identifier_snapshot,
+                'advert_id' => $verified->advert_id,
             ]);
         }
 
         return response()->json([
-            'message' => 'Verification failed. The identifier was either destroyed by compression or cropped out.',
-            'raw_output' => $text
-        ], 404);
+            'message' => 'Verification failed. The QR code is missing or does not match this account and advert.',
+        ], 422);
     }
 
     public function downloadImage($filename)

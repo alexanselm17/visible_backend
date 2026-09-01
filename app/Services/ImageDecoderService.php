@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-use Zxing\QrReader;
 use Illuminate\Support\Str;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
+use Zxing\QrReader;
 
 class ImageDecoderService
 {
@@ -14,20 +14,23 @@ class ImageDecoderService
      */
     public function decode($uploadedFile)
     {
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
 
         // Define our cropping strategies [Width, Height, X, Y, Contrast, Zoom]
         $strategies = [
-            // Pass 1: Standard broad crop (Top 800px)
+            // Pass 1: Exact QR area in a downloaded 1080px-wide advert.
+            ['w' => 250, 'h' => 250, 'x' => 90, 'y' => 25, 'contrast' => 0, 'zoom' => false],
+
+            // Pass 2: Standard broad crop (Top 800px)
             ['w' => 1080, 'h' => 800, 'x' => 0, 'y' => 0, 'contrast' => 0, 'zoom' => false],
 
-            // Pass 2: "The Sniper". Isolates the Top-Left where the banner sits.
+            // Pass 3: "The Sniper". Isolates the Top-Left where the banner sits.
             ['w' => 450, 'h' => 400, 'x' => 50, 'y' => 100, 'contrast' => 0, 'zoom' => false],
 
-            // Pass 3: Sniper + Contrast (Helps separate gray mush into black/white)
+            // Pass 4: Sniper + Contrast (Helps separate gray mush into black/white)
             ['w' => 450, 'h' => 400, 'x' => 50, 'y' => 100, 'contrast' => 20, 'zoom' => false],
 
-            // Pass 4: "The Magnifying Glass". Crops tightly around the QR and blows it up 300%
+            // Pass 5: "The Magnifying Glass". Crops tightly around the QR and blows it up 300%
             // This is the ultimate fix for heavy WhatsApp compression.
             ['w' => 300, 'h' => 300, 'x' => 60, 'y' => 120, 'contrast' => 15, 'zoom' => true],
         ];
@@ -52,8 +55,8 @@ class ImageDecoderService
                 $image->scale(width: $strat['w'] * 3);
             }
 
-            $tempPath = public_path('storage/image_ads/decode/temp_qr_' . time() . '_' . Str::random(5) . '.png');
-            if (!file_exists(dirname($tempPath))) {
+            $tempPath = public_path('storage/image_ads/decode/temp_qr_'.time().'_'.Str::random(5).'.png');
+            if (! file_exists(dirname($tempPath))) {
                 mkdir(dirname($tempPath), 0755, true);
             }
             $image->toPng()->save($tempPath);
@@ -65,8 +68,9 @@ class ImageDecoderService
                 @unlink($tempPath);
             }
 
-            // If we found the 10-digit code, return it instantly
-            if ($text && preg_match('/^\d{10}$/', $text)) {
+            // Validation of the URL, token, user and advert happens in
+            // AdvertQrCodeService after extraction.
+            if ($text !== '') {
                 return $text;
             }
         }
