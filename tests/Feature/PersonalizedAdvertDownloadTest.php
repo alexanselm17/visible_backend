@@ -32,6 +32,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
         config()->set('app.key', 'base64:'.base64_encode(str_repeat('q', 32)));
+        config()->set('services.visible_qr.public_url', 'https://www.visibledm.com');
         DB::purge('sqlite');
         DB::setDefaultConnection('sqlite');
         DB::reconnect('sqlite');

@@ -37,6 +37,7 @@ return [
 
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
+        'verification_model' => env('OPENAI_VERIFICATION_MODEL', 'gpt-4o'),
     ],
 
 ];

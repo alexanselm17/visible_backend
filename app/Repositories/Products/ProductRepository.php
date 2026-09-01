@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Products;
 
+use App\Exceptions\ScreenshotVerificationException;
 use App\Http\Controllers\NotificationController;
 use App\Http\Requests\ProductAdvertRequest;
 use App\Http\Requests\RepostAdvertRequest;
@@ -15,10 +16,10 @@ use App\Models\User;
 use App\Services\AdvertQrCodeService;
 use App\Services\ImageDecoderService;
 use App\Services\RewardPeriodService;
+use App\Services\ScreenshotVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -604,72 +605,21 @@ class ProductRepository implements ProductRepositoryInterface
 
             $screenshotPath = public_path("storage/screenshots/{$filename}");
 
-            // Encode images to base64
-            $advertBase64 = base64_encode(file_get_contents($advertPath));
-            $screenshotBase64 = base64_encode(file_get_contents($screenshotPath));
-
-            // Prepare OpenAI request
-            $apiKey = config('services.openai.api_key');
-            if (! $apiKey) {
-                throw new \RuntimeException('OPENAI_API_KEY is not configured.');
-            }
-            $prompt = "
-            You are verifying whether a WhatsApp Status screenshot contains a specific media item (either an image or a video) and the necessary WhatsApp interface elements.
-            
-            Instructions:
-            1. Confirm the screenshot is from WhatsApp and clearly displays 'My status' and a visible timestamp (e.g., 'Just now', 'Yesterday', '10:24pm', or '9 minutes ago').
-            2. Extract the number of views from the screenshot if it is clearly visible.
-            3. Extract the timestamp shown below 'My status'.
-            
-            Respond only in this valid JSON format:
-            
-            {
-              \"status\": \"Screenshot Successfully Verified.\" OR \"Screenshot Not Verified.Please confirm your screenshot and try again\",
-              \"reason\": \"[If not verified, explain why. If verified, return null]\",
-              \"views\": \"[Exact number of views like '91', or 'Not visible']\",
-              \"timestamp\": \"[e.g., 'Just now', 'Today, 1:06 PM', or '43 minutes ago']\"
-            }
-            
-            Do not include any other text before or after the JSON.
-            ";
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-4o',
-                'messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => [
-                            ['type' => 'text', 'text' => $prompt],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $advertBase64]],
-                            ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,' . $screenshotBase64]],
-                        ],
-                    ],
-                ],
-                'max_tokens' => 300,
-            ]);
-
-            $output = $response->json('choices.0.message.content') ?? '❌ Not Verified';
-
-            // Remove markdown formatting like ```json ... ``` if present
-            $output = trim($output);
-            $output = preg_replace('/^```json|```$/i', '', $output);
-            $output = trim($output);
-
-            // Decode cleaned JSON
-            $json = json_decode($output, true);
-
-            // Handle invalid or unexpected response
-            if (! $json || ! isset($json['status'])) {
+            try {
+                $json = app(ScreenshotVerificationService::class)->verify(
+                    $advertPath,
+                    $screenshotPath
+                );
+            } catch (ScreenshotVerificationException $exception) {
                 @unlink($screenshotPath);
+                DB::rollBack();
 
                 return response()->json([
-                    'message' => '❌ Not Verified',
-                    'reason' => 'Invalid format from the verification model...',
-                    'raw' => $output,
-                ], 400);
+                    'message' => 'Screenshot verification could not be completed.',
+                    'reason' => $exception->getMessage(),
+                    'upstream_status' => $exception->upstreamStatus,
+                    'request_id' => $exception->requestId,
+                ], 502);
             }
 
             $isVerified = trim((string) $json['status']) === 'Screenshot Successfully Verified.';
