@@ -3,7 +3,7 @@
 return [
 
     'visible_qr' => [
-        'public_url' => env('VISIBLE_QR_PUBLIC_URL', 'https://www.visibledm.com'),
+        'public_url' => env('VISIBLE_QR_PUBLIC_URL', 'https://app.visibledm.com'),
     ],
 
     /*
