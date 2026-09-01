@@ -82,8 +82,8 @@ class ImageEncoderService
             throw new RuntimeException('The encoded image directory could not be created.');
         }
 
-        $filename = 'stamped_'.Str::uuid().'.png';
-        $savePath = $saveDirectory.'/'.$filename;
+        $filename = 'stamped_' . Str::uuid() . '.png';
+        $savePath = $saveDirectory . '/' . $filename;
         $canvas->toPng()->save($savePath);
 
         return [
@@ -236,7 +236,7 @@ class ImageEncoderService
     private function fontPath(string ...$filenames): ?string
     {
         foreach ($filenames as $filename) {
-            $path = public_path('fonts/'.$filename);
+            $path = public_path('fonts/' . $filename);
             if (is_file($path)) {
                 return $path;
             }

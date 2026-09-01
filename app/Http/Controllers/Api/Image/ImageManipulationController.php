@@ -274,11 +274,7 @@ class ImageManipulationController extends Controller
             ], 404);
         }
 
-        $encoded = $encoder->encode(
-            $sourcePath,
-            $identifier,
-            captionText: Str::limit((string) $advert->name, 120)
-        );
+        $encoded = $encoder->encode($sourcePath, $identifier);
         $downloadName = Str::slug((string) $advert->name ?: 'advert').'-personalized.png';
 
         $response = response()->download($encoded['path'], $downloadName, [
