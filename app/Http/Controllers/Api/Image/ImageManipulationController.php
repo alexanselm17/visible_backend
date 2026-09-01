@@ -9,6 +9,7 @@ use App\Services\ImageDecoderService;
 use App\Services\ImageEncoderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -303,19 +304,26 @@ class ImageManipulationController extends Controller
 
         $advert = AdvertImages::findOrFail($request->input('advert_id'));
         $text = $decoder->decode($request->file('screenshot'));
-        $verified = $text ? $qrCodes->verify($text, $request->user(), $advert) : null;
+        try {
+            $verified = $qrCodes->verifyOrFail(
+                (string) $text,
+                $request->user(),
+                $advert
+            );
+        } catch (ValidationException $exception) {
+            $errors = $exception->errors();
 
-        if ($verified) {
             return response()->json([
-                'message' => 'Screenshot verified successfully!',
-                'identifier' => $verified->identifier_snapshot,
-                'advert_id' => $verified->advert_id,
-            ]);
+                'message' => collect($errors)->flatten()->first() ?? 'QR code verification failed.',
+                'errors' => $errors,
+            ], 422);
         }
 
         return response()->json([
-            'message' => 'Verification failed. The QR code is missing or does not match this account and advert.',
-        ], 422);
+            'message' => 'Screenshot verified successfully!',
+            'identifier' => $verified->identifier_snapshot,
+            'advert_id' => $verified->advert_id,
+        ]);
     }
 
     public function downloadImage($filename)

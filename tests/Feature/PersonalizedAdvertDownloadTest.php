@@ -11,6 +11,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -30,6 +31,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
         config()->set('database.default', 'sqlite');
         config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('app.key', 'base64:'.base64_encode(str_repeat('q', 32)));
         DB::purge('sqlite');
         DB::setDefaultConnection('sqlite');
         DB::reconnect('sqlite');
@@ -130,6 +132,43 @@ class PersonalizedAdvertDownloadTest extends TestCase
                 ->assertOk()
                 ->assertJsonPath('identifier', $user->my_code)
                 ->assertJsonPath('advert_id', $advert->id);
+
+            $otherAdvert = AdvertImages::create([
+                'id' => '77777777-7777-4777-8777-777777777777',
+                'name' => 'Different Advert',
+                'image_path' => 'personalized-advert-tests/source.png',
+            ]);
+
+            $this->post('/api/v1/image/decode', [
+                'advert_id' => $otherAdvert->id,
+                'screenshot' => new UploadedFile(
+                    $encodedPath,
+                    basename($encodedPath),
+                    'image/png',
+                    null,
+                    true
+                ),
+            ])->assertUnprocessable()
+                ->assertJsonPath('message', 'The QR code belongs to a different advert.')
+                ->assertJsonPath('errors.advert_id.0', 'The QR code belongs to a different advert.');
+
+            $otherUser = new User;
+            $otherUser->id = '88888888-8888-4888-8888-888888888888';
+            $otherUser->my_code = '0987654321';
+
+            $this->actingAs($otherUser, 'sanctum')
+                ->post('/api/v1/image/decode', [
+                    'advert_id' => $advert->id,
+                    'screenshot' => new UploadedFile(
+                        $encodedPath,
+                        basename($encodedPath),
+                        'image/png',
+                        null,
+                        true
+                    ),
+                ])->assertUnprocessable()
+                ->assertJsonPath('message', 'The QR code belongs to a different user account.')
+                ->assertJsonPath('errors.identifier.0', 'The QR code belongs to a different user account.');
         } finally {
             File::delete($encodedPath);
         }
@@ -175,7 +214,36 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
         $this->assertNull($service->verify($url, $owner, $secondAdvert));
         $this->assertNull($service->verify($url, $otherUser, $firstAdvert));
+
+        try {
+            $service->verifyOrFail($url, $owner, $secondAdvert);
+            $this->fail('A QR code from another advert should be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertSame([
+                'advert_id' => ['The QR code belongs to a different advert.'],
+            ], $exception->errors());
+        }
+
+        try {
+            $service->verifyOrFail($url, $otherUser, $firstAdvert);
+            $this->fail('A QR code from another user should be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertSame([
+                'identifier' => ['The QR code belongs to a different user account.'],
+            ], $exception->errors());
+        }
+
         $replacement = str_ends_with($url, 'A') ? 'B' : 'A';
-        $this->assertNull($service->resolve(substr($url, 0, -1).$replacement));
+        $tamperedUrl = substr($url, 0, -1).$replacement;
+        $this->assertNull($service->resolve($tamperedUrl));
+
+        try {
+            $service->verifyOrFail($tamperedUrl, $owner, $firstAdvert);
+            $this->fail('A modified QR token should be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertSame([
+                'qr_code' => ['The QR code is missing, invalid, expired, or has been altered.'],
+            ], $exception->errors());
+        }
     }
 }

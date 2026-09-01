@@ -56,22 +56,48 @@ class AdvertQrCodeService
         User $user,
         AdvertImages $advert
     ): ?AdvertQrCode {
+        try {
+            return $this->verifyOrFail($decodedQrContent, $user, $advert);
+        } catch (ValidationException) {
+            return null;
+        }
+    }
+
+    public function verifyOrFail(
+        string $decodedQrContent,
+        User $user,
+        AdvertImages $advert
+    ): AdvertQrCode {
         return DB::transaction(function () use ($decodedQrContent, $user, $advert) {
             $record = $this->resolve($decodedQrContent);
             $identifier = trim((string) $user->my_code);
 
+            if (! $record) {
+                throw ValidationException::withMessages([
+                    'qr_code' => 'The QR code is missing, invalid, expired, or has been altered.',
+                ]);
+            }
+
+            if (! hash_equals((string) $record->advert_id, (string) $advert->id)) {
+                throw ValidationException::withMessages([
+                    'advert_id' => 'The QR code belongs to a different advert.',
+                ]);
+            }
+
             if (
-                ! $record
-                || ! hash_equals((string) $record->user_id, (string) $user->id)
-                || ! hash_equals((string) $record->advert_id, (string) $advert->id)
+                ! hash_equals((string) $record->user_id, (string) $user->id)
                 || ! hash_equals((string) $record->identifier_snapshot, $identifier)
             ) {
-                return null;
+                throw ValidationException::withMessages([
+                    'identifier' => 'The QR code belongs to a different user account.',
+                ]);
             }
 
             $expectedToken = $this->tokenFor($identifier, (string) $advert->id);
             if (! hash_equals((string) $record->token_hash, hash('sha256', $expectedToken))) {
-                return null;
+                throw ValidationException::withMessages([
+                    'qr_code' => 'The QR code signature is invalid.',
+                ]);
             }
 
             $record->last_verified_at = now();

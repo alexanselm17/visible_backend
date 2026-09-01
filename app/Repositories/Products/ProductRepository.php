@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProductRepository implements ProductRepositoryInterface
 {
@@ -510,19 +511,11 @@ class ProductRepository implements ProductRepositoryInterface
             }
 
             $decodedText = app(ImageDecoderService::class)->decode($request->file('screenshot'));
-            $verifiedQr = $decodedText
-                ? app(AdvertQrCodeService::class)->verify($decodedText, $user, $advert)
-                : null;
-
-            if (! $verifiedQr) {
-                DB::rollBack();
-
-                return response()->json([
-                    'ok' => false,
-                    'status' => 'failed',
-                    'message' => 'Verification failed. The QR code is missing or does not match this account and advert.',
-                ], 422);
-            }
+            $verifiedQr = app(AdvertQrCodeService::class)->verifyOrFail(
+                (string) $decodedText,
+                $user,
+                $advert
+            );
 
             $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
                 ->where('advert_images.id', $advert_id)
@@ -755,6 +748,16 @@ class ProductRepository implements ProductRepositoryInterface
                     'advert_id' => $verifiedQr->advert_id,
                 ],
             ]);
+        } catch (ValidationException $exception) {
+            DB::rollBack();
+            $errors = $exception->errors();
+
+            return response()->json([
+                'ok' => false,
+                'status' => 'failed',
+                'message' => collect($errors)->flatten()->first() ?? 'QR code verification failed.',
+                'errors' => $errors,
+            ], 422);
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Error verifying image: '.$th->getMessage());
