@@ -139,6 +139,10 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('/stamp', [ImageManipulationController::class, 'encodeImage']);
         Route::post('/decode', [ImageManipulationController::class, 'decodeScreenshot']);
         Route::get('/download/{filename}', [ImageManipulationController::class, 'downloadImage']);
+        Route::get('/advert/{advertId}/download', [ImageManipulationController::class, 'downloadPersonalizedAdvert'])
+            ->middleware(['auth:sanctum', 'check.active'])
+            ->whereUuid('advertId')
+            ->name('download.advert.personalized');
     });
 
     Route::middleware(['auth:sanctum', 'check.active'])->prefix('tokens')->group(function () {

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Image;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\AdvertImages;
-use Intervention\Image\ImageManager;
+use App\Services\ImageEncoderService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ImageManipulationController extends Controller
@@ -243,6 +245,50 @@ class ImageManipulationController extends Controller
             'identifier' => $identifier,
             'advert_id' => $advertId,
         ]);
+    }
+
+    public function downloadPersonalizedAdvert(
+        Request $request,
+        string $advertId,
+        ImageEncoderService $encoder
+    ) {
+        $advert = AdvertImages::findOrFail($advertId);
+        $identifier = trim((string) $request->user()?->my_code);
+
+        if (! preg_match('/^\d{10}$/', $identifier)) {
+            return response()->json([
+                'message' => 'Your account does not have a valid 10-digit QR identifier.',
+            ], 422);
+        }
+
+        if (! $advert->image_path) {
+            return response()->json([
+                'message' => 'This advert does not have an image that can be downloaded.',
+            ], 422);
+        }
+
+        $sourcePath = public_path('storage/'.ltrim($advert->image_path, '/'));
+        if (! is_file($sourcePath)) {
+            return response()->json([
+                'message' => 'Advert image file not found.',
+            ], 404);
+        }
+
+        $encoded = $encoder->encode(
+            $sourcePath,
+            $identifier,
+            captionText: Str::limit((string) $advert->name, 120)
+        );
+        $downloadName = Str::slug((string) $advert->name ?: 'advert').'-personalized.png';
+
+        $response = response()->download($encoded['path'], $downloadName, [
+            'Content-Type' => 'image/png',
+        ]);
+        $response->setPrivate();
+        $response->headers->addCacheControlDirective('no-store');
+        $response->headers->addCacheControlDirective('max-age', 0);
+
+        return $response->deleteFileAfterSend(true);
     }
 
     public function decodeScreenshot(Request $request, \App\Services\ImageDecoderService $decoder)
