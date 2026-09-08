@@ -4,15 +4,18 @@ namespace App\Repositories\Auth;
 
 use App\Http\Controllers\NotificationController;
 use App\Http\Requests\UpdateProfileRequest;
+use App\Exceptions\SmsDeliveryException;
 use App\Models\Counties;
 use App\Models\Permission;
 use App\Models\RolesModel;
 use App\Models\User;
+use App\Services\PhoneOtpService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -154,18 +157,38 @@ class AuthRepository implements AuthRepositoryInterface
                 'my_code'      => $myCode,
             ]);
 
-            // 4. Notify admins
-            $notificationController = new NotificationController;
-            $notificationRequest = new Request(['new_user_id' => $user->id]);
-            $notificationController->notifyAdminsNewAccount($notificationRequest);
+            $otp = app(PhoneOtpService::class)->sendSignupOtp($user);
 
             DB::commit();
+
+            try {
+                $notificationController = new NotificationController;
+                $notificationRequest = new Request(['new_user_id' => $user->id]);
+                $notificationController->notifyAdminsNewAccount($notificationRequest);
+            } catch (\Throwable $notificationError) {
+                Log::error('New account admin notification failed: ' . $notificationError->getMessage());
+            }
 
             return response()->json([
                 'ok' => true,
                 'status' => 'success',
-                'message' => 'Account created successfully',
+                'message' => 'Account created successfully. We sent an OTP to your phone.',
+                'data' => [
+                    'user_id' => $user->id,
+                    'phone' => $user->phone,
+                    'requires_phone_verification' => true,
+                    'otp_expires_at' => $otp->expires_at,
+                ],
             ]);
+        } catch (SmsDeliveryException $th) {
+            DB::rollBack();
+            Log::error('Sign Up OTP Delivery Error: ' . $th->getMessage());
+
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Account was not created because we could not send the phone verification OTP. Please try again.',
+            ], Response::HTTP_BAD_GATEWAY);
         } catch (\Throwable $th) {
             DB::rollBack();
             Log::error('Sign Up Error: ' . $th->getMessage());
@@ -197,6 +220,16 @@ class AuthRepository implements AuthRepositoryInterface
                     'ok' => false,
                     'status' => 'warning',
                     'message' => 'Invalid login Credetials.',
+                ], Response::HTTP_UNAUTHORIZED);
+            }
+
+            if (Schema::hasColumn('users', 'phone_verified_at') && ! $user->phone_verified_at) {
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'Please verify your phone number before logging in.',
+                    'requires_phone_verification' => true,
+                    'phone' => $user->phone,
                 ], Response::HTTP_UNAUTHORIZED);
             }
 

@@ -6,6 +6,17 @@ return [
         'public_url' => env('VISIBLE_QR_PUBLIC_URL', 'https://app.visibledm.com'),
     ],
 
+    'talksasa' => [
+        'api_key' => env('TALKSASA_API_KEY'),
+        'base_url' => env('TALKSASA_BASE_URL', 'https://bulksms.talksasa.com/api/v3'),
+        'send_path' => env('TALKSASA_SEND_PATH', 'sms/send'),
+        'sender_id' => env('TALKSASA_SENDER_ID', 'VisibleDM'),
+        'timeout' => (int) env('TALKSASA_TIMEOUT', 30),
+        'otp_ttl_minutes' => (int) env('TALKSASA_OTP_TTL_MINUTES', 10),
+        'otp_resend_cooldown_seconds' => (int) env('TALKSASA_OTP_RESEND_COOLDOWN_SECONDS', 60),
+        'otp_max_attempts' => (int) env('TALKSASA_OTP_MAX_ATTEMPTS', 5),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

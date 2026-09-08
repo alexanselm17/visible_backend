@@ -42,6 +42,7 @@ class User extends Authenticatable implements FilamentUser
         'fullname',
         'username',
         'phone',
+        'phone_verified_at',
         'is_active',
         'role_id',
         'email',
@@ -82,6 +83,7 @@ class User extends Authenticatable implements FilamentUser
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'phone_verified_at' => 'datetime',
     ];
 
     /**
@@ -209,6 +211,11 @@ class User extends Authenticatable implements FilamentUser
     public function unreadNotifications()
     {
         return $this->hasMany(Notification::class)->where('is_read', false)->orderBy('created_at', 'desc');
+    }
+
+    public function phoneVerificationOtps()
+    {
+        return $this->hasMany(PhoneVerificationOtp::class);
     }
 
     public function county()

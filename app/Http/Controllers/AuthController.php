@@ -10,6 +10,9 @@ use App\Http\Requests\SignUp;
 use App\Http\Requests\UnAssignRoleRequest;
 use App\Http\Requests\UpdateProfileRequest;
 use App\Repositories\Auth\AuthRepositoryInterface;
+use App\Exceptions\SmsDeliveryException;
+use App\Services\PhoneOtpService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
@@ -31,6 +34,55 @@ class AuthController extends Controller
     public function signup(SignUp $request)
     {
         return $this->authRepository->signUpUser($request);
+    }
+
+    public function resendSignupOtp(Request $request, PhoneOtpService $phoneOtpService): JsonResponse
+    {
+        $validated = $request->validate([
+            'phone' => ['required', 'regex:/^\+254\d{9}$/'],
+        ]);
+
+        try {
+            $otp = $phoneOtpService->resendSignupOtp($validated['phone']);
+        } catch (SmsDeliveryException) {
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'We could not send the OTP. Please try again.',
+            ], 502);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'status' => 'success',
+            'message' => 'OTP sent successfully.',
+            'data' => [
+                'phone' => $validated['phone'],
+                'expires_at' => $otp->expires_at,
+            ],
+        ]);
+    }
+
+    public function verifySignupOtp(Request $request, PhoneOtpService $phoneOtpService): JsonResponse
+    {
+        $validated = $request->validate([
+            'phone' => ['required', 'regex:/^\+254\d{9}$/'],
+            'otp' => ['required', 'digits:6'],
+        ]);
+
+        $user = $phoneOtpService->verifySignupOtp($validated['phone'], $validated['otp']);
+
+        return response()->json([
+            'ok' => true,
+            'status' => 'success',
+            'message' => 'Phone number verified successfully. Your account is awaiting activation.',
+            'data' => [
+                'user_id' => $user->id,
+                'phone' => $user->phone,
+                'phone_verified_at' => $user->phone_verified_at,
+                'is_active' => (bool) $user->is_active,
+            ],
+        ]);
     }
 
     public function getAllUserReferred(Request $request, $userId)

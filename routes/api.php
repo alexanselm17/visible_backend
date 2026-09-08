@@ -19,6 +19,8 @@ Route::group(['prefix' => 'v1'], function () {
     Route::group(['prefix' => 'auth'], function () {
         Route::post('/fcm-token', [NotificationController::class, 'updateFcmToken']);
         Route::post('/signup', [AuthController::class, 'signup']);
+        Route::post('/signup/otp/resend', [AuthController::class, 'resendSignupOtp']);
+        Route::post('/signup/otp/verify', [AuthController::class, 'verifySignupOtp']);
         Route::get('/location', [AuthController::class, 'getCountiesWithSubCounties']);
         Route::post('/all_account_activation', [AuthController::class, 'activateAllInactiveAcounts']);
         Route::post('/signin', [AuthController::class, 'signin']);
@@ -26,7 +28,7 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
     Route::get('/download/advert/{path}', function ($path) {
-        $fullPath = public_path('storage/'.$path);
+        $fullPath = public_path('storage/' . $path);
         if (! file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
@@ -35,7 +37,7 @@ Route::group(['prefix' => 'v1'], function () {
 
         return response()->make(file_get_contents($fullPath), 200, [
             'Content-Type' => 'application/octet-stream',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Content-Transfer-Encoding' => 'binary',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
