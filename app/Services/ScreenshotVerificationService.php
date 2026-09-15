@@ -46,7 +46,7 @@ class ScreenshotVerificationService
                         ],
                     ],
                     'response_format' => $this->responseFormat(),
-                    'max_tokens' => 300,
+                    'max_completion_tokens' => 300,
                 ]);
         } catch (ConnectionException $exception) {
             Log::warning('Could not connect to OpenAI for screenshot verification.', [
