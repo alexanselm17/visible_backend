@@ -45,7 +45,6 @@ class ScreenshotVerificationServiceTest extends TestCase
 
         [$advert, $screenshot] = $this->images();
         $result = app(ScreenshotVerificationService::class)->verify(
-            $advert->getPathname(),
             $screenshot->getPathname()
         );
 
@@ -56,7 +55,7 @@ class ScreenshotVerificationServiceTest extends TestCase
             $content = $request->data()['messages'][0]['content'];
             $images = array_values(array_filter(
                 $content,
-                fn (array $part): bool => $part['type'] === 'image_url'
+                fn(array $part): bool => $part['type'] === 'image_url'
             ));
 
             return $request->url() === 'https://api.openai.com/v1/chat/completions'
@@ -84,7 +83,6 @@ class ScreenshotVerificationServiceTest extends TestCase
 
         try {
             app(ScreenshotVerificationService::class)->verify(
-                $advert->getPathname(),
                 $screenshot->getPathname()
             );
             $this->fail('An upstream OpenAI error should fail screenshot verification.');

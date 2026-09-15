@@ -11,7 +11,7 @@ use RuntimeException;
 
 class ScreenshotVerificationService
 {
-    public function verify(string $advertPath, string $screenshotPath): array
+    public function verify(string $screenshotPath): array
     {
         $apiKey = trim((string) config('services.openai.api_key'));
 
@@ -19,7 +19,6 @@ class ScreenshotVerificationService
             throw new RuntimeException('OPENAI_API_KEY is not configured.');
         }
 
-        $advertDataUrl = $this->imageDataUrl($advertPath);
         $screenshotDataUrl = $this->imageDataUrl($screenshotPath);
 
         try {
@@ -27,7 +26,7 @@ class ScreenshotVerificationService
                 ->acceptJson()
                 ->timeout(90)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => config('services.openai.verification_model', 'gpt-5.6-luna'),
+                    'model' => config('services.openai.verification_model', 'gpt-4o'), // Make sure this is a Vision-capable model
                     'messages' => [
                         [
                             'role' => 'user',
@@ -35,21 +34,6 @@ class ScreenshotVerificationService
                                 [
                                     'type' => 'text',
                                     'text' => $this->prompt(),
-                                ],
-                                [
-                                    'type' => 'text',
-                                    'text' => 'Original advert image:',
-                                ],
-                                [
-                                    'type' => 'image_url',
-                                    'image_url' => [
-                                        'url' => $advertDataUrl,
-                                        'detail' => 'high',
-                                    ],
-                                ],
-                                [
-                                    'type' => 'text',
-                                    'text' => 'Submitted WhatsApp screenshot:',
                                 ],
                                 [
                                     'type' => 'image_url',
@@ -81,7 +65,8 @@ class ScreenshotVerificationService
         $output = $response->json('choices.0.message.content');
         $result = is_string($output) ? json_decode($output, true) : null;
 
-        if (! is_array($result) || ! isset($result['status'])) {
+        // Validation updated to check for 'is_from_whatsapp' instead of 'status'
+        if (! is_array($result) || ! isset($result['is_from_whatsapp'])) {
             Log::warning('OpenAI returned an invalid screenshot verification response.', [
                 'request_id' => $response->header('x-request-id'),
                 'response_id' => $response->json('id'),
@@ -110,7 +95,7 @@ class ScreenshotVerificationService
             throw new RuntimeException('Verification images must be JPEG or PNG files.');
         }
 
-        return 'data:'.$mimeType.';base64,'.base64_encode((string) file_get_contents($path));
+        return 'data:' . $mimeType . ';base64,' . base64_encode((string) file_get_contents($path));
     }
 
     private function throwUpstreamFailure(Response $response): never
@@ -140,14 +125,11 @@ class ScreenshotVerificationService
     private function prompt(): string
     {
         return <<<'PROMPT'
-Compare the original advert with the media displayed in the submitted WhatsApp Status screenshot.
+Analyze the submitted screenshot.
 
-Verify all of the following:
-1. The screenshot is from WhatsApp Status and visibly contains "My status" and a timestamp.
-2. The advert shown in the screenshot matches the original advert image. Allow only subtle Visible DM branding near the bottom of the downloaded image.
-3. A numeric view count is clearly visible.
-
-Return a successful status only when every requirement passes. Otherwise return the failed status and a short reason.
+Extract the following two pieces of information:
+1. Is the screenshot visibly from WhatsApp Status (e.g., does it contain "My status" or WhatsApp UI elements)?
+2. What is the exact numeric view count displayed on the status?
 PROMPT;
     }
 
@@ -161,25 +143,16 @@ PROMPT;
                 'schema' => [
                     'type' => 'object',
                     'properties' => [
-                        'status' => [
-                            'type' => 'string',
-                            'enum' => [
-                                'Screenshot Successfully Verified.',
-                                'Screenshot Not Verified.Please confirm your screenshot and try again',
-                            ],
-                        ],
-                        'reason' => [
-                            'type' => ['string', 'null'],
+                        'is_from_whatsapp' => [
+                            'type' => 'boolean',
+                            'description' => 'True if the image contains WhatsApp status UI elements.',
                         ],
                         'views' => [
                             'type' => ['integer', 'null'],
-                            'minimum' => 0,
-                        ],
-                        'timestamp' => [
-                            'type' => ['string', 'null'],
+                            'description' => 'The numeric view count, or null if not found.',
                         ],
                     ],
-                    'required' => ['status', 'reason', 'views', 'timestamp'],
+                    'required' => ['is_from_whatsapp', 'views'],
                     'additionalProperties' => false,
                 ],
             ],

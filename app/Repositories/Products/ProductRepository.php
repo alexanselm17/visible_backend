@@ -626,7 +626,7 @@ class ProductRepository implements ProductRepositoryInterface
 
             try {
                 $json = app(ScreenshotVerificationService::class)->verify(
-                    $advertPath,
+
                     $screenshotPath
                 );
             } catch (ScreenshotVerificationException $exception) {
