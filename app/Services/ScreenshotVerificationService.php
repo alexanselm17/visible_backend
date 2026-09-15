@@ -27,7 +27,7 @@ class ScreenshotVerificationService
                 ->acceptJson()
                 ->timeout(90)
                 ->post('https://api.openai.com/v1/chat/completions', [
-                    'model' => config('services.openai.verification_model', 'gpt-4o'),
+                    'model' => config('services.openai.verification_model', 'gpt-5.6-luna'),
                     'messages' => [
                         [
                             'role' => 'user',
