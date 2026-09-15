@@ -37,6 +37,7 @@ class ScreenshotVerificationServiceTest extends TestCase
                             'reason' => null,
                             'views' => 91,
                             'timestamp' => 'Today, 1:06 PM',
+                            'tracking_code' => 'VDM-A1B2C3D4',
                         ], JSON_THROW_ON_ERROR),
                     ],
                 ]],
@@ -50,6 +51,7 @@ class ScreenshotVerificationServiceTest extends TestCase
 
         $this->assertSame(91, $result['views']);
         $this->assertSame('Screenshot Successfully Verified.', $result['status']);
+        $this->assertSame('VDM-A1B2C3D4', $result['tracking_code']);
 
         Http::assertSent(function (Request $request): bool {
             $content = $request->data()['messages'][0]['content'];

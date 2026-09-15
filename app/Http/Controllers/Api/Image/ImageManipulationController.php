@@ -88,7 +88,8 @@ class ImageManipulationController extends Controller
         }
 
         $qrUrl = $qrCodes->issue($request->user(), $advert);
-        $encoded = $encoder->encode($sourcePath, $qrUrl);
+        $visibleProofCode = $qrCodes->visibleCodeFor($request->user(), $advert);
+        $encoded = $encoder->encode($sourcePath, $qrUrl, null, null, null, $visibleProofCode);
         $downloadName = Str::slug((string) $advert->name ?: 'advert').'-personalized.png';
 
         $response = response()->download($encoded['path'], $downloadName, [

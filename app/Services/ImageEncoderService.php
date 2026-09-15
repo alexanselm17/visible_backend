@@ -25,7 +25,8 @@ class ImageEncoderService
         string $watermarkContent,
         ?string $footerImagePath = null,
         ?string $headerText = null,
-        ?string $captionText = null
+        ?string $captionText = null,
+        ?string $visibleProofCode = null
     ): array {
         if ($watermarkContent === '' || strlen($watermarkContent) > 2048) {
             throw ValidationException::withMessages([
@@ -65,6 +66,7 @@ class ImageEncoderService
         );
 
         $this->placeSubtleLogo($manager, $canvas, $canvasWidth, $canvasHeight);
+        $this->placeVisibleProofCode($canvas, $visibleProofCode, $canvasHeight);
 
         $saveDirectory = public_path('storage/image_ads/encoded');
         if (! is_dir($saveDirectory) && ! mkdir($saveDirectory, 0755, true) && ! is_dir($saveDirectory)) {
@@ -113,6 +115,41 @@ class ImageEncoderService
         );
     }
 
+    private function placeVisibleProofCode(
+        Image $canvas,
+        ?string $visibleProofCode,
+        int $canvasHeight
+    ): void {
+        if ($visibleProofCode === null || trim($visibleProofCode) === '') {
+            return;
+        }
+
+        $fontPath = $this->fontPath('Roboto_SemiCondensed-SemiBold.ttf', 'Roboto-Bold.ttf');
+        $text = strtoupper(trim($visibleProofCode));
+        $x = 34;
+        $y = $canvasHeight - 54;
+
+        $canvas->text($text, $x + 2, $y + 2, function ($font) use ($fontPath) {
+            if ($fontPath !== null) {
+                $font->file($fontPath);
+            }
+            $font->size(30);
+            $font->color('000000');
+            $font->align('left');
+            $font->valign('top');
+        });
+
+        $canvas->text($text, $x, $y, function ($font) use ($fontPath) {
+            if ($fontPath !== null) {
+                $font->file($fontPath);
+            }
+            $font->size(30);
+            $font->color('ffffff');
+            $font->align('left');
+            $font->valign('top');
+        });
+    }
+
     private function placeMainImage(
         ImageManager $manager,
         Image $canvas,
@@ -156,5 +193,17 @@ class ImageEncoderService
         if (! is_file($path) || ! is_readable($path)) {
             throw ValidationException::withMessages(['image' => $message]);
         }
+    }
+
+    private function fontPath(string ...$filenames): ?string
+    {
+        foreach ($filenames as $filename) {
+            $path = public_path('fonts/'.$filename);
+            if (is_file($path)) {
+                return $path;
+            }
+        }
+
+        return null;
     }
 }

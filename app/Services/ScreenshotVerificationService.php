@@ -129,6 +129,7 @@ Analyze the submitted screenshot only.
 Verify all of the following:
 1. The screenshot is from WhatsApp Status and visibly contains WhatsApp status UI elements, such as "My status", status controls, or a status timestamp.
 2. A numeric view count is clearly visible.
+3. Extract the small Visible DM tracking code printed on the advert image if it is visible. It usually looks like "VDM-A1B2C3D4". If it is not visible, return null for tracking_code.
 
 Return a successful status only when every requirement passes. Otherwise return the failed status and a short reason.
 PROMPT;
@@ -160,8 +161,11 @@ PROMPT;
                         'timestamp' => [
                             'type' => ['string', 'null'],
                         ],
+                        'tracking_code' => [
+                            'type' => ['string', 'null'],
+                        ],
                     ],
-                    'required' => ['status', 'reason', 'views', 'timestamp'],
+                    'required' => ['status', 'reason', 'views', 'timestamp', 'tracking_code'],
                     'additionalProperties' => false,
                 ],
             ],

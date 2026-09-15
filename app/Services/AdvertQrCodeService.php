@@ -13,6 +13,8 @@ class AdvertQrCodeService
 {
     private const TOKEN_PATTERN = '/^[A-Za-z0-9_-]{22}$/';
 
+    private const VISIBLE_CODE_PATTERN = '/^VDM-[A-Z0-9]{8}$/';
+
     public function issue(User $user, AdvertImages $advert): string
     {
         $identifier = trim((string) $user->my_code);
@@ -23,7 +25,7 @@ class AdvertQrCodeService
             ]);
         }
 
-        $token = $this->tokenFor($identifier, (string) $advert->id);
+        $token = $this->tokenFor($identifier, (string) $advert->id, (string) $user->id);
 
         AdvertQrCode::updateOrCreate(
             [
@@ -38,6 +40,21 @@ class AdvertQrCodeService
         );
 
         return $this->publicUrl($token);
+    }
+
+    public function visibleCodeFor(User $user, AdvertImages $advert): string
+    {
+        $identifier = trim((string) $user->my_code);
+
+        if (! preg_match('/^\d{10}$/', $identifier)) {
+            throw ValidationException::withMessages([
+                'identifier' => 'Your account must have a valid 10-digit QR identifier.',
+            ]);
+        }
+
+        return $this->visibleCodeFromToken(
+            $this->tokenFor($identifier, (string) $advert->id, (string) $user->id)
+        );
     }
 
     public function resolve(string $decodedQrContent): ?AdvertQrCode
@@ -93,7 +110,7 @@ class AdvertQrCodeService
                 ]);
             }
 
-            $expectedToken = $this->tokenFor($identifier, (string) $advert->id);
+            $expectedToken = $this->tokenFor($identifier, (string) $advert->id, (string) $user->id);
             if (! hash_equals((string) $record->token_hash, hash('sha256', $expectedToken))) {
                 throw ValidationException::withMessages([
                     'qr_code' => 'The QR code signature is invalid.',
@@ -107,11 +124,43 @@ class AdvertQrCodeService
         });
     }
 
-    private function tokenFor(string $identifier, string $advertId): string
+    public function verifyVisibleCodeOrFail(
+        string $visibleCode,
+        User $user,
+        AdvertImages $advert
+    ): AdvertQrCode {
+        return DB::transaction(function () use ($visibleCode, $user, $advert) {
+            $visibleCode = $this->normalizeVisibleCode($visibleCode);
+            $expectedCode = $this->visibleCodeFor($user, $advert);
+
+            if (! hash_equals($expectedCode, $visibleCode)) {
+                throw ValidationException::withMessages([
+                    'tracking_code' => 'The image tracking code belongs to a different user account or advert.',
+                ]);
+            }
+
+            $record = AdvertQrCode::where('user_id', $user->id)
+                ->where('advert_id', $advert->id)
+                ->first();
+
+            if (! $record) {
+                throw ValidationException::withMessages([
+                    'tracking_code' => 'The image tracking code was not issued for this account.',
+                ]);
+            }
+
+            $record->last_verified_at = now();
+            $record->save();
+
+            return $record;
+        });
+    }
+
+    private function tokenFor(string $identifier, string $advertId, string $userId): string
     {
         $key = $this->signingKey();
         $binaryHash = substr(
-            hash_hmac('sha256', $identifier.'|'.strtolower($advertId), $key, true),
+            hash_hmac('sha256', $identifier.'|'.strtolower($advertId).'|'.strtolower($userId), $key, true),
             0,
             16
         );
@@ -138,6 +187,31 @@ class AdvertQrCodeService
         $token = is_string($query['qr'] ?? null) ? $query['qr'] : null;
 
         return $token && preg_match(self::TOKEN_PATTERN, $token) ? $token : null;
+    }
+
+    private function visibleCodeFromToken(string $token): string
+    {
+        return 'VDM-'.strtoupper(substr(hash_hmac('sha256', 'visible|'.$token, $this->signingKey()), 0, 8));
+    }
+
+    private function normalizeVisibleCode(string $visibleCode): string
+    {
+        $visibleCode = strtoupper(trim($visibleCode));
+        $visibleCode = preg_replace('/[^A-Z0-9]/', '', $visibleCode) ?? '';
+
+        if (str_starts_with($visibleCode, 'VDM')) {
+            $visibleCode = substr($visibleCode, 3);
+        }
+
+        $visibleCode = 'VDM-'.substr($visibleCode, 0, 8);
+
+        if (! preg_match(self::VISIBLE_CODE_PATTERN, $visibleCode)) {
+            throw ValidationException::withMessages([
+                'tracking_code' => 'The image tracking code is missing or invalid.',
+            ]);
+        }
+
+        return $visibleCode;
     }
 
     private function publicUrl(string $token): string

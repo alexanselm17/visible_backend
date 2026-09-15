@@ -658,6 +658,27 @@ class ProductRepository implements ProductRepositoryInterface
                 ], 400);
             }
 
+            if ($verifiedQr === null) {
+                try {
+                    $verifiedQr = app(AdvertQrCodeService::class)->verifyVisibleCodeOrFail(
+                        (string) ($json['tracking_code'] ?? ''),
+                        $user,
+                        $advert
+                    );
+                } catch (ValidationException $exception) {
+                    @unlink($screenshotPath);
+                    DB::rollBack();
+                    $errors = $exception->errors();
+
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => collect($errors)->flatten()->first() ?? 'Image tracking verification failed.',
+                        'errors' => $errors,
+                    ], 422);
+                }
+            }
+
             $number = $previousScreenshot ? $previousScreenshot->number + 1 : 1;
 
             // let's ensure that views is progressive
@@ -712,6 +733,7 @@ class ProductRepository implements ProductRepositoryInterface
                     'identifier' => $verifiedQr?->identifier_snapshot,
                     'advert_id' => $verifiedQr?->advert_id,
                     'verified' => $verifiedQr !== null,
+                    'tracking_code' => $json['tracking_code'] ?? null,
                 ],
             ]);
         } catch (ValidationException $exception) {

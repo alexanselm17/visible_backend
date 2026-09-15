@@ -118,6 +118,11 @@ class PersonalizedAdvertDownloadTest extends TestCase
             $this->assertSame($user->my_code, $verified->identifier_snapshot);
             $this->assertNotNull($verified->last_verified_at);
 
+            $visibleCode = app(AdvertQrCodeService::class)->visibleCodeFor($user, $advert);
+            $visibleVerified = app(AdvertQrCodeService::class)->verifyVisibleCodeOrFail($visibleCode, $user, $advert);
+            $this->assertSame($user->id, $visibleVerified->user_id);
+            $this->assertSame($advert->id, $visibleVerified->advert_id);
+
             $verificationResponse = $this->post('/api/v1/image/decode', [
                 'advert_id' => $advert->id,
                 'screenshot' => new UploadedFile(
@@ -156,6 +161,15 @@ class PersonalizedAdvertDownloadTest extends TestCase
             $otherUser = new User;
             $otherUser->id = '88888888-8888-4888-8888-888888888888';
             $otherUser->my_code = '0987654321';
+
+            try {
+                app(AdvertQrCodeService::class)->verifyVisibleCodeOrFail($visibleCode, $otherUser, $advert);
+                $this->fail('A visible tracking code from another user should be rejected.');
+            } catch (ValidationException $exception) {
+                $this->assertSame([
+                    'tracking_code' => ['The image tracking code belongs to a different user account or advert.'],
+                ], $exception->errors());
+            }
 
             $this->actingAs($otherUser, 'sanctum')
                 ->post('/api/v1/image/decode', [
