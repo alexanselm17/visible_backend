@@ -511,12 +511,31 @@ class ProductRepository implements ProductRepositoryInterface
                 return response()->json(['message' => 'Advert not found.'], 404);
             }
 
+            $verifiedQr = null;
             $decodedText = app(ImageDecoderService::class)->decode($request->file('screenshot'));
-            $verifiedQr = app(AdvertQrCodeService::class)->verifyOrFail(
-                (string) $decodedText,
-                $user,
-                $advert
-            );
+
+            if ($decodedText !== null && trim((string) $decodedText) !== '') {
+                try {
+                    $verifiedQr = app(AdvertQrCodeService::class)->verifyOrFail(
+                        (string) $decodedText,
+                        $user,
+                        $advert
+                    );
+                } catch (ValidationException $exception) {
+                    $errors = $exception->errors();
+
+                    if (! array_key_exists('qr_code', $errors)) {
+                        DB::rollBack();
+
+                        return response()->json([
+                            'ok' => false,
+                            'status' => 'failed',
+                            'message' => collect($errors)->flatten()->first() ?? 'Image tracking verification failed.',
+                            'errors' => $errors,
+                        ], 422);
+                    }
+                }
+            }
 
             $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
                 ->where('advert_images.id', $advert_id)
@@ -690,8 +709,9 @@ class ProductRepository implements ProductRepositoryInterface
                 'views' => $verifiedViews,
                 'path' => 'screenshots/' . $filename,
                 'qr' => [
-                    'identifier' => $verifiedQr->identifier_snapshot,
-                    'advert_id' => $verifiedQr->advert_id,
+                    'identifier' => $verifiedQr?->identifier_snapshot,
+                    'advert_id' => $verifiedQr?->advert_id,
+                    'verified' => $verifiedQr !== null,
                 ],
             ]);
         } catch (ValidationException $exception) {
