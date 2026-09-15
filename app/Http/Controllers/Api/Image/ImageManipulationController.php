@@ -10,13 +10,10 @@ use App\Services\ImageEncoderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Intervention\Image\Drivers\Gd\Driver;
-use Intervention\Image\ImageManager;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ImageManipulationController extends Controller
 {
-    public function encodeImage(Request $request)
+    public function encodeImage(Request $request, ImageEncoderService $encoder)
     {
         $request->validate([
             'image' => 'required|image|mimes:jpeg,png,jpg|max:10240',
@@ -29,12 +26,6 @@ class ImageManipulationController extends Controller
         $identifier = $request->input('identifier');
         $uploadedFile = $request->file('image');
         $advertId = $request->input('advert_id');
-        $captionText = $request->input('caption');
-
-        $headerText = $request->input(
-            'header_text',
-            'The content media attached to this advertisement campaign has no affiliation to VISIBLE DM or its partners but has been attached solely by the holder of this account in full knowledge and consent. For any queries, contact 0712345678.'
-        );
 
         $advertRecord = AdvertImages::findOrFail($advertId);
         $adImagePath = public_path('storage/' . ltrim($advertRecord->image_path, '/'));
@@ -45,209 +36,27 @@ class ImageManipulationController extends Controller
             ], 404);
         }
 
-        $templatePath = public_path('images/not_full_sample.jpeg');
-        if (!file_exists($templatePath)) {
-            return response()->json([
-                'message' => 'Blank template image missing.'
-            ], 500);
-        }
-
-        $titleFontPath = public_path('fonts/Roboto_SemiCondensed-SemiBold.ttf');
-        $bodyFontPath = public_path('fonts/Roboto_SemiCondensed-Regular.ttf');
-
-        if (!file_exists($titleFontPath)) {
-            $titleFontPath = public_path('fonts/Roboto-Bold.ttf');
-        }
-        if (!file_exists($bodyFontPath)) {
-            $bodyFontPath = public_path('fonts/Roboto-Regular.ttf');
-        }
-
-        $manager = new ImageManager(new Driver());
-
-        // ======================================================
-        // 1. FINAL CANVAS
-        // ======================================================
-        $canvasWidth = 1080;
-        $canvasHeight = 1350;
-        $canvas = $manager->create($canvasWidth, $canvasHeight)->fill('000000');
-
-        // ======================================================
-        // 2. TOP BANNER - CENTERED, FULL, SHARPER TEXT
-        // ======================================================
-        $topMargin = 18;
-        $headerTargetWidth = 920;
-
-        $header = $manager->read($templatePath);
-        $header->scaleDown(width: $headerTargetWidth);
-
-        $headerWidth = $header->width();
-        $headerHeight = $header->height();
-
-        // QR placement on final-size banner
-        $sideCircleWidth = $headerHeight;
-        $qrSize = (int) round($sideCircleWidth * 0.60);
-
-        $qrCodeImage = (string) QrCode::format('png')
-            ->size($qrSize)
-            ->margin(1)
-            ->errorCorrection('H')
-            ->generate((string) $identifier);
-
-        $qrOffsetX = (int) round(($sideCircleWidth - $qrSize) / 2);
-        $qrOffsetY = (int) round(($headerHeight - $qrSize) / 2);
-
-        $header->place(
-            $manager->read($qrCodeImage),
-            'top-left',
-            $qrOffsetX,
-            $qrOffsetY
+        $watermarkRef = $this->watermarkReference((string) $identifier, (string) $advertId);
+        $encoded = $encoder->encode(
+            $uploadedFile->getPathname(),
+            $watermarkRef,
+            $adImagePath
         );
-
-        // Text zone between QR and logo
-        $textPadding = (int) round($headerHeight * 0.05);
-        $textLeft = $sideCircleWidth + $textPadding;
-        $textRight = $headerWidth - $sideCircleWidth - $textPadding;
-        $textCenterX = (int) round(($textLeft + $textRight) / 2);
-
-        $titleY = (int) round($headerHeight * 0.08);
-        $underlineY = (int) round($headerHeight * 0.19);
-        $bodyY = (int) round($headerHeight * 0.23);
-
-        if (file_exists($titleFontPath)) {
-            $header->text('DISCLAIMER', $textCenterX, $titleY, function ($font) use ($titleFontPath, $headerHeight) {
-                $font->file($titleFontPath);
-                $font->size((int) round($headerHeight * 0.11));
-                $font->color('000000');
-                $font->align('center');
-                $font->valign('top');
-            });
-        }
-
-        $underlineWidth = (int) round(($textRight - $textLeft) * 0.42);
-        $header->drawLine(function ($line) use ($textCenterX, $underlineWidth, $underlineY) {
-            $line->from((int) round($textCenterX - ($underlineWidth / 2)), $underlineY);
-            $line->to((int) round($textCenterX + ($underlineWidth / 2)), $underlineY);
-            $line->color('000000');
-            $line->width(1);
-        });
-
-        $bodyText = preg_replace('/^DISCLAIMER\s*/i', '', trim($headerText));
-        $bodyText = trim($bodyText);
-        $wrappedBodyText = wordwrap($bodyText, 34, "\n");
-
-        if (file_exists($bodyFontPath)) {
-            $header->text($wrappedBodyText, $textCenterX, $bodyY, function ($font) use ($bodyFontPath, $headerHeight) {
-                $font->file($bodyFontPath);
-                $font->size((int) round($headerHeight * 0.09));
-                $font->color('000000');
-                $font->align('center');
-                $font->valign('top');
-                $font->lineHeight(1.30);
-            });
-        }
-
-        $headerTopY = $topMargin;
-        $headerX = (int) round(($canvasWidth - $header->width()) / 2);
-
-        $canvas->place($header, 'top-left', $headerX, $headerTopY);
-        $headerBottomY = $headerTopY + $header->height();
-        // ======================================================
-        // 3. BOTTOM AD - FULL WIDTH COVER
-        // ======================================================
-        $ad = $manager->read($adImagePath);
-
-        $bottomMargin = 18;
-        $adTargetWidth = 1080;
-        $adTargetHeight = 200;
-        $adTopY = $canvasHeight - $bottomMargin - $adTargetHeight;
-
-        $adSrcW = $ad->width();
-        $adSrcH = $ad->height();
-
-        $adScale = max($adTargetWidth / $adSrcW, $adTargetHeight / $adSrcH);
-        $adResizedW = (int) ceil($adSrcW * $adScale);
-        $adResizedH = (int) ceil($adSrcH * $adScale);
-
-        $ad->resize($adResizedW, $adResizedH);
-
-        $adCropX = (int) max(0, floor(($adResizedW - $adTargetWidth) / 2));
-        $adCropY = (int) max(0, floor(($adResizedH - $adTargetHeight) / 2));
-
-        $ad->crop($adTargetWidth, $adTargetHeight, $adCropX, $adCropY);
-        $canvas->place($ad, 'top-left', 0, $adTopY);
-
-        // ======================================================
-        // 4. MAIN IMAGE
-        // ======================================================
-        $mainImage = $manager->read($uploadedFile->getPathname());
-
-        $sidePadding = 24;
-        $sectionGap = 18;
-        $captionSpace = ($captionText && file_exists($bodyFontPath)) ? 70 : 0;
-
-        $availableTop = $headerBottomY + $sectionGap;
-        $availableBottom = $adTopY - $sectionGap;
-
-        $targetX = $sidePadding;
-        $targetY = $availableTop + $captionSpace;
-        $targetWidth = $canvasWidth - ($sidePadding * 2);
-        $targetHeight = $availableBottom - $availableTop - $captionSpace;
-
-        if ($captionText && file_exists($bodyFontPath)) {
-            $lineY = $availableTop + 14;
-
-            $canvas->drawLine(function ($line) use ($sidePadding, $canvasWidth, $lineY) {
-                $line->from($sidePadding, $lineY);
-                $line->to($canvasWidth - $sidePadding, $lineY);
-                $line->color('000000');
-                $line->width(2);
-            });
-
-            $canvas->text($captionText, $sidePadding, $lineY + 12, function ($font) use ($bodyFontPath) {
-                $font->file($bodyFontPath);
-                $font->size(24);
-                $font->color('000000');
-                $font->align('left');
-                $font->valign('top');
-                $font->lineHeight(1.18);
-            });
-        }
-
-        $srcW = $mainImage->width();
-        $srcH = $mainImage->height();
-
-        $scale = max($targetWidth / $srcW, $targetHeight / $srcH);
-        $resizedW = (int) ceil($srcW * $scale);
-        $resizedH = (int) ceil($srcH * $scale);
-
-        $mainImage->resize($resizedW, $resizedH);
-
-        $cropX = (int) max(0, floor(($resizedW - $targetWidth) / 2));
-        $cropY = (int) max(0, floor(($resizedH - $targetHeight) / 2));
-
-        $mainImage->crop($targetWidth, $targetHeight, $cropX, $cropY);
-        $canvas->place($mainImage, 'top-left', $targetX, $targetY);
-
-        // ======================================================
-        // 5. SAVE
-        // ======================================================
-        $filename = 'stamped_' . time() . '.png';
-        $saveDirectory = public_path('storage/image_ads/encoded');
-        $savePath = $saveDirectory . '/' . $filename;
-
-        if (!file_exists($saveDirectory)) {
-            mkdir($saveDirectory, 0755, true);
-        }
-
-        $canvas->toPng()->save($savePath);
 
         return response()->json([
             'message' => 'Layout generated successfully',
-            'filename' => $filename,
-            'download_url' => url('/storage/image_ads/encoded/' . $filename),
-            'identifier' => $identifier,
+            'filename' => $encoded['filename'],
+            'download_url' => url('/storage/image_ads/encoded/' . $encoded['filename']),
+            'watermark_ref' => $watermarkRef,
             'advert_id' => $advertId,
         ]);
+    }
+
+    private function watermarkReference(string $identifier, string $advertId): string
+    {
+        $key = (string) config('app.key');
+
+        return 'IMG_REF_'.strtoupper(substr(hash_hmac('sha256', $identifier.'|'.$advertId, $key), 0, 16));
     }
 
     public function downloadPersonalizedAdvert(

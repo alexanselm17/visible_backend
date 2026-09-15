@@ -9,11 +9,21 @@ use Zxing\QrReader;
 
 class ImageDecoderService
 {
+    public function __construct(private readonly InvisibleImageWatermarkService $watermarks)
+    {
+    }
+
     /**
-     * Extracts and decodes the QR code using a Multi-Pass Isolation & Zoom Strategy
+     * Extracts the hidden watermark from new images, then falls back to the old QR code layout.
      */
     public function decode($uploadedFile)
     {
+        $hidden = $this->watermarks->extract($uploadedFile->getPathname());
+
+        if ($hidden !== null) {
+            return $hidden;
+        }
+
         $manager = new ImageManager(new Driver);
 
         // Define our cropping strategies [Width, Height, X, Y, Contrast, Zoom]

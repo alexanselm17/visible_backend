@@ -144,7 +144,7 @@ Compare the original advert with the media displayed in the submitted WhatsApp S
 
 Verify all of the following:
 1. The screenshot is from WhatsApp Status and visibly contains "My status" and a timestamp.
-2. The advert shown in the screenshot matches the original advert image. Allow the personalized disclaimer and QR header added above the advert.
+2. The advert shown in the screenshot matches the original advert image. Allow only subtle Visible DM branding near the bottom of the downloaded image.
 3. A numeric view count is clearly visible.
 
 Return a successful status only when every requirement passes. Otherwise return the failed status and a short reason.
