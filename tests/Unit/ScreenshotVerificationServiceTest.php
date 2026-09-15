@@ -24,7 +24,7 @@ class ScreenshotVerificationServiceTest extends TestCase
         config()->set('services.openai.verification_model', 'gpt-4o');
     }
 
-    public function test_it_sends_both_images_and_returns_the_structured_result(): void
+    public function test_it_sends_the_screenshot_and_returns_the_structured_result(): void
     {
         Http::fake([
             'api.openai.com/*' => Http::response([
@@ -43,7 +43,7 @@ class ScreenshotVerificationServiceTest extends TestCase
             ], 200, ['x-request-id' => 'req_success']),
         ]);
 
-        [$advert, $screenshot] = $this->images();
+        $screenshot = $this->image();
         $result = app(ScreenshotVerificationService::class)->verify(
             $screenshot->getPathname()
         );
@@ -59,9 +59,8 @@ class ScreenshotVerificationServiceTest extends TestCase
             ));
 
             return $request->url() === 'https://api.openai.com/v1/chat/completions'
-                && count($images) === 2
+                && count($images) === 1
                 && str_starts_with($images[0]['image_url']['url'], 'data:image/png;base64,')
-                && str_starts_with($images[1]['image_url']['url'], 'data:image/png;base64,')
                 && $request->data()['response_format']['type'] === 'json_schema'
                 && $request->data()['response_format']['json_schema']['strict'] === true;
         });
@@ -79,7 +78,7 @@ class ScreenshotVerificationServiceTest extends TestCase
             ], 429, ['x-request-id' => 'req_quota']),
         ]);
 
-        [$advert, $screenshot] = $this->images();
+        $screenshot = $this->image();
 
         try {
             app(ScreenshotVerificationService::class)->verify(
@@ -96,11 +95,8 @@ class ScreenshotVerificationServiceTest extends TestCase
         }
     }
 
-    private function images(): array
+    private function image(): UploadedFile
     {
-        return [
-            UploadedFile::fake()->image('advert.png', 20, 20),
-            UploadedFile::fake()->image('screenshot.png', 20, 20),
-        ];
+        return UploadedFile::fake()->image('screenshot.png', 20, 20);
     }
 }

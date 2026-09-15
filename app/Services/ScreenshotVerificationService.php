@@ -65,8 +65,7 @@ class ScreenshotVerificationService
         $output = $response->json('choices.0.message.content');
         $result = is_string($output) ? json_decode($output, true) : null;
 
-        // Validation updated to check for 'is_from_whatsapp' instead of 'status'
-        if (! is_array($result) || ! isset($result['is_from_whatsapp'])) {
+        if (! is_array($result) || ! isset($result['status'])) {
             Log::warning('OpenAI returned an invalid screenshot verification response.', [
                 'request_id' => $response->header('x-request-id'),
                 'response_id' => $response->json('id'),
@@ -112,7 +111,7 @@ class ScreenshotVerificationService
         ]);
 
         $message = match ($status) {
-            400 => 'OpenAI rejected the screenshot verification request.',
+            400 => 'OpenAI rejected the screenshot verification request: ' . ($response->json('error.message') ?: 'No upstream reason was provided.'),
             401, 403 => 'OpenAI authentication failed. Check OPENAI_API_KEY.',
             429 => 'OpenAI rate limit or quota was reached. Check API billing and usage limits.',
             500, 502, 503, 504 => 'OpenAI is temporarily unavailable. Please try again.',
@@ -125,11 +124,13 @@ class ScreenshotVerificationService
     private function prompt(): string
     {
         return <<<'PROMPT'
-Analyze the submitted screenshot.
+Analyze the submitted screenshot only.
 
-Extract the following two pieces of information:
-1. Is the screenshot visibly from WhatsApp Status (e.g., does it contain "My status" or WhatsApp UI elements)?
-2. What is the exact numeric view count displayed on the status?
+Verify all of the following:
+1. The screenshot is from WhatsApp Status and visibly contains WhatsApp status UI elements, such as "My status", status controls, or a status timestamp.
+2. A numeric view count is clearly visible.
+
+Return a successful status only when every requirement passes. Otherwise return the failed status and a short reason.
 PROMPT;
     }
 
@@ -143,16 +144,24 @@ PROMPT;
                 'schema' => [
                     'type' => 'object',
                     'properties' => [
-                        'is_from_whatsapp' => [
-                            'type' => 'boolean',
-                            'description' => 'True if the image contains WhatsApp status UI elements.',
+                        'status' => [
+                            'type' => 'string',
+                            'enum' => [
+                                'Screenshot Successfully Verified.',
+                                'Screenshot Not Verified.Please confirm your screenshot and try again',
+                            ],
+                        ],
+                        'reason' => [
+                            'type' => ['string', 'null'],
                         ],
                         'views' => [
                             'type' => ['integer', 'null'],
-                            'description' => 'The numeric view count, or null if not found.',
+                        ],
+                        'timestamp' => [
+                            'type' => ['string', 'null'],
                         ],
                     ],
-                    'required' => ['is_from_whatsapp', 'views'],
+                    'required' => ['status', 'reason', 'views', 'timestamp'],
                     'additionalProperties' => false,
                 ],
             ],
