@@ -222,9 +222,12 @@ class PersonalizedAdvertDownloadTest extends TestCase
             'identifier' => '1234567890',
             'advert_id' => $advert->id,
             'image' => UploadedFile::fake()->image('user-image.png', 500, 900),
+            'layout' => 'story',
         ], ['Accept' => 'application/json']);
 
         $response->assertOk();
+        $response->assertJsonPath('layout', 'story');
+        $response->assertJsonPath('available_layouts', ['story', 'balanced', 'ad_focus']);
         $filename = $response->json('filename');
         $encodedPath = public_path('storage/image_ads/encoded/'.$filename);
 
@@ -248,6 +251,59 @@ class PersonalizedAdvertDownloadTest extends TestCase
         } finally {
             File::delete($encodedPath);
         }
+    }
+
+    public function test_stamp_can_generate_each_supported_layout_option(): void
+    {
+        $footerPath = $this->sourceDirectory.'/footer-blue.png';
+        $this->createSolidPng($footerPath, 900, 300, [10, 80, 220]);
+
+        $advert = AdvertImages::create([
+            'id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'name' => 'Layout Options Advert',
+            'image_path' => 'personalized-advert-tests/footer-blue.png',
+        ]);
+
+        foreach (['story', 'balanced', 'ad_focus'] as $layout) {
+            $response = $this->post('/api/v1/image/stamp', [
+                'identifier' => '1234567890',
+                'advert_id' => $advert->id,
+                'image' => UploadedFile::fake()->image("user-image-{$layout}.png", 500, 900),
+                'layout' => $layout,
+            ], ['Accept' => 'application/json']);
+
+            $response->assertOk();
+            $response->assertJsonPath('layout', $layout);
+
+            $encodedPath = public_path('storage/image_ads/encoded/'.$response->json('filename'));
+
+            try {
+                $this->assertFileExists($encodedPath);
+                [$width, $height] = getimagesize($encodedPath);
+                $this->assertSame(1080, $width);
+                $this->assertSame(1350, $height);
+            } finally {
+                File::delete($encodedPath);
+            }
+        }
+    }
+
+    public function test_stamp_rejects_an_unknown_layout_option(): void
+    {
+        $advert = AdvertImages::create([
+            'id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            'name' => 'Invalid Layout Advert',
+            'image_path' => 'personalized-advert-tests/source.png',
+        ]);
+
+        $this->post('/api/v1/image/stamp', [
+            'identifier' => '1234567890',
+            'advert_id' => $advert->id,
+            'image' => UploadedFile::fake()->image('user-image.png', 500, 900),
+            'layout' => 'bad_layout',
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('layout');
     }
 
     public function test_qr_token_cannot_be_reused_for_another_user_or_advert(): void

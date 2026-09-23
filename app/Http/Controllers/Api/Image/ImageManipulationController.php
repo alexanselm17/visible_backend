@@ -9,6 +9,7 @@ use App\Services\ImageDecoderService;
 use App\Services\ImageEncoderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ImageManipulationController extends Controller
@@ -21,11 +22,13 @@ class ImageManipulationController extends Controller
             'advert_id' => 'required|string|exists:advert_images,id',
             'header_text' => 'nullable|string|max:1000',
             'caption' => 'nullable|string|max:120',
+            'layout' => ['nullable', 'string', Rule::in(ImageEncoderService::supportedLayouts())],
         ]);
 
         $identifier = $request->input('identifier');
         $uploadedFile = $request->file('image');
         $advertId = $request->input('advert_id');
+        $layout = $request->input('layout', 'story');
 
         $advertRecord = AdvertImages::findOrFail($advertId);
         $adImagePath = public_path('storage/' . ltrim($advertRecord->image_path, '/'));
@@ -40,7 +43,11 @@ class ImageManipulationController extends Controller
         $encoded = $encoder->encode(
             $uploadedFile->getPathname(),
             $watermarkRef,
-            $adImagePath
+            $adImagePath,
+            null,
+            null,
+            null,
+            $layout
         );
 
         return response()->json([
@@ -49,6 +56,8 @@ class ImageManipulationController extends Controller
             'download_url' => url('/storage/image_ads/encoded/' . $encoded['filename']),
             'watermark_ref' => $watermarkRef,
             'advert_id' => $advertId,
+            'layout' => $layout,
+            'available_layouts' => ImageEncoderService::supportedLayouts(),
         ]);
     }
 

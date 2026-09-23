@@ -11,8 +11,18 @@ use RuntimeException;
 
 class ImageEncoderService
 {
+    private const DEFAULT_LAYOUT = 'story';
+
     public function __construct(private readonly InvisibleImageWatermarkService $watermarks)
     {
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function supportedLayouts(): array
+    {
+        return array_keys(self::splitLayoutConfigs());
     }
 
     /**
@@ -26,7 +36,8 @@ class ImageEncoderService
         ?string $footerImagePath = null,
         ?string $headerText = null,
         ?string $captionText = null,
-        ?string $visibleProofCode = null
+        ?string $visibleProofCode = null,
+        ?string $layout = null
     ): array {
         if ($watermarkContent === '' || strlen($watermarkContent) > 2048) {
             throw ValidationException::withMessages([
@@ -44,9 +55,10 @@ class ImageEncoderService
         $canvasWidth = 1080;
         $canvasHeight = 1350;
         $canvas = $manager->create($canvasWidth, $canvasHeight)->fill('ffffff');
+        $layout = $this->normalizeLayout($layout);
 
         if ($footerImagePath !== null) {
-            $this->placeSplitImages($manager, $canvas, $mainImagePath, $footerImagePath, $canvasWidth, $canvasHeight);
+            $this->placeSplitImages($manager, $canvas, $mainImagePath, $footerImagePath, $canvasWidth, $canvasHeight, $layout);
         } else {
             $this->placeMainImage(
                 $manager,
@@ -149,10 +161,12 @@ class ImageEncoderService
         string $mainImagePath,
         string $footerImagePath,
         int $canvasWidth,
-        int $canvasHeight
+        int $canvasHeight,
+        string $layout
     ): void {
+        $config = self::splitLayoutConfigs()[$layout];
         $sectionGap = 18;
-        $mainHeight = 820;
+        $mainHeight = $config['main_height'];
         $footerTop = $mainHeight + $sectionGap;
         $footerHeight = $canvasHeight - $footerTop;
 
@@ -164,9 +178,9 @@ class ImageEncoderService
             0,
             $canvasWidth,
             $mainHeight,
-            28,
-            18,
-            18
+            $config['main_padding'],
+            $config['main_blur'],
+            $config['main_overlay']
         );
 
         $this->placeImagePanel(
@@ -177,10 +191,76 @@ class ImageEncoderService
             $footerTop,
             $canvasWidth,
             $footerHeight,
-            44,
-            14,
-            10
+            $config['advert_padding'],
+            $config['advert_blur'],
+            $config['advert_overlay']
         );
+    }
+
+    /**
+     * @return array<string, array{
+     *     main_height: int,
+     *     main_padding: int,
+     *     main_blur: int,
+     *     main_overlay: int,
+     *     advert_padding: int,
+     *     advert_blur: int,
+     *     advert_overlay: int
+     * }>
+     */
+    private static function splitLayoutConfigs(): array
+    {
+        return [
+            // Best default for WhatsApp/status screenshots: big user proof image, advert clearly shown below.
+            'story' => [
+                'main_height' => 820,
+                'main_padding' => 28,
+                'main_blur' => 18,
+                'main_overlay' => 18,
+                'advert_padding' => 44,
+                'advert_blur' => 14,
+                'advert_overlay' => 10,
+            ],
+
+            // Gives the user image and advert more equal visual weight.
+            'balanced' => [
+                'main_height' => 700,
+                'main_padding' => 34,
+                'main_blur' => 18,
+                'main_overlay' => 16,
+                'advert_padding' => 40,
+                'advert_blur' => 16,
+                'advert_overlay' => 8,
+            ],
+
+            // Makes the advert feel more premium/prominent while still keeping the user image visible.
+            'ad_focus' => [
+                'main_height' => 590,
+                'main_padding' => 34,
+                'main_blur' => 20,
+                'main_overlay' => 20,
+                'advert_padding' => 36,
+                'advert_blur' => 14,
+                'advert_overlay' => 8,
+            ],
+        ];
+    }
+
+    private function normalizeLayout(?string $layout): string
+    {
+        $layout = trim((string) $layout);
+
+        if ($layout === '') {
+            return self::DEFAULT_LAYOUT;
+        }
+
+        if (! in_array($layout, self::supportedLayouts(), true)) {
+            throw ValidationException::withMessages([
+                'layout' => 'The selected image layout is invalid.',
+            ]);
+        }
+
+        return $layout;
     }
 
     private function placeImagePanel(
