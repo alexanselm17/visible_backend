@@ -45,25 +45,18 @@ class ImageEncoderService
         $canvasHeight = 1350;
         $canvas = $manager->create($canvasWidth, $canvasHeight)->fill('ffffff');
 
-        $availableBottom = $canvasHeight;
-
         if ($footerImagePath !== null) {
-            $footerHeight = 200;
-            $footerTopY = $canvasHeight - $footerHeight;
-            $footer = $manager->read($footerImagePath);
-            $this->cover($footer, $canvasWidth, $footerHeight);
-            $canvas->place($footer, 'top-left', 0, $footerTopY);
-            $availableBottom = $footerTopY;
+            $this->placeSplitImages($manager, $canvas, $mainImagePath, $footerImagePath, $canvasWidth, $canvasHeight);
+        } else {
+            $this->placeMainImage(
+                $manager,
+                $canvas,
+                $mainImagePath,
+                0,
+                $canvasHeight,
+                $canvasWidth
+            );
         }
-
-        $this->placeMainImage(
-            $manager,
-            $canvas,
-            $mainImagePath,
-            0,
-            $availableBottom,
-            $canvasWidth
-        );
 
         $this->placeSubtleLogo($manager, $canvas, $canvasWidth, $canvasHeight);
         $this->placeVisibleProofCode($canvas, $visibleProofCode, $canvasHeight);
@@ -148,6 +141,74 @@ class ImageEncoderService
             $font->align('left');
             $font->valign('top');
         });
+    }
+
+    private function placeSplitImages(
+        ImageManager $manager,
+        Image $canvas,
+        string $mainImagePath,
+        string $footerImagePath,
+        int $canvasWidth,
+        int $canvasHeight
+    ): void {
+        $outerPadding = 24;
+        $sectionGap = 18;
+        $footerHeight = 430;
+        $mainHeight = $canvasHeight - $footerHeight - $sectionGap;
+        $targetWidth = $canvasWidth - ($outerPadding * 2);
+
+        $this->placeContainedImage(
+            $manager,
+            $canvas,
+            $mainImagePath,
+            $outerPadding,
+            $outerPadding,
+            $targetWidth,
+            $mainHeight - ($outerPadding * 2),
+            'f8f8f8'
+        );
+
+        $this->placeContainedImage(
+            $manager,
+            $canvas,
+            $footerImagePath,
+            $outerPadding,
+            $mainHeight + $sectionGap,
+            $targetWidth,
+            $footerHeight - $outerPadding,
+            'ffffff'
+        );
+    }
+
+    private function placeContainedImage(
+        ImageManager $manager,
+        Image $canvas,
+        string $imagePath,
+        int $targetX,
+        int $targetY,
+        int $targetWidth,
+        int $targetHeight,
+        string $background
+    ): void {
+        if ($targetWidth < 1 || $targetHeight < 1) {
+            throw new RuntimeException('The encoded image layout does not have enough space for the image.');
+        }
+
+        $area = $manager->create($targetWidth, $targetHeight)->fill($background);
+        $image = $manager->read($imagePath);
+        $scale = min($targetWidth / $image->width(), $targetHeight / $image->height());
+        $resizedWidth = (int) max(1, floor($image->width() * $scale));
+        $resizedHeight = (int) max(1, floor($image->height() * $scale));
+        $image->resize($resizedWidth, $resizedHeight);
+
+        $area->place(
+            $image,
+            'top-left',
+            (int) floor(($targetWidth - $resizedWidth) / 2),
+            (int) floor(($targetHeight - $resizedHeight) / 2)
+        );
+
+        $canvas->place($area, 'top-left', $targetX, $targetY);
     }
 
     private function placeMainImage(

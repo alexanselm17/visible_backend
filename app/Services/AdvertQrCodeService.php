@@ -160,7 +160,7 @@ class AdvertQrCodeService
     {
         $key = $this->signingKey();
         $binaryHash = substr(
-            hash_hmac('sha256', $identifier.'|'.strtolower($advertId).'|'.strtolower($userId), $key, true),
+            hash_hmac('sha256', $identifier . '|' . strtolower($advertId) . '|' . strtolower($userId), $key, true),
             0,
             16
         );
@@ -191,7 +191,7 @@ class AdvertQrCodeService
 
     private function visibleCodeFromToken(string $token): string
     {
-        return 'VDM-'.strtoupper(substr(hash_hmac('sha256', 'visible|'.$token, $this->signingKey()), 0, 8));
+        return 'VDM-' . strtoupper(substr(hash_hmac('sha256', 'visible|' . $token, $this->signingKey()), 0, 8));
     }
 
     private function normalizeVisibleCode(string $visibleCode): string
@@ -203,7 +203,7 @@ class AdvertQrCodeService
             $visibleCode = substr($visibleCode, 3);
         }
 
-        $visibleCode = 'VDM-'.substr($visibleCode, 0, 8);
+        $visibleCode = 'VDM-' . substr($visibleCode, 0, 8);
 
         if (! preg_match(self::VISIBLE_CODE_PATTERN, $visibleCode)) {
             throw ValidationException::withMessages([
@@ -219,7 +219,7 @@ class AdvertQrCodeService
         $baseUrl = $this->baseUrl();
         $separator = str_contains($baseUrl, '?') ? '&' : '?';
 
-        return $baseUrl.$separator.http_build_query(['qr' => $token], '', '&', PHP_QUERY_RFC3986);
+        return $baseUrl . $separator . http_build_query(['qr' => $token], '', '&', PHP_QUERY_RFC3986);
     }
 
     private function baseUrl(): string

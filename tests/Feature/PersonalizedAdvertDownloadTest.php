@@ -207,6 +207,49 @@ class PersonalizedAdvertDownloadTest extends TestCase
             ->assertJsonPath('message', 'Your account does not have a valid 10-digit QR identifier.');
     }
 
+    public function test_stamp_layout_keeps_the_advert_image_visible_in_the_lower_section(): void
+    {
+        $footerPath = $this->sourceDirectory.'/footer-red.png';
+        $this->createSolidPng($footerPath, 900, 300, [230, 15, 15]);
+
+        $advert = AdvertImages::create([
+            'id' => '99999999-9999-4999-8999-999999999999',
+            'name' => 'Visible Footer Advert',
+            'image_path' => 'personalized-advert-tests/footer-red.png',
+        ]);
+
+        $response = $this->post('/api/v1/image/stamp', [
+            'identifier' => '1234567890',
+            'advert_id' => $advert->id,
+            'image' => UploadedFile::fake()->image('user-image.png', 500, 900),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertOk();
+        $filename = $response->json('filename');
+        $encodedPath = public_path('storage/image_ads/encoded/'.$filename);
+
+        try {
+            $this->assertFileExists($encodedPath);
+            [$width, $height] = getimagesize($encodedPath);
+            $this->assertSame(1080, $width);
+            $this->assertSame(1350, $height);
+
+            $image = imagecreatefrompng($encodedPath);
+            $pixel = imagecolorat($image, 540, 1070);
+            imagedestroy($image);
+
+            $red = ($pixel >> 16) & 0xFF;
+            $green = ($pixel >> 8) & 0xFF;
+            $blue = $pixel & 0xFF;
+
+            $this->assertGreaterThan(180, $red);
+            $this->assertLessThan(90, $green);
+            $this->assertLessThan(90, $blue);
+        } finally {
+            File::delete($encodedPath);
+        }
+    }
+
     public function test_qr_token_cannot_be_reused_for_another_user_or_advert(): void
     {
         $firstAdvert = AdvertImages::create([
@@ -260,5 +303,14 @@ class PersonalizedAdvertDownloadTest extends TestCase
                 'qr_code' => ['The QR code is missing, invalid, expired, or has been altered.'],
             ], $exception->errors());
         }
+    }
+
+    private function createSolidPng(string $path, int $width, int $height, array $rgb): void
+    {
+        $image = imagecreatetruecolor($width, $height);
+        $color = imagecolorallocate($image, $rgb[0], $rgb[1], $rgb[2]);
+        imagefilledrectangle($image, 0, 0, $width, $height, $color);
+        imagepng($image, $path);
+        imagedestroy($image);
     }
 }
