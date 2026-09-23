@@ -97,14 +97,14 @@ class ImageEncoderService
             max(0, $header->width() - $headerHeight),
             0
         );
-        $logo->scale(width: 150);
+        $logo->scale(width: 104);
 
         $canvas->place(
             $logo,
             'top-left',
-            $canvasWidth - $logo->width() - 26,
-            $canvasHeight - $logo->height() - 26,
-            22
+            $canvasWidth - $logo->width() - 28,
+            $canvasHeight - $logo->height() - 28,
+            16
         );
     }
 
@@ -151,64 +151,86 @@ class ImageEncoderService
         int $canvasWidth,
         int $canvasHeight
     ): void {
-        $outerPadding = 24;
         $sectionGap = 18;
-        $footerHeight = 430;
-        $mainHeight = $canvasHeight - $footerHeight - $sectionGap;
-        $targetWidth = $canvasWidth - ($outerPadding * 2);
+        $mainHeight = 820;
+        $footerTop = $mainHeight + $sectionGap;
+        $footerHeight = $canvasHeight - $footerTop;
 
-        $this->placeContainedImage(
+        $this->placeImagePanel(
             $manager,
             $canvas,
             $mainImagePath,
-            $outerPadding,
-            $outerPadding,
-            $targetWidth,
-            $mainHeight - ($outerPadding * 2),
-            'f8f8f8'
+            0,
+            0,
+            $canvasWidth,
+            $mainHeight,
+            28,
+            18,
+            18
         );
 
-        $this->placeContainedImage(
+        $this->placeImagePanel(
             $manager,
             $canvas,
             $footerImagePath,
-            $outerPadding,
-            $mainHeight + $sectionGap,
-            $targetWidth,
-            $footerHeight - $outerPadding,
-            'ffffff'
+            0,
+            $footerTop,
+            $canvasWidth,
+            $footerHeight,
+            44,
+            14,
+            10
         );
     }
 
-    private function placeContainedImage(
+    private function placeImagePanel(
         ImageManager $manager,
         Image $canvas,
         string $imagePath,
-        int $targetX,
-        int $targetY,
-        int $targetWidth,
-        int $targetHeight,
-        string $background
+        int $panelX,
+        int $panelY,
+        int $panelWidth,
+        int $panelHeight,
+        int $foregroundPadding,
+        int $backgroundBlur,
+        int $backgroundOverlayOpacity
     ): void {
+        if ($panelWidth < 1 || $panelHeight < 1) {
+            throw new RuntimeException('The encoded image layout does not have enough space for the image.');
+        }
+
+        $panel = $manager->create($panelWidth, $panelHeight)->fill('f4f4f4');
+        $background = $manager->read($imagePath);
+        $this->cover($background, $panelWidth, $panelHeight);
+        $background->blur($backgroundBlur);
+        $panel->place($background, 'top-left', 0, 0);
+
+        if ($backgroundOverlayOpacity > 0) {
+            $overlay = $manager->create($panelWidth, $panelHeight)->fill('000000');
+            $panel->place($overlay, 'top-left', 0, 0, $backgroundOverlayOpacity);
+        }
+
+        $targetWidth = $panelWidth - ($foregroundPadding * 2);
+        $targetHeight = $panelHeight - ($foregroundPadding * 2);
+
         if ($targetWidth < 1 || $targetHeight < 1) {
             throw new RuntimeException('The encoded image layout does not have enough space for the image.');
         }
 
-        $area = $manager->create($targetWidth, $targetHeight)->fill($background);
         $image = $manager->read($imagePath);
         $scale = min($targetWidth / $image->width(), $targetHeight / $image->height());
         $resizedWidth = (int) max(1, floor($image->width() * $scale));
         $resizedHeight = (int) max(1, floor($image->height() * $scale));
         $image->resize($resizedWidth, $resizedHeight);
 
-        $area->place(
+        $panel->place(
             $image,
             'top-left',
-            (int) floor(($targetWidth - $resizedWidth) / 2),
-            (int) floor(($targetHeight - $resizedHeight) / 2)
+            $foregroundPadding + (int) floor(($targetWidth - $resizedWidth) / 2),
+            $foregroundPadding + (int) floor(($targetHeight - $resizedHeight) / 2)
         );
 
-        $canvas->place($area, 'top-left', $targetX, $targetY);
+        $canvas->place($panel, 'top-left', $panelX, $panelY);
     }
 
     private function placeMainImage(
