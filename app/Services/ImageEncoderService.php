@@ -275,17 +275,21 @@ class ImageEncoderService
         $this->cover($userImage, $canvasWidth, $canvasHeight);
         $canvas->place($userImage, 'top-left', 0, 0);
 
-        $cardWidth = 900;
-        $cardHeight = 290;
+        $this->placeBottomFade($manager, $canvas, $canvasWidth, $canvasHeight);
+
+        $cardWidth = 920;
+        $cardHeight = 330;
         $cardX = (int) floor(($canvasWidth - $cardWidth) / 2);
-        $cardY = $canvasHeight - $cardHeight - 150;
+        $cardY = $canvasHeight - $cardHeight - 120;
         $advertLuminance = $this->averageOpaqueLuminance($advertImagePath);
-        $cardColor = $advertLuminance < 95 ? 'f59e0b' : '111827';
-        $borderColor = $advertLuminance < 95 ? '92400e' : '334155';
-        $cardOpacity = $advertLuminance < 95 ? 72 : 68;
+        $isDarkAdvert = $advertLuminance < 95;
+        $cardColor = $isDarkAdvert ? 'f59e0b' : '111827';
+        $borderColor = $isDarkAdvert ? 'fbbf24' : '475569';
+        $accentColor = $isDarkAdvert ? '111827' : 'f59e0b';
+        $cardOpacity = $isDarkAdvert ? 70 : 72;
 
         $shadow = $manager->create($cardWidth, $cardHeight)->fill('000000');
-        $canvas->place($shadow, 'top-left', $cardX, $cardY + 18, 26);
+        $canvas->place($shadow, 'top-left', $cardX, $cardY + 22, 34);
 
         $card = $manager->create($cardWidth, $cardHeight)->fill($cardColor);
         $canvas->place($card, 'top-left', $cardX, $cardY, $cardOpacity);
@@ -294,15 +298,38 @@ class ImageEncoderService
             $rectangle->border($borderColor, 3);
         });
 
+        $accent = $manager->create($cardWidth - 72, 10)->fill($accentColor);
+        $canvas->place($accent, 'top-left', $cardX + 36, $cardY + 28, 86);
+
+        $shine = $manager->create($cardWidth - 96, 1)->fill('ffffff');
+        $canvas->place($shine, 'top-left', $cardX + 48, $cardY + 56, 22);
+
         $advert = $this->readImageWithTransparentTrim($manager, $advertImagePath);
         $this->placeContainedImageOnCanvas(
             $canvas,
             $advert,
-            $cardX + 54,
-            $cardY + 38,
-            $cardWidth - 108,
-            $cardHeight - 76
+            $cardX + 58,
+            $cardY + 72,
+            $cardWidth - 116,
+            $cardHeight - 108
         );
+    }
+
+    private function placeBottomFade(
+        ImageManager $manager,
+        Image $canvas,
+        int $canvasWidth,
+        int $canvasHeight
+    ): void {
+        $startY = (int) floor($canvasHeight * 0.48);
+        $steps = 18;
+        $stepHeight = (int) ceil(($canvasHeight - $startY) / $steps);
+
+        for ($step = 0; $step < $steps; $step++) {
+            $opacity = min(52, 6 + ($step * 3));
+            $overlay = $manager->create($canvasWidth, $stepHeight)->fill('000000');
+            $canvas->place($overlay, 'top-left', 0, $startY + ($step * $stepHeight), $opacity);
+        }
     }
 
     private function placeContainedImageOnCanvas(
