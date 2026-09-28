@@ -227,7 +227,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('layout', 'story');
-        $response->assertJsonPath('available_layouts', ['story', 'balanced', 'ad_focus', 'smart_overlay']);
+        $response->assertJsonPath('available_layouts', ['story', 'balanced', 'ad_focus', 'smart_overlay', 'floating_advert']);
         $filename = $response->json('filename');
         $encodedPath = public_path('storage/image_ads/encoded/'.$filename);
 
@@ -264,7 +264,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
             'image_path' => 'personalized-advert-tests/footer-blue.png',
         ]);
 
-        foreach (['story', 'balanced', 'ad_focus', 'smart_overlay'] as $layout) {
+        foreach (['story', 'balanced', 'ad_focus', 'smart_overlay', 'floating_advert'] as $layout) {
             $response = $this->post('/api/v1/image/stamp', [
                 'identifier' => '1234567890',
                 'advert_id' => $advert->id,

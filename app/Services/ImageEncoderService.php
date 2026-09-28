@@ -13,6 +13,7 @@ class ImageEncoderService
 {
     private const DEFAULT_LAYOUT = 'story';
     private const SMART_OVERLAY_LAYOUT = 'smart_overlay';
+    private const FLOATING_ADVERT_LAYOUT = 'floating_advert';
 
     public function __construct(private readonly InvisibleImageWatermarkService $watermarks)
     {
@@ -26,6 +27,7 @@ class ImageEncoderService
         return [
             ...array_keys(self::splitLayoutConfigs()),
             self::SMART_OVERLAY_LAYOUT,
+            self::FLOATING_ADVERT_LAYOUT,
         ];
     }
 
@@ -170,6 +172,19 @@ class ImageEncoderService
     ): void {
         if ($layout === self::SMART_OVERLAY_LAYOUT) {
             $this->placeSmartOverlayLayout(
+                $manager,
+                $canvas,
+                $mainImagePath,
+                $footerImagePath,
+                $canvasWidth,
+                $canvasHeight
+            );
+
+            return;
+        }
+
+        if ($layout === self::FLOATING_ADVERT_LAYOUT) {
+            $this->placeFloatingAdvertLayout(
                 $manager,
                 $canvas,
                 $mainImagePath,
@@ -339,6 +354,130 @@ class ImageEncoderService
             $opacity = min(52, 6 + ($step * 3));
             $overlay = $manager->create($canvasWidth, $stepHeight)->fill('000000');
             $canvas->place($overlay, 'top-left', 0, $startY + ($step * $stepHeight), $opacity);
+        }
+    }
+
+    private function placeFloatingAdvertLayout(
+        ImageManager $manager,
+        Image $canvas,
+        string $mainImagePath,
+        string $advertImagePath,
+        int $canvasWidth,
+        int $canvasHeight
+    ): void {
+        $backdrop = $manager->create($canvasWidth, $canvasHeight)->fill('0b1020');
+        $canvas->place($backdrop, 'top-left', 0, 0);
+
+        $userImage = $manager->read($mainImagePath);
+        $this->placeContainedImageOnCanvas(
+            $canvas,
+            $userImage,
+            0,
+            0,
+            $canvasWidth,
+            $canvasHeight
+        );
+
+        $this->placeBottomFade($manager, $canvas, $canvasWidth, $canvasHeight);
+
+        $advert = $this->readImageWithTransparentTrim($manager, $advertImagePath);
+        [$advertWidth, $advertHeight] = $this->resizeImageToFit(
+            $advert,
+            (int) floor($canvasWidth * 0.54),
+            320
+        );
+
+        $advertX = $canvasWidth - $advertWidth - 76;
+        $advertY = $canvasHeight - $advertHeight - 150;
+        $advertLuminance = $this->averageOpaqueLuminance($advertImagePath);
+        $isDarkAdvert = $advertLuminance < 95;
+
+        $glowColor = $isDarkAdvert ? [245, 158, 11] : [0, 0, 0];
+        $haloColor = $isDarkAdvert ? [255, 255, 255] : [245, 158, 11];
+
+        $this->placeEllipseGlow(
+            $manager,
+            $canvas,
+            $advertX + (int) floor($advertWidth / 2),
+            $advertY + (int) floor($advertHeight / 2) + 14,
+            $advertWidth + 170,
+            $advertHeight + 120,
+            $glowColor,
+            78
+        );
+
+        $this->placeEllipseGlow(
+            $manager,
+            $canvas,
+            $advertX + (int) floor($advertWidth / 2),
+            $advertY + (int) floor($advertHeight / 2) - 2,
+            $advertWidth + 78,
+            $advertHeight + 56,
+            $haloColor,
+            102
+        );
+
+        $shadow = clone $advert;
+        $canvas->place($shadow, 'top-left', $advertX + 10, $advertY + 12, 28);
+        $canvas->place($advert, 'top-left', $advertX, $advertY);
+    }
+
+    /**
+     * @param array{0: int, 1: int, 2: int} $rgb
+     */
+    private function placeEllipseGlow(
+        ImageManager $manager,
+        Image $canvas,
+        int $centerX,
+        int $centerY,
+        int $width,
+        int $height,
+        array $rgb,
+        int $alpha
+    ): void {
+        $width = max(1, $width);
+        $height = max(1, $height);
+        $source = imagecreatetruecolor($width, $height);
+
+        if ($source === false) {
+            return;
+        }
+
+        imagealphablending($source, false);
+        imagesavealpha($source, true);
+        $transparent = imagecolorallocatealpha($source, 0, 0, 0, 127);
+        imagefilledrectangle($source, 0, 0, $width, $height, $transparent);
+
+        $color = imagecolorallocatealpha(
+            $source,
+            max(0, min(255, $rgb[0])),
+            max(0, min(255, $rgb[1])),
+            max(0, min(255, $rgb[2])),
+            max(0, min(127, $alpha))
+        );
+        imagefilledellipse($source, (int) floor($width / 2), (int) floor($height / 2), $width, $height, $color);
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'visible_glow_');
+
+        if ($tempPath === false) {
+            imagedestroy($source);
+
+            return;
+        }
+
+        imagepng($source, $tempPath);
+        imagedestroy($source);
+
+        try {
+            $glow = $manager->read($tempPath);
+            $canvas->place(
+                $glow,
+                'top-left',
+                $centerX - (int) floor($width / 2),
+                $centerY - (int) floor($height / 2)
+            );
+        } finally {
+            @unlink($tempPath);
         }
     }
 
