@@ -318,14 +318,19 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
             $image = imagecreatefrompng($encodedPath);
             $pixel = imagecolorat($image, 540, 1055);
+            $cardPixel = imagecolorat($image, 120, 930);
             imagedestroy($image);
 
             $red = ($pixel >> 16) & 0xFF;
             $green = ($pixel >> 8) & 0xFF;
             $blue = $pixel & 0xFF;
+            $cardRed = ($cardPixel >> 16) & 0xFF;
+            $cardGreen = ($cardPixel >> 8) & 0xFF;
+            $cardBlue = $cardPixel & 0xFF;
 
             $this->assertGreaterThan($red, $green);
             $this->assertGreaterThan($blue, $green);
+            $this->assertFalse($cardRed > 230 && $cardGreen > 230 && $cardBlue > 230);
         } finally {
             File::delete($encodedPath);
         }

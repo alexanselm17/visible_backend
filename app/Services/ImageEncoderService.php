@@ -271,29 +271,18 @@ class ImageEncoderService
         int $canvasWidth,
         int $canvasHeight
     ): void {
-        $background = $manager->read($mainImagePath);
-        $this->cover($background, $canvasWidth, $canvasHeight);
-        $background->blur(18);
-        $canvas->place($background, 'top-left', 0, 0);
-
         $userImage = $manager->read($mainImagePath);
-        $this->placeContainedImageOnCanvas(
-            $canvas,
-            $userImage,
-            0,
-            0,
-            $canvasWidth,
-            $canvasHeight
-        );
+        $this->cover($userImage, $canvasWidth, $canvasHeight);
+        $canvas->place($userImage, 'top-left', 0, 0);
 
         $cardWidth = 900;
         $cardHeight = 290;
         $cardX = (int) floor(($canvasWidth - $cardWidth) / 2);
         $cardY = $canvasHeight - $cardHeight - 150;
         $advertLuminance = $this->averageOpaqueLuminance($advertImagePath);
-        $cardColor = $advertLuminance > 165 ? '101827' : 'ffffff';
-        $borderColor = $advertLuminance > 165 ? 'ffffff' : '111827';
-        $cardOpacity = $advertLuminance > 165 ? 84 : 90;
+        $cardColor = $advertLuminance < 95 ? 'f59e0b' : '111827';
+        $borderColor = $advertLuminance < 95 ? '92400e' : '334155';
+        $cardOpacity = $advertLuminance < 95 ? 72 : 68;
 
         $shadow = $manager->create($cardWidth, $cardHeight)->fill('000000');
         $canvas->place($shadow, 'top-left', $cardX, $cardY + 18, 26);
