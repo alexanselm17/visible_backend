@@ -227,7 +227,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('layout', 'story');
-        $response->assertJsonPath('available_layouts', ['story', 'balanced', 'ad_focus']);
+        $response->assertJsonPath('available_layouts', ['story', 'balanced', 'ad_focus', 'smart_overlay']);
         $filename = $response->json('filename');
         $encodedPath = public_path('storage/image_ads/encoded/'.$filename);
 
@@ -264,7 +264,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
             'image_path' => 'personalized-advert-tests/footer-blue.png',
         ]);
 
-        foreach (['story', 'balanced', 'ad_focus'] as $layout) {
+        foreach (['story', 'balanced', 'ad_focus', 'smart_overlay'] as $layout) {
             $response = $this->post('/api/v1/image/stamp', [
                 'identifier' => '1234567890',
                 'advert_id' => $advert->id,
@@ -285,6 +285,49 @@ class PersonalizedAdvertDownloadTest extends TestCase
             } finally {
                 File::delete($encodedPath);
             }
+        }
+    }
+
+    public function test_smart_overlay_layout_keeps_a_transparent_advert_visible(): void
+    {
+        $transparentAdvertPath = $this->sourceDirectory.'/transparent-advert.png';
+        $this->createTransparentPngWithRectangle($transparentAdvertPath, 900, 420, [22, 180, 85]);
+
+        $advert = AdvertImages::create([
+            'id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            'name' => 'Transparent Advert',
+            'image_path' => 'personalized-advert-tests/transparent-advert.png',
+        ]);
+
+        $response = $this->post('/api/v1/image/stamp', [
+            'identifier' => '1234567890',
+            'advert_id' => $advert->id,
+            'image' => UploadedFile::fake()->image('dark-user-image.png', 500, 900),
+            'layout' => 'smart_overlay',
+        ], ['Accept' => 'application/json']);
+
+        $response->assertOk();
+        $response->assertJsonPath('layout', 'smart_overlay');
+        $encodedPath = public_path('storage/image_ads/encoded/'.$response->json('filename'));
+
+        try {
+            $this->assertFileExists($encodedPath);
+            [$width, $height] = getimagesize($encodedPath);
+            $this->assertSame(1080, $width);
+            $this->assertSame(1350, $height);
+
+            $image = imagecreatefrompng($encodedPath);
+            $pixel = imagecolorat($image, 540, 1055);
+            imagedestroy($image);
+
+            $red = ($pixel >> 16) & 0xFF;
+            $green = ($pixel >> 8) & 0xFF;
+            $blue = $pixel & 0xFF;
+
+            $this->assertGreaterThan($red, $green);
+            $this->assertGreaterThan($blue, $green);
+        } finally {
+            File::delete($encodedPath);
         }
     }
 
@@ -366,6 +409,23 @@ class PersonalizedAdvertDownloadTest extends TestCase
         $image = imagecreatetruecolor($width, $height);
         $color = imagecolorallocate($image, $rgb[0], $rgb[1], $rgb[2]);
         imagefilledrectangle($image, 0, 0, $width, $height, $color);
+        imagepng($image, $path);
+        imagedestroy($image);
+    }
+
+    private function createTransparentPngWithRectangle(string $path, int $width, int $height, array $rgb): void
+    {
+        $image = imagecreatetruecolor($width, $height);
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+
+        $transparent = imagecolorallocatealpha($image, 0, 0, 0, 127);
+        imagefilledrectangle($image, 0, 0, $width, $height, $transparent);
+
+        imagealphablending($image, true);
+        $color = imagecolorallocatealpha($image, $rgb[0], $rgb[1], $rgb[2], 0);
+        imagefilledrectangle($image, 180, 110, $width - 180, $height - 110, $color);
+
         imagepng($image, $path);
         imagedestroy($image);
     }

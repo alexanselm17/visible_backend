@@ -12,6 +12,7 @@ use RuntimeException;
 class ImageEncoderService
 {
     private const DEFAULT_LAYOUT = 'story';
+    private const SMART_OVERLAY_LAYOUT = 'smart_overlay';
 
     public function __construct(private readonly InvisibleImageWatermarkService $watermarks)
     {
@@ -22,7 +23,10 @@ class ImageEncoderService
      */
     public static function supportedLayouts(): array
     {
-        return array_keys(self::splitLayoutConfigs());
+        return [
+            ...array_keys(self::splitLayoutConfigs()),
+            self::SMART_OVERLAY_LAYOUT,
+        ];
     }
 
     /**
@@ -164,6 +168,19 @@ class ImageEncoderService
         int $canvasHeight,
         string $layout
     ): void {
+        if ($layout === self::SMART_OVERLAY_LAYOUT) {
+            $this->placeSmartOverlayLayout(
+                $manager,
+                $canvas,
+                $mainImagePath,
+                $footerImagePath,
+                $canvasWidth,
+                $canvasHeight
+            );
+
+            return;
+        }
+
         $config = self::splitLayoutConfigs()[$layout];
         $sectionGap = 18;
         $mainHeight = $config['main_height'];
@@ -244,6 +261,232 @@ class ImageEncoderService
                 'advert_overlay' => 8,
             ],
         ];
+    }
+
+    private function placeSmartOverlayLayout(
+        ImageManager $manager,
+        Image $canvas,
+        string $mainImagePath,
+        string $advertImagePath,
+        int $canvasWidth,
+        int $canvasHeight
+    ): void {
+        $background = $manager->read($mainImagePath);
+        $this->cover($background, $canvasWidth, $canvasHeight);
+        $background->blur(18);
+        $canvas->place($background, 'top-left', 0, 0);
+
+        $userImage = $manager->read($mainImagePath);
+        $this->placeContainedImageOnCanvas(
+            $canvas,
+            $userImage,
+            0,
+            0,
+            $canvasWidth,
+            $canvasHeight
+        );
+
+        $cardWidth = 900;
+        $cardHeight = 290;
+        $cardX = (int) floor(($canvasWidth - $cardWidth) / 2);
+        $cardY = $canvasHeight - $cardHeight - 150;
+        $advertLuminance = $this->averageOpaqueLuminance($advertImagePath);
+        $cardColor = $advertLuminance > 165 ? '101827' : 'ffffff';
+        $borderColor = $advertLuminance > 165 ? 'ffffff' : '111827';
+        $cardOpacity = $advertLuminance > 165 ? 84 : 90;
+
+        $shadow = $manager->create($cardWidth, $cardHeight)->fill('000000');
+        $canvas->place($shadow, 'top-left', $cardX, $cardY + 18, 26);
+
+        $card = $manager->create($cardWidth, $cardHeight)->fill($cardColor);
+        $canvas->place($card, 'top-left', $cardX, $cardY, $cardOpacity);
+        $canvas->drawRectangle($cardX, $cardY, function ($rectangle) use ($cardWidth, $cardHeight, $borderColor) {
+            $rectangle->size($cardWidth, $cardHeight);
+            $rectangle->border($borderColor, 3);
+        });
+
+        $advert = $this->readImageWithTransparentTrim($manager, $advertImagePath);
+        $this->placeContainedImageOnCanvas(
+            $canvas,
+            $advert,
+            $cardX + 54,
+            $cardY + 38,
+            $cardWidth - 108,
+            $cardHeight - 76
+        );
+    }
+
+    private function placeContainedImageOnCanvas(
+        Image $canvas,
+        Image $image,
+        int $targetX,
+        int $targetY,
+        int $targetWidth,
+        int $targetHeight
+    ): void {
+        if ($targetWidth < 1 || $targetHeight < 1) {
+            throw new RuntimeException('The encoded image layout does not have enough space for the image.');
+        }
+
+        $scale = min($targetWidth / $image->width(), $targetHeight / $image->height());
+        $resizedWidth = (int) max(1, floor($image->width() * $scale));
+        $resizedHeight = (int) max(1, floor($image->height() * $scale));
+        $image->resize($resizedWidth, $resizedHeight);
+
+        $canvas->place(
+            $image,
+            'top-left',
+            $targetX + (int) floor(($targetWidth - $resizedWidth) / 2),
+            $targetY + (int) floor(($targetHeight - $resizedHeight) / 2)
+        );
+    }
+
+    private function readImageWithTransparentTrim(ImageManager $manager, string $imagePath): Image
+    {
+        $metadata = getimagesize($imagePath);
+
+        if (($metadata['mime'] ?? null) !== 'image/png') {
+            return $manager->read($imagePath);
+        }
+
+        $source = imagecreatefrompng($imagePath);
+
+        if ($source === false) {
+            return $manager->read($imagePath);
+        }
+
+        $width = imagesx($source);
+        $height = imagesy($source);
+        $bounds = $this->opaqueBounds($source, $width, $height);
+
+        if ($bounds === null) {
+            imagedestroy($source);
+
+            return $manager->read($imagePath);
+        }
+
+        [$minX, $minY, $maxX, $maxY] = $bounds;
+        $cropWidth = $maxX - $minX + 1;
+        $cropHeight = $maxY - $minY + 1;
+
+        if ($cropWidth >= $width && $cropHeight >= $height) {
+            imagedestroy($source);
+
+            return $manager->read($imagePath);
+        }
+
+        $cropped = imagecrop($source, [
+            'x' => $minX,
+            'y' => $minY,
+            'width' => $cropWidth,
+            'height' => $cropHeight,
+        ]);
+        imagedestroy($source);
+
+        if ($cropped === false) {
+            return $manager->read($imagePath);
+        }
+
+        imagealphablending($cropped, false);
+        imagesavealpha($cropped, true);
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'visible_advert_');
+
+        if ($tempPath === false) {
+            imagedestroy($cropped);
+
+            return $manager->read($imagePath);
+        }
+
+        imagepng($cropped, $tempPath);
+        imagedestroy($cropped);
+
+        try {
+            return $manager->read($tempPath);
+        } finally {
+            @unlink($tempPath);
+        }
+    }
+
+    /**
+     * @param resource|\GdImage $source
+     *
+     * @return array{0: int, 1: int, 2: int, 3: int}|null
+     */
+    private function opaqueBounds($source, int $width, int $height): ?array
+    {
+        $minX = $width;
+        $minY = $height;
+        $maxX = -1;
+        $maxY = -1;
+
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $rgba = imagecolorat($source, $x, $y);
+                $alpha = ($rgba & 0x7F000000) >> 24;
+
+                if ($alpha >= 120) {
+                    continue;
+                }
+
+                $minX = min($minX, $x);
+                $minY = min($minY, $y);
+                $maxX = max($maxX, $x);
+                $maxY = max($maxY, $y);
+            }
+        }
+
+        if ($maxX < 0 || $maxY < 0) {
+            return null;
+        }
+
+        return [$minX, $minY, $maxX, $maxY];
+    }
+
+    private function averageOpaqueLuminance(string $imagePath): float
+    {
+        $metadata = getimagesize($imagePath);
+        $mime = $metadata['mime'] ?? null;
+        $source = match ($mime) {
+            'image/png' => imagecreatefrompng($imagePath),
+            'image/jpeg' => imagecreatefromjpeg($imagePath),
+            default => false,
+        };
+
+        if ($source === false) {
+            return 120.0;
+        }
+
+        $width = imagesx($source);
+        $height = imagesy($source);
+        $step = max(1, (int) floor(max($width, $height) / 160));
+        $total = 0.0;
+        $count = 0;
+
+        for ($y = 0; $y < $height; $y += $step) {
+            for ($x = 0; $x < $width; $x += $step) {
+                $rgba = imagecolorat($source, $x, $y);
+                $alpha = ($rgba & 0x7F000000) >> 24;
+
+                if ($mime === 'image/png' && $alpha >= 120) {
+                    continue;
+                }
+
+                $red = ($rgba >> 16) & 0xFF;
+                $green = ($rgba >> 8) & 0xFF;
+                $blue = $rgba & 0xFF;
+                $total += ($red * 0.2126) + ($green * 0.7152) + ($blue * 0.0722);
+                $count++;
+            }
+        }
+
+        imagedestroy($source);
+
+        if ($count === 0) {
+            return 120.0;
+        }
+
+        return $total / $count;
     }
 
     private function normalizeLayout(?string $layout): string
