@@ -271,48 +271,58 @@ class ImageEncoderService
         int $canvasWidth,
         int $canvasHeight
     ): void {
+        $backdrop = $manager->create($canvasWidth, $canvasHeight)->fill('0b1020');
+        $canvas->place($backdrop, 'top-left', 0, 0);
+
         $userImage = $manager->read($mainImagePath);
-        $this->cover($userImage, $canvasWidth, $canvasHeight);
-        $canvas->place($userImage, 'top-left', 0, 0);
+        $this->placeContainedImageOnCanvas(
+            $canvas,
+            $userImage,
+            0,
+            0,
+            $canvasWidth,
+            $canvasHeight
+        );
 
         $this->placeBottomFade($manager, $canvas, $canvasWidth, $canvasHeight);
 
-        $cardWidth = 920;
-        $cardHeight = 330;
+        $advert = $this->readImageWithTransparentTrim($manager, $advertImagePath);
+        [$advertWidth, $advertHeight] = $this->resizeImageToFit(
+            $advert,
+            (int) floor($canvasWidth * 0.56),
+            310
+        );
+
+        $cardPaddingX = 32;
+        $cardPaddingY = 28;
+        $cardWidth = $advertWidth + ($cardPaddingX * 2);
+        $cardHeight = $advertHeight + ($cardPaddingY * 2) + 20;
         $cardX = (int) floor(($canvasWidth - $cardWidth) / 2);
-        $cardY = $canvasHeight - $cardHeight - 120;
+        $cardY = $canvasHeight - $cardHeight - 130;
         $advertLuminance = $this->averageOpaqueLuminance($advertImagePath);
         $isDarkAdvert = $advertLuminance < 95;
         $cardColor = $isDarkAdvert ? 'f59e0b' : '111827';
         $borderColor = $isDarkAdvert ? 'fbbf24' : '475569';
         $accentColor = $isDarkAdvert ? '111827' : 'f59e0b';
-        $cardOpacity = $isDarkAdvert ? 70 : 72;
+        $cardOpacity = $isDarkAdvert ? 62 : 58;
 
         $shadow = $manager->create($cardWidth, $cardHeight)->fill('000000');
-        $canvas->place($shadow, 'top-left', $cardX, $cardY + 22, 34);
+        $canvas->place($shadow, 'top-left', $cardX, $cardY + 16, 32);
 
         $card = $manager->create($cardWidth, $cardHeight)->fill($cardColor);
         $canvas->place($card, 'top-left', $cardX, $cardY, $cardOpacity);
         $canvas->drawRectangle($cardX, $cardY, function ($rectangle) use ($cardWidth, $cardHeight, $borderColor) {
             $rectangle->size($cardWidth, $cardHeight);
-            $rectangle->border($borderColor, 3);
+            $rectangle->border($borderColor, 2);
         });
 
-        $accent = $manager->create($cardWidth - 72, 10)->fill($accentColor);
-        $canvas->place($accent, 'top-left', $cardX + 36, $cardY + 28, 86);
+        $accent = $manager->create($cardWidth - 54, 7)->fill($accentColor);
+        $canvas->place($accent, 'top-left', $cardX + 27, $cardY + 20, 82);
 
-        $shine = $manager->create($cardWidth - 96, 1)->fill('ffffff');
-        $canvas->place($shine, 'top-left', $cardX + 48, $cardY + 56, 22);
+        $shine = $manager->create($cardWidth - 70, 1)->fill('ffffff');
+        $canvas->place($shine, 'top-left', $cardX + 35, $cardY + 40, 18);
 
-        $advert = $this->readImageWithTransparentTrim($manager, $advertImagePath);
-        $this->placeContainedImageOnCanvas(
-            $canvas,
-            $advert,
-            $cardX + 58,
-            $cardY + 72,
-            $cardWidth - 116,
-            $cardHeight - 108
-        );
+        $canvas->place($advert, 'top-left', $cardX + $cardPaddingX, $cardY + $cardPaddingY + 20);
     }
 
     private function placeBottomFade(
@@ -321,7 +331,7 @@ class ImageEncoderService
         int $canvasWidth,
         int $canvasHeight
     ): void {
-        $startY = (int) floor($canvasHeight * 0.48);
+        $startY = (int) floor($canvasHeight * 0.58);
         $steps = 18;
         $stepHeight = (int) ceil(($canvasHeight - $startY) / $steps);
 
@@ -344,10 +354,7 @@ class ImageEncoderService
             throw new RuntimeException('The encoded image layout does not have enough space for the image.');
         }
 
-        $scale = min($targetWidth / $image->width(), $targetHeight / $image->height());
-        $resizedWidth = (int) max(1, floor($image->width() * $scale));
-        $resizedHeight = (int) max(1, floor($image->height() * $scale));
-        $image->resize($resizedWidth, $resizedHeight);
+        [$resizedWidth, $resizedHeight] = $this->resizeImageToFit($image, $targetWidth, $targetHeight);
 
         $canvas->place(
             $image,
@@ -355,6 +362,23 @@ class ImageEncoderService
             $targetX + (int) floor(($targetWidth - $resizedWidth) / 2),
             $targetY + (int) floor(($targetHeight - $resizedHeight) / 2)
         );
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function resizeImageToFit(Image $image, int $targetWidth, int $targetHeight): array
+    {
+        if ($targetWidth < 1 || $targetHeight < 1) {
+            throw new RuntimeException('The encoded image layout does not have enough space for the image.');
+        }
+
+        $scale = min($targetWidth / $image->width(), $targetHeight / $image->height());
+        $resizedWidth = (int) max(1, floor($image->width() * $scale));
+        $resizedHeight = (int) max(1, floor($image->height() * $scale));
+        $image->resize($resizedWidth, $resizedHeight);
+
+        return [$resizedWidth, $resizedHeight];
     }
 
     private function readImageWithTransparentTrim(ImageManager $manager, string $imagePath): Image

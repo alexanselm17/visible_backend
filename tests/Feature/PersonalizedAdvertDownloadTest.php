@@ -318,7 +318,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
             $image = imagecreatefrompng($encodedPath);
             $pixel = imagecolorat($image, 540, 1055);
-            $cardPixel = imagecolorat($image, 120, 930);
+            $cardPixel = imagecolorat($image, 230, 955);
             imagedestroy($image);
 
             $red = ($pixel >> 16) & 0xFF;
