@@ -63,8 +63,7 @@ Route::group(['prefix' => 'v1'], function () {
             Route::post('/repost_product_advert', [ProductController::class, 'repostAdvertProducts']);
             Route::get('/get_product_advert', [ProductController::class, 'getAdvertProducts']);
             Route::post('/upload_screenshot/{advert_id}', [ProductController::class, 'uploadScreenShotPlusCompare']);
-            Route::post('/manual_screenshot/{advert_id}', [ProductController::class, 'submitManualScreenshot'])
-                ->middleware('permission:advert_operations');
+            Route::post('/manual_screenshot/{advert_id}', [ProductController::class, 'submitManualScreenshot']);
             Route::get('/dashboard/{userId}', [ProductController::class, 'getDashboardData']);
             Route::get('/admin_dashboard', [ProductController::class, 'getAdminDashboardData']);
         });
