@@ -19,6 +19,8 @@ interface ProductRepositoryInterface
 
     public function uploadScreenShotPlusCompare(Request $request, $advert_id);
 
+    public function submitManualScreenshot(Request $request, $advert_id);
+
     public function getCampaigns(Request $request);
 
     public function getAdvertCampaigns(Request $request, $campaignId);

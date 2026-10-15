@@ -757,6 +757,234 @@ class ProductRepository implements ProductRepositoryInterface
         }
     }
 
+    public function submitManualScreenshot(Request $request, $advert_id)
+    {
+        DB::beginTransaction();
+        $receiptPath = null;
+
+        try {
+            $request->validate([
+                'user_id' => 'required|uuid|exists:users,id',
+                'views' => 'required|integer|min:0',
+                'timestamp' => 'nullable|string|max:255',
+            ]);
+
+            $userId = (string) $request->input('user_id');
+            $user = User::findOrFail($userId);
+            $advert = AdvertImages::find($advert_id);
+
+            if (! $advert) {
+                DB::rollBack();
+
+                return response()->json(['message' => 'Advert not found.'], 404);
+            }
+
+            $campaign = Campaign::leftJoin('advert_images', 'campaigns.id', '=', 'advert_images.campaign_id')
+                ->where('advert_images.id', $advert_id)
+                ->select('campaigns.*')
+                ->first();
+
+            if (! $campaign) {
+                DB::rollBack();
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'Campaign not found for the given advert ID',
+                ], 404);
+            }
+
+            $previousScreenshot = Screenshots::where('advert_id', $advert_id)
+                ->where('processed_by', $userId)
+                ->lockForUpdate()
+                ->latest()
+                ->first();
+
+            $allStarted = Screenshots::where('advert_id', $advert_id)
+                ->where('number', 1)
+                ->count();
+
+            if ($previousScreenshot === null && $allStarted >= $advert->capacity) {
+                DB::rollBack();
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'This campaign has reached full capacity. Thank you for your interest.',
+                ], 400);
+            }
+
+            if ($previousScreenshot !== null) {
+                $previousTime = Carbon::parse($previousScreenshot->created_at)->timezone('Africa/Nairobi');
+                $eighteenHoursAgo = Carbon::now('Africa/Nairobi')->subHours(18);
+
+                if ($previousTime > $eighteenHoursAgo) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => 'You can only process this after 18 hours since your last submission.',
+                    ], 400);
+                }
+
+                if ((int) $previousScreenshot->number === 2) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'ok' => false,
+                        'status' => 'failed',
+                        'message' => 'Already Completed this task',
+                    ], 400);
+                }
+            }
+
+            $verifiedViews = (int) $request->input('views');
+            $number = $previousScreenshot ? ((int) $previousScreenshot->number + 1) : 1;
+
+            if ($previousScreenshot !== null && (int) $previousScreenshot->views >= $verifiedViews) {
+                DB::rollBack();
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'This screenshot seems to have equal or lower views than your previous submission. Please try again with a higher view count.',
+                ], 400);
+            }
+
+            if ($number === 2 && $verifiedViews < 50) {
+                DB::rollBack();
+
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'failed',
+                    'message' => 'To complete this task, your status must have at least 50 views. Please try again once you have met this requirement.',
+                ], 400);
+            }
+
+            $timestamp = $request->filled('timestamp')
+                ? (string) $request->input('timestamp')
+                : Carbon::now('Africa/Nairobi')->toDateTimeString();
+
+            $receiptPath = $this->createManualScreenshotReceipt($advert, $user, $verifiedViews, $timestamp, $number);
+
+            $screenshot = new Screenshots;
+            $screenshot->screenshot = $receiptPath;
+            $screenshot->advert_id = $advert_id;
+            $screenshot->views = $verifiedViews;
+            $screenshot->timestamp = $timestamp;
+            $screenshot->processed_by = $userId;
+            $screenshot->number = $number;
+            $screenshot->save();
+
+            $message = 'Manual screenshot submission recorded. | Views: '.$verifiedViews;
+
+            if ($number === 2) {
+                app(RewardPeriodService::class)->recordAdvertCompletion($userId, $advert);
+                $message = 'Task completed manually. Your performance earnings estimate has been updated.';
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'ok' => true,
+                'status' => 'success',
+                'message' => $message,
+                'views' => $verifiedViews,
+                'path' => $receiptPath,
+                'data' => [
+                    'advert_id' => (string) $advert_id,
+                    'user_id' => $userId,
+                    'number' => $number,
+                    'timestamp' => $timestamp,
+                    'manual' => true,
+                ],
+            ]);
+        } catch (ValidationException $exception) {
+            DB::rollBack();
+            $this->deleteManualReceipt($receiptPath);
+            $errors = $exception->errors();
+
+            return response()->json([
+                'ok' => false,
+                'status' => 'failed',
+                'message' => collect($errors)->flatten()->first() ?? 'Manual screenshot submission failed.',
+                'errors' => $errors,
+            ], 422);
+        } catch (\Throwable $th) {
+            DB::rollBack();
+            $this->deleteManualReceipt($receiptPath);
+            Log::error('Error recording manual screenshot submission: '.$th->getMessage());
+
+            return response()->json([
+                'message' => 'An error occurred.',
+                'error' => $th->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function createManualScreenshotReceipt(
+        AdvertImages $advert,
+        User $user,
+        int $views,
+        string $timestamp,
+        int $number
+    ): string {
+        $directory = public_path('storage/screenshots');
+
+        if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            throw new \RuntimeException('The screenshots directory could not be created.');
+        }
+
+        $width = 900;
+        $height = 520;
+        $image = imagecreatetruecolor($width, $height);
+
+        if ($image === false) {
+            throw new \RuntimeException('The manual screenshot receipt could not be created.');
+        }
+
+        $background = imagecolorallocate($image, 15, 23, 42);
+        $panel = imagecolorallocate($image, 30, 41, 59);
+        $accent = imagecolorallocate($image, 245, 158, 11);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $muted = imagecolorallocate($image, 203, 213, 225);
+
+        imagefilledrectangle($image, 0, 0, $width, $height, $background);
+        imagefilledrectangle($image, 40, 40, $width - 40, $height - 40, $panel);
+        imagefilledrectangle($image, 40, 40, $width - 40, 52, $accent);
+
+        imagestring($image, 5, 74, 88, 'Manual WhatsApp Screenshot Submission', $white);
+        imagestring($image, 4, 74, 145, 'Advert: '.substr((string) $advert->name, 0, 70), $muted);
+        imagestring($image, 4, 74, 188, 'Advert ID: '.$advert->id, $muted);
+        imagestring($image, 4, 74, 231, 'User: '.substr((string) ($user->fullname ?: $user->id), 0, 70), $muted);
+        imagestring($image, 4, 74, 274, 'User ID: '.$user->id, $muted);
+        imagestring($image, 5, 74, 332, 'Views: '.$views, $white);
+        imagestring($image, 4, 74, 382, 'Screenshot #: '.$number, $muted);
+        imagestring($image, 4, 74, 425, 'Timestamp: '.$timestamp, $muted);
+
+        $filename = 'manual_'.time().'_'.Str::uuid().'.png';
+        $absolutePath = $directory.'/'.$filename;
+
+        imagepng($image, $absolutePath);
+        imagedestroy($image);
+
+        return 'screenshots/'.$filename;
+    }
+
+    private function deleteManualReceipt(?string $path): void
+    {
+        if ($path === null || ! str_starts_with($path, 'screenshots/manual_')) {
+            return;
+        }
+
+        $absolutePath = public_path('storage/'.$path);
+
+        if (is_file($absolutePath)) {
+            @unlink($absolutePath);
+        }
+    }
+
     public function getAdvertCampaignsFraud(Request $request, $campaignId)
     {
         try {

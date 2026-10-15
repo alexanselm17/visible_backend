@@ -62,6 +62,11 @@ class ProductController extends Controller
         return $this->productRepository->uploadScreenShotPlusCompare($request, $advert_id);
     }
 
+    public function submitManualScreenshot(Request $request, $advert_id)
+    {
+        return $this->productRepository->submitManualScreenshot($request, $advert_id);
+    }
+
     public function getDashboardData(Request $request, $userId)
     {
         return $this->productRepository->getDashboardData($request, $userId);
