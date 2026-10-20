@@ -105,7 +105,7 @@ class TokenOnlyAdvertSubmissionController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => $insufficient
-                    ? 'Insufficient token balance for this advert and target reach.'
+                    ? 'Your token balance is too low to run this advert and reach your selected audience. Please top up your tokens to continue.'
                     : 'Advert submission validation failed.',
                 'errors' => $e->errors(),
             ], $insufficient ? 402 : 422);
@@ -436,18 +436,18 @@ class TokenOnlyAdvertSubmissionController extends Controller
 
     private function storeFile($file, string $folder, array &$storedFiles): string
     {
-        $directory = public_path('storage/'.$folder);
+        $directory = public_path('storage/' . $folder);
         if (! is_dir($directory)) {
             mkdir($directory, 0755, true);
         }
 
         $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
-        $name = time().'_'.Str::random(8).'_'.$safe;
+        $name = time() . '_' . Str::random(8) . '_' . $safe;
         $file->move($directory, $name);
 
-        $storedFiles[] = $directory.DIRECTORY_SEPARATOR.$name;
+        $storedFiles[] = $directory . DIRECTORY_SEPARATOR . $name;
 
-        return $folder.'/'.$name;
+        return $folder . '/' . $name;
     }
 
     private function manager(Request $request): void
