@@ -28,13 +28,13 @@ class EnsureCampaignOwner
             ], 404);
         }
 
-        // Adjust this depending on your role structure
         $roleSlug = $user->role->slug ?? null;
 
-        if ($roleSlug !== 'campaign_owner') {
+        // Allow campaign owners and admins
+        if (!in_array($roleSlug, ['campaign_owner', 'admin'])) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Unauthorized. Campaign owner role required.'
+                'message' => 'Unauthorized. Campaign owner or admin role required.'
             ], 403);
         }
 
