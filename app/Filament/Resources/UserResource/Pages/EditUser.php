@@ -9,22 +9,18 @@ class EditUser extends EditRecord
 {
     protected static string $resource = UserResource::class;
 
-    protected function mutateFormDataBeforeSave(array $data): array
-    {
-        if (! \App\Support\AdminAccess::allows('settings')) {
-            unset($data['role_id'], $data['permissions']);
-        }
-        if (($data['phone'] ?? null) !== $this->record->phone) {
-            $data['phone_verified_at'] = null;
-        }
+    use \App\Filament\Support\NotifiesWorkflowErrors;
 
-        return $data;
+    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
+    {
+        return app(\App\Services\AdminUserService::class)->update($record, $data);
     }
 
-    protected function afterSave(): void
+    protected function getHeaderActions(): array
     {
-        if (! $this->record->is_active) {
-            $this->record->tokens()->delete();
-        }
+        return [
+            \Filament\Actions\ViewAction::make(),
+            \Filament\Actions\ActionGroup::make(\App\Filament\Support\UserAccountActions::make(\Filament\Actions\Action::class, $this->record))->label('Manage account')->button(),
+        ];
     }
 }

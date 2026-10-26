@@ -70,6 +70,8 @@ class AdvertSubmissionResource extends OperationsResource
                 SelectFilter::make('status')->options(array_combine(\App\Enums\AdvertSubmissionStatus::all(), \App\Enums\AdvertSubmissionStatus::all())),
                 SelectFilter::make('type')->options(['IMAGE' => 'Image', 'VIDEO' => 'Video', 'TEXT' => 'Text']),
                 SelectFilter::make('submitted_by')->relationship('user', 'fullname')->searchable()->label('Owner'),
+                SelectFilter::make('designed_by')->relationship('designer', 'fullname')->searchable()->label('Designer'),
+                SelectFilter::make('reviewed_by')->relationship('reviewer', 'fullname')->searchable()->label('Reviewer'),
             ])->actions([
                 A\ViewAction::make()->label('Brief & files')->modalWidth('5xl'),
                 A\ActionGroup::make([

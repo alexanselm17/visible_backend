@@ -6,6 +6,13 @@ use App\Filament\Support\CatalogResource;
 
 class RewardLedgerEntryResource extends CatalogResource
 {
+    public static function table(\Filament\Tables\Table $table): \Filament\Tables\Table
+    {
+        return parent::table($table)->filters([
+            \Filament\Tables\Filters\SelectFilter::make('user_id')->relationship('user', 'fullname')->label('User')->searchable(),
+        ]);
+    }
+
     protected static ?string $model = \App\Models\RewardLedgerEntry::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';

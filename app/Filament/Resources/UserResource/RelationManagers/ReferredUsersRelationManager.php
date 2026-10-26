@@ -11,7 +11,9 @@ class ReferredUsersRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return \App\Filament\Resources\UserResource::table($table)->headerActions([])->actions([])->bulkActions([]);
+        return \App\Filament\Resources\UserResource::table($table)
+            ->modifyQueryUsing(fn ($query) => $query->withoutGlobalScopes([\Illuminate\Database\Eloquent\SoftDeletingScope::class]))
+            ->headerActions([])->actions([])->bulkActions([]);
     }
 
     public function isReadOnly(): bool

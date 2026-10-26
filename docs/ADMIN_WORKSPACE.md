@@ -2,6 +2,8 @@
 
 Open **/admin** in the application served from this checkout. Sign in with an active admin, developer or manager account using its username and password.
 
+For the full user workspace, filters, account/phone/email verification and audit controls, see [User management](USER_MANAGEMENT.md).
+
 ## Feature map
 
 | Workspace | Screens and actions |

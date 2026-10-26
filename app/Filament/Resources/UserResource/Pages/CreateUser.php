@@ -9,12 +9,8 @@ class CreateUser extends CreateRecord
 {
     protected static string $resource = UserResource::class;
 
-    protected function mutateFormDataBeforeCreate(array $data): array
+    protected function handleRecordCreation(array $data): \Illuminate\Database\Eloquent\Model
     {
-        do {
-            $data['my_code'] = (string) random_int(1000000000, 9999999999);
-        } while (\App\Models\User::where('my_code', $data['my_code'])->exists());
-
-        return $data;
+        return app(\App\Services\AdminUserService::class)->create($data);
     }
 }

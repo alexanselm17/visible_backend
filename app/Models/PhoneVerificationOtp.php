@@ -9,6 +9,8 @@ class PhoneVerificationOtp extends Model
 {
     use HasUuids;
 
+    protected $hidden = ['code_hash'];
+
     public const SIGNUP = 'signup';
 
     protected $fillable = [

@@ -40,6 +40,7 @@ class AdvertSubmission extends Model
     ];
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $casts = [
@@ -98,17 +99,17 @@ class AdvertSubmission extends Model
 
     public function getFinalImageUrlAttribute()
     {
-        return $this->final_image_path ? asset('storage/' . $this->final_image_path) : null;
+        return $this->final_image_path ? asset('storage/'.$this->final_image_path) : null;
     }
 
     public function getFinalVideoUrlAttribute()
     {
-        return $this->final_video_path ? asset('storage/' . $this->final_video_path) : null;
+        return $this->final_video_path ? asset('storage/'.$this->final_video_path) : null;
     }
 
     public function getFinalThumbnailUrlAttribute()
     {
-        return $this->final_thumbnail_path ? asset('storage/' . $this->final_thumbnail_path) : null;
+        return $this->final_thumbnail_path ? asset('storage/'.$this->final_thumbnail_path) : null;
     }
 
     public function campaign()
@@ -124,6 +125,11 @@ class AdvertSubmission extends Model
     public function designer()
     {
         return $this->belongsTo(User::class, 'designed_by');
+    }
+
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
     }
 
     public function tokenType()

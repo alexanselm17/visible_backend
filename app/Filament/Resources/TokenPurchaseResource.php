@@ -45,7 +45,10 @@ class TokenPurchaseResource extends OperationsResource
             C\TextColumn::make('quantity')->numeric()->sortable(), C\TextColumn::make('total_amount')->money(fn ($record) => $record->currency),
             Fields::status(), C\TextColumn::make('payment_reference')->copyable()->searchable()->placeholder('Awaiting payment'),
             C\TextColumn::make('paid_at')->dateTime()->placeholder('—'), C\TextColumn::make('created_at')->since()->sortable(),
-        ])->filters([SelectFilter::make('status')->options(array_combine(['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED'], ['Pending', 'Paid', 'Failed', 'Cancelled', 'Refunded']))])
+        ])->filters([
+            SelectFilter::make('status')->options(array_combine(['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED'], ['Pending', 'Paid', 'Failed', 'Cancelled', 'Refunded'])),
+            SelectFilter::make('user_id')->relationship('user', 'fullname')->label('User')->searchable(),
+        ])
             ->headerActions([
                 A\Action::make('new_purchase')->label('Record purchase')->form(fn (Form $form) => static::form($form))
                     ->action(function (array $data) {

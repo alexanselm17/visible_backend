@@ -11,9 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class PhoneOtpService
 {
-    public function __construct(private readonly TalkSasaSmsService $sms)
-    {
-    }
+    public function __construct(private readonly TalkSasaSmsService $sms) {}
 
     public function sendSignupOtp(User $user): PhoneVerificationOtp
     {
@@ -96,9 +94,15 @@ class PhoneOtpService
         }
 
         return DB::transaction(function () use ($otp) {
-            $otp->update(['verified_at' => now()]);
-
             $user = User::lockForUpdate()->findOrFail($otp->user_id);
+            if (! hash_equals((string) $user->phone, (string) $otp->phone)) {
+                throw ValidationException::withMessages(['otp' => 'The phone number has changed. Request a new code for the current phone.']);
+            }
+            $consumed = PhoneVerificationOtp::whereKey($otp->id)->whereNull('verified_at')
+                ->where('expires_at', '>', now())->update(['verified_at' => now()]);
+            if ($consumed !== 1) {
+                throw ValidationException::withMessages(['otp' => 'This OTP has expired or has already been used.']);
+            }
             $user->phone_verified_at = now();
 
             if (Schema::hasColumn('users', 'is_verified')) {

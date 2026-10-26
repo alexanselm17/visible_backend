@@ -68,6 +68,8 @@ class CampaignResource extends OperationsResource
             C\TextColumn::make('adverts_count')->label('Adverts')->numeric()->sortable(),
             C\TextColumn::make('live_adverts_count')->label('Live')->numeric()->sortable(),
             C\TextColumn::make('created_at')->date()->sortable(),
+        ])->filters([
+            \Filament\Tables\Filters\SelectFilter::make('owner_id')->relationship('owner', 'fullname')->label('Owner')->searchable(),
         ])->actions([
             A\ViewAction::make(), A\EditAction::make(),
             A\Action::make('report')->label('Campaign report')->icon('heroicon-o-document-chart-bar')

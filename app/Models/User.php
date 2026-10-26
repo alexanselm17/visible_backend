@@ -88,6 +88,9 @@ class User extends Authenticatable implements FilamentUser, HasName
     ];
 
     protected $casts = [
+        'is_active' => 'boolean',
+        'is_verified' => 'boolean',
+        'is_logged_in' => 'boolean',
         'email_verified_at' => 'datetime',
         'phone_verified_at' => 'datetime',
     ];
@@ -309,5 +312,65 @@ class User extends Authenticatable implements FilamentUser, HasName
     public function rewardPayoutPreferences()
     {
         return $this->hasMany(RewardPayoutPreference::class);
+    }
+
+    public function accountEvents()
+    {
+        return $this->hasMany(UserAccountEvent::class);
+    }
+
+    public function tokenWallets()
+    {
+        return $this->hasMany(TokenWallet::class);
+    }
+
+    public function tokenPurchases()
+    {
+        return $this->hasMany(TokenPurchase::class);
+    }
+
+    public function rewardPayouts()
+    {
+        return $this->hasMany(RewardPayout::class);
+    }
+
+    public function rewardLedgerEntries()
+    {
+        return $this->hasMany(RewardLedgerEntry::class);
+    }
+
+    public function ownedCampaigns()
+    {
+        return $this->hasMany(Campaign::class, 'owner_id');
+    }
+
+    public function advertSubmissions()
+    {
+        return $this->hasMany(AdvertSubmission::class, 'submitted_by');
+    }
+
+    public function designedSubmissions()
+    {
+        return $this->hasMany(AdvertSubmission::class, 'designed_by');
+    }
+
+    public function reviewedSubmissions()
+    {
+        return $this->hasMany(AdvertSubmission::class, 'reviewed_by');
+    }
+
+    public function qualifiedReferrals()
+    {
+        return $this->hasMany(RewardReferralQualification::class, 'referrer_user_id');
+    }
+
+    public function referrer()
+    {
+        return $this->belongsTo(User::class, 'referal_code', 'my_code')->withTrashed();
+    }
+
+    public function legacyWallet()
+    {
+        return $this->hasOne(Wallet::class);
     }
 }
