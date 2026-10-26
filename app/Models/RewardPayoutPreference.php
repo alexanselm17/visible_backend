@@ -16,4 +16,9 @@ class RewardPayoutPreference extends Model
     protected $fillable = ['user_id', 'frequency', 'effective_from'];
 
     protected $casts = ['effective_from' => 'datetime'];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

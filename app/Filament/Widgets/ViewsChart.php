@@ -7,7 +7,7 @@ use Filament\Widgets\BarChartWidget;
 
 class ViewsChart extends BarChartWidget
 {
-    protected static ?string $heading = 'Daily Views (Last 7 Days)';
+    protected static ?string $heading = 'Completed task views · last 7 days';
 
     protected static ?int $sort = 1;
 
@@ -22,6 +22,7 @@ class ViewsChart extends BarChartWidget
 
             // Get actual views data from screenshots
             $dailyViews = Screenshots::whereDate('created_at', $date)
+                ->where('number', 2)
                 ->sum('views');
 
             $views[] = $dailyViews ?: 0;

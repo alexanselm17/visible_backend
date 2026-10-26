@@ -2,24 +2,29 @@
 
 namespace App\Filament\Pages;
 
+use App\Support\AdminAccess;
 use Filament\Pages\Dashboard as BaseDashboard;
-use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 
 class Dashboard extends BaseDashboard
 {
-    use HasFiltersForm;
+    protected static ?string $navigationLabel = 'Overview';
+
+    protected static ?string $title = 'Operations overview';
 
     public function getWidgets(): array
     {
-        return [
-            \App\Filament\Widgets\CampaignCardsWidget::class,
-            \App\Filament\Widgets\RecentActivityWidget::class,
+        $widgets = [
+            \App\Filament\Widgets\OperationsGuide::class,
+            \App\Filament\Widgets\OperationsOverview::class,
             \App\Filament\Widgets\ViewsChart::class,
             \App\Filament\Widgets\ScreenshotsSubmissionChart::class,
-            \App\Filament\Widgets\RevenueChart::class,
-            \App\Filament\Widgets\UserEngagementChart::class,
-            \App\Filament\Widgets\TopPerformingAdvertsChart::class,
-
         ];
+        if (AdminAccess::allows('finance')) {
+            $widgets[] = \App\Filament\Widgets\TokenRevenueChart::class;
+            $widgets[] = \App\Filament\Widgets\RewardsChart::class;
+        }
+        $widgets[] = \App\Filament\Widgets\RecentActivityWidget::class;
+
+        return $widgets;
     }
 }

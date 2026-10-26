@@ -178,6 +178,7 @@ class TokenController extends Controller
             'unit_price' => ['sometimes', 'nullable', 'numeric', 'min:0.01'],
             'currency' => ['sometimes', 'string', 'size:3'],
             'seconds_per_token' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'people_per_token' => ['sometimes', 'integer', 'min:1'],
             'max_video_duration_seconds' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'description' => ['sometimes', 'nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
@@ -244,7 +245,7 @@ class TokenController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (!$user->isAdmin() && !$user->isDeveloper())) {
+        if (! $user || (! $user->isAdmin() && ! $user->isDeveloper())) {
             abort(403, 'You are not authorized to manage token pricing or payments.');
         }
     }
@@ -257,7 +258,7 @@ class TokenController extends Controller
             TokenType::SILVER,
         ])->pluck('unit_price', 'code');
 
-        if ($prices->count() !== 3 || $prices->contains(fn($price) => $price === null)) {
+        if ($prices->count() !== 3 || $prices->contains(fn ($price) => $price === null)) {
             return;
         }
 
@@ -265,7 +266,7 @@ class TokenController extends Controller
         $platinum = (float) $prices[TokenType::PLATINUM];
         $silver = (float) $prices[TokenType::SILVER];
 
-        if (!($gold > $platinum && $platinum > $silver)) {
+        if (! ($gold > $platinum && $platinum > $silver)) {
             throw ValidationException::withMessages([
                 'unit_price' => 'Token pricing must remain Gold > Platinum > Silver.',
             ]);

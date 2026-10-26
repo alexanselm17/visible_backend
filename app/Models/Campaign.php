@@ -37,6 +37,11 @@ class Campaign extends Model
         return $this->hasMany(AdvertImages::class, 'campaign_id');
     }
 
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
     // Helper method to get total screenshots across all adverts
     public function getTotalScreenshotsAttribute()
     {

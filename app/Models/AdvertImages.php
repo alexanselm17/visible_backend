@@ -11,6 +11,7 @@ class AdvertImages extends Model
 
     protected $fillable = [
         'image_path',
+        'video_path',
         'category',
         'name',
         'selling_price',

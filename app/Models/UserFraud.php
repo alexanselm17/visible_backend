@@ -17,4 +17,14 @@ class UserFraud extends Model
     protected $casts = [
         'flagged_at' => 'datetime',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function reporter()
+    {
+        return $this->belongsTo(User::class, 'reported_by');
+    }
 }

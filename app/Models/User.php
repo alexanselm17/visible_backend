@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,18 +13,23 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasName
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isAdmin() || $this->isDeveloper() || $this->isManager();
+        return (bool) $this->is_active && ($this->isAdmin() || $this->isDeveloper() || $this->isManager());
     }
 
     public function getUserName(): string
     {
-        return $this->fullname;
+        return $this->fullname ?? $this->username;
+    }
+
+    public function getFilamentName(): string
+    {
+        return $this->fullname ?? $this->username;
     }
 
     public function permissions()
@@ -261,7 +267,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function referredUsers()
     {
-        return $this->hasMany(User::class, 'my_code', 'referral_code')
+        return $this->hasMany(User::class, 'referal_code', 'my_code')
             ->where('id', '!=', $this->id);
     }
 

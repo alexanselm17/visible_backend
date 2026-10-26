@@ -9,7 +9,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -26,12 +25,23 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->brandLogo(asset('favicon.ico'))
-            ->brandLogoHeight('5rem')
+            ->brandName('Visible Workspace')
+            ->brandLogoHeight('2rem')
+            ->maxContentWidth('full')
+            ->renderHook('panels::head.end', fn () => view('filament.theme'))
+            ->navigationGroups([
+                \Filament\Navigation\NavigationGroup::make('Campaigns'),
+                \Filament\Navigation\NavigationGroup::make('Members')->collapsed(),
+                \Filament\Navigation\NavigationGroup::make('Tokens')->collapsed(),
+                \Filament\Navigation\NavigationGroup::make('Performance earnings')->collapsed(),
+                \Filament\Navigation\NavigationGroup::make('Trust & verification')->collapsed(),
+                \Filament\Navigation\NavigationGroup::make('Settings')->collapsed(),
+                \Filament\Navigation\NavigationGroup::make('Legacy records')->collapsed(),
+            ])
             ->sidebarCollapsibleOnDesktop()
             ->login(CustomLogin::class)
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Teal,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
@@ -39,10 +49,14 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Pages\Dashboard::class,
 
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                \App\Filament\Widgets\OperationsGuide::class,
+                \App\Filament\Widgets\OperationsOverview::class,
+                \App\Filament\Widgets\ViewsChart::class,
+                \App\Filament\Widgets\ScreenshotsSubmissionChart::class,
+                \App\Filament\Widgets\TokenRevenueChart::class,
+                \App\Filament\Widgets\RewardsChart::class,
+                \App\Filament\Widgets\RecentActivityWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

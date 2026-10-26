@@ -246,6 +246,12 @@ class RewardAdminController extends Controller
     private function validateMetricConfiguration(array $metrics): void
     {
         foreach ($metrics as $metricIndex => $metric) {
+            $existingMetric = RewardMetric::where('code', $metric['code'])->first();
+            if ($existingMetric && $existingMetric->evaluator_key !== $metric['evaluator_key']) {
+                throw ValidationException::withMessages([
+                    "metrics.{$metricIndex}.code" => 'Use a new metric code when changing its evaluator so existing plan versions retain their behavior.',
+                ]);
+            }
             $minimum = (float) ($metric['minimum_multiplier'] ?? 0);
             $maximum = (float) ($metric['maximum_multiplier'] ?? 1);
 

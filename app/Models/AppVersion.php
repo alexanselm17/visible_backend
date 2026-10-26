@@ -10,4 +10,6 @@ class AppVersion extends Model
     use HasFactory;
 
     protected $table = 'app_versions';
+
+    protected $fillable = ['versions'];
 }

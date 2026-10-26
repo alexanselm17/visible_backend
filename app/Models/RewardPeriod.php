@@ -52,6 +52,11 @@ class RewardPeriod extends Model
         return $this->belongsTo(RewardPlan::class, 'reward_plan_id');
     }
 
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public function metrics()
     {
         return $this->hasMany(RewardPeriodMetric::class)->with('metric');

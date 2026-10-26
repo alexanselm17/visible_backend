@@ -11,6 +11,8 @@ use Tests\TestCase;
 
 class ManualScreenshotSubmissionTest extends TestCase
 {
+    private ?string $receiptPath = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -59,8 +61,8 @@ class ManualScreenshotSubmissionTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob(public_path('storage/screenshots/manual_*.png')) ?: [] as $path) {
-            File::delete($path);
+        if ($this->receiptPath !== null) {
+            File::delete($this->receiptPath);
         }
 
         parent::tearDown();
@@ -118,6 +120,7 @@ class ManualScreenshotSubmissionTest extends TestCase
         ]);
 
         $path = $response->json('path');
+        $this->receiptPath = public_path('storage/'.$path);
         $this->assertIsString($path);
         $this->assertFileExists(public_path('storage/'.$path));
     }

@@ -3,163 +3,87 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CampaignResource\Pages;
+use App\Filament\Support\Fields;
+use App\Filament\Support\OperationsResource;
 use App\Models\Campaign;
-use Filament\Forms;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components as F;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Support\Enums\FontWeight;
-use Filament\Tables;
-use Filament\Tables\Columns\BadgeColumn;
-use Filament\Tables\Columns\TextColumn;
+use Filament\Infolists\Components as I;
+use Filament\Infolists\Infolist;
+use Filament\Tables\Actions as A;
+use Filament\Tables\Columns as C;
 use Filament\Tables\Table;
 
-class CampaignResource extends Resource
+class CampaignResource extends OperationsResource
 {
     protected static ?string $model = Campaign::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-megaphone';
 
-    protected static ?string $navigationGroup = 'Campaign Management';
+    protected static ?string $navigationGroup = 'Campaigns';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
+
+    protected static string $area = 'campaigns';
+
+    protected static bool $editable = true;
+
+    protected static array $exportColumns = ['id', 'name', 'owner.fullname', 'created_at'];
 
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Campaign Information')
-                    ->schema([
-                        TextInput::make('name')
-                            ->required()
-                            ->maxLength(255)
-                            ->placeholder('Enter campaign name')
-                            ->columnSpan(2),
-                    ])
-                    ->columns(2),
-            ]);
+        return $form->schema([
+            F\Section::make('Campaign')->description('Group an owner’s adverts and submissions in one place.')->schema([
+                F\TextInput::make('name')->required()->maxLength(255),
+                Fields::user('owner_id', 'Campaign owner')->required(),
+            ])->columns(2),
+        ]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+            I\Section::make('Campaign')->columns(3)->schema([
+                I\TextEntry::make('name'), I\TextEntry::make('owner.fullname')->label('Owner'),
+                I\TextEntry::make('created_at')->dateTime(),
+                I\TextEntry::make('adverts_count')->state(fn ($record) => $record->adverts()->count())->label('Adverts'),
+                I\TextEntry::make('live_adverts')->state(fn ($record) => $record->adverts()->where('valid_until', '>=', now())->count())->label('Live adverts'),
+                I\TextEntry::make('completed_tasks')->state(fn ($record) => \App\Models\Screenshots::whereHas('advert', fn ($query) => $query->where('campaign_id', $record->id))->where('number', 2)->count()),
+                I\TextEntry::make('total_capacity')->state(fn ($record) => $record->adverts()->sum('capacity'))->label('Total participant capacity'),
+                I\TextEntry::make('screenshots')->state(fn ($record) => \App\Models\Screenshots::whereHas('advert', fn ($query) => $query->where('campaign_id', $record->id))->count()),
+                I\TextEntry::make('verified_views')->state(fn ($record) => \App\Models\Screenshots::whereHas('advert', fn ($query) => $query->where('campaign_id', $record->id))->where('number', 2)->sum('views')),
+                I\TextEntry::make('participants')->state(fn ($record) => \App\Models\Screenshots::whereHas('advert', fn ($query) => $query->where('campaign_id', $record->id))->distinct()->count('processed_by')),
+                I\TextEntry::make('days_running')->state(fn ($record) => (int) $record->created_at->diffInDays(now())),
+            ]),
+        ]);
     }
 
     public static function table(Table $table): Table
     {
-        return $table
-            ->columns([
-                TextColumn::make('name')
-                    ->label('Campaign Name')
-                    ->searchable()
-                    ->sortable()
-                    ->weight(FontWeight::Bold)
-                    ->copyable(),
-
-                TextColumn::make('adverts_count')
-                    ->label('Total Adverts')
-                    ->badge()
-                    ->color(fn ($state) => $state > 0 ? 'success' : 'gray')
-                    ->counts('adverts')
-                    ->sortable(),
-
-                TextColumn::make('active_adverts_count')
-                    ->label('Active Adverts')
-                    ->badge()
-                    ->color('info')
-                    ->getStateUsing(function ($record) {
-                        return $record->adverts()->where('valid_until', '>', now())->count() ?? 0;
-                    }),
-
-                TextColumn::make('total_screenshots')
-                    ->label('Screenshots')
-                    ->badge()
-                    ->color('warning')
-                    ->getStateUsing(fn ($record) => $record->total_screenshots ?? 0),
-
-                TextColumn::make('total_views')
-                    ->label('Total Views')
-                    ->badge()
-                    ->color('purple')
-                    ->getStateUsing(fn ($record) => number_format($record->total_views ?? 0)),
-
-                BadgeColumn::make('is_active')
-                    ->label('Status')
-                    ->getStateUsing(fn ($record) => $record->is_active ? 'Active' : 'Expired')
-                    ->colors([
-                        'success' => 'Active',
-                        'danger' => 'Expired',
-                    ])
-                    ->icons([
-                        'heroicon-m-check-circle' => 'Active',
-                        'heroicon-m-x-circle' => 'Expired',
-                    ]),
-
-            ])
-            ->actions([
-                Tables\Actions\Action::make('campaignReport')
-                    ->label('Generate Report')
-                    ->icon('heroicon-o-chart-bar')
-                    ->color('warning')
-                    ->size('sm')
-                    ->button()
-                    ->extraAttributes([
-                        'class' => 'bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200',
-                    ])
-                    ->action(function ($record) {
-                        return redirect()->route('campaign_report', [
-                            'campaign_id' => $record->id,
-                        ]);
-                    }),
-
-                Tables\Actions\ViewAction::make()
-                    ->icon('heroicon-o-eye')
-                    ->color('info')
-                    ->size('sm')
-                    ->button()
-                    ->extraAttributes([
-                        'class' => 'bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200',
-                    ]),
-
-                Tables\Actions\EditAction::make()
-                    ->icon('heroicon-o-pencil')
-                    ->color('success')
-                    ->size('sm')
-                    ->button()
-                    ->extraAttributes([
-                        'class' => 'bg-gradient-to-r from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 text-white font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200',
-                    ]),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ])
-            ->defaultSort('created_at', 'desc')
-            ->striped()
-            ->paginated([10, 25, 50])
-            ->recordUrl(fn ($record) => Pages\ViewCampaign::getUrl([$record->id]));
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            // RelationManagers\AdvertsRelationManager::class,
-        ];
+        return parent::table($table)->modifyQueryUsing(fn ($query) => $query->with('owner')->withCount([
+            'adverts', 'adverts as live_adverts_count' => fn ($query) => $query->where('valid_until', '>=', now()),
+        ]))->columns([
+            C\TextColumn::make('name')->searchable()->sortable()->weight('semibold'),
+            C\TextColumn::make('owner.fullname')->label('Owner')->searchable()->placeholder('No owner assigned'),
+            C\TextColumn::make('adverts_count')->label('Adverts')->numeric()->sortable(),
+            C\TextColumn::make('live_adverts_count')->label('Live')->numeric()->sortable(),
+            C\TextColumn::make('created_at')->date()->sortable(),
+        ])->actions([
+            A\ViewAction::make(), A\EditAction::make(),
+            A\Action::make('report')->label('Campaign report')->icon('heroicon-o-document-chart-bar')
+                ->url(fn ($record) => route('campaign_report', ['campaign_id' => $record->id]))->openUrlInNewTab(),
+            A\Action::make('adverts')->url(fn ($record) => AdvertImagesResource::getUrl('index', ['tableFilters' => ['campaign_id' => ['value' => $record->id]]])),
+        ]);
     }
 
     public static function getPages(): array
     {
-        return [
-            'index' => Pages\ListCampaigns::route('/'),
-            'create' => Pages\CreateCampaign::route('/create'),
-            'view' => Pages\ViewCampaign::route('/{record}'),
-            'edit' => Pages\EditCampaign::route('/{record}/edit'),
-        ];
+        return ['index' => Pages\ListCampaigns::route('/'), 'create' => Pages\CreateCampaign::route('/create'),
+            'view' => Pages\ViewCampaign::route('/{record}'), 'edit' => Pages\EditCampaign::route('/{record}/edit')];
     }
 
-    public static function getNavigationBadge(): ?string
+    public static function getRelations(): array
     {
-        return static::getModel()::count();
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return 'success';
+        return [CampaignResource\RelationManagers\AdvertsRelationManager::class];
     }
 }

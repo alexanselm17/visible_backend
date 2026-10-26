@@ -8,6 +8,9 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListAdvertImages extends ListRecords
 {
+    use \App\Filament\Support\NotifiesWorkflowErrors;
+    use \App\Filament\Support\RefreshesWorkflowRecords;
+
     protected static string $resource = AdvertImagesResource::class;
 
     protected function getHeaderActions(): array

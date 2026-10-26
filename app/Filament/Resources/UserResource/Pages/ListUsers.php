@@ -9,6 +9,9 @@ use Filament\Resources\Pages\ListRecords;
 
 class ListUsers extends ListRecords
 {
+    use \App\Filament\Support\NotifiesWorkflowErrors;
+    use \App\Filament\Support\RefreshesWorkflowRecords;
+
     protected static string $resource = UserResource::class;
 
     public function getTabs(): array

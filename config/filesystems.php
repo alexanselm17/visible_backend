@@ -30,6 +30,15 @@ return [
 
     'disks' => [
 
+        // API-generated assets already live here, including historical non-symlink installations.
+        'admin_media' => [
+            'driver' => 'local',
+            'root' => public_path('storage'),
+            'url' => env('APP_URL').'/storage',
+            'visibility' => 'public',
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app'),

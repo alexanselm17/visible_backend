@@ -21,4 +21,14 @@ class RewardReferralQualification extends Model
         'qualified_at' => 'datetime',
         'evidence' => 'array',
     ];
+
+    public function referrer()
+    {
+        return $this->belongsTo(User::class, 'referrer_user_id');
+    }
+
+    public function referred()
+    {
+        return $this->belongsTo(User::class, 'referred_user_id');
+    }
 }

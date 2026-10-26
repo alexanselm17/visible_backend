@@ -33,4 +33,9 @@ class RewardLedgerEntry extends Model
         'amount_minor' => 'integer',
         'metadata' => 'array',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
