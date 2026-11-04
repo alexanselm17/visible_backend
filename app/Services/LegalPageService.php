@@ -62,18 +62,30 @@ class LegalPageService
         return $settings;
     }
 
-    public function publish(LegalDocument $document): void
+    public function publish(LegalDocument $document, ?string $effectiveOn = null): void
     {
         abort_unless(AdminAccess::allows('settings'), 403);
-        DB::transaction(function () use ($document) {
+        DB::transaction(function () use ($document, $effectiveOn) {
             $document = LegalDocument::lockForUpdate()->findOrFail($document->id);
             $settings = SiteSetting::current();
             $this->validateIdentity($settings);
-            Validator::make($document->toArray(), [
+            $data = $document->toArray();
+            // This is a calendar date, not the UTC timestamp produced by toArray().
+            $data['effective_on'] = $effectiveOn ?? $document->effective_on?->toDateString();
+            $validated = Validator::make($data, [
                 'title' => 'required|string|max:255',
                 'effective_on' => 'required|date|before_or_equal:today',
                 'draft_content' => 'required|string|max:150000',
+            ], [
+                'effective_on.required' => 'Choose an effective date before publishing this policy.',
+                'effective_on.date' => 'Choose a valid effective date before publishing this policy.',
+                'effective_on.before_or_equal' => 'The effective date cannot be in the future.',
             ])->validate();
+            // Save the selected date in the same transaction as its published snapshot.
+            $document->effective_on = $validated['effective_on'];
+            if ($effectiveOn !== null) {
+                $document->updated_by = auth()->id();
+            }
             $content = $this->render($document->draft_content, $settings);
             if (mb_strlen(trim(strip_tags($content))) < 250 || preg_match('/\[insert\b|\[your\b|\[app\/company|\{\{/i', $content)) {
                 throw ValidationException::withMessages(['draft_content' => 'Replace placeholders and provide the complete policy before publishing.']);

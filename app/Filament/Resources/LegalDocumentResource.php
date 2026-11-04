@@ -58,10 +58,14 @@ class LegalDocumentResource extends OperationsResource
             }),
             A\Action::make('preview')->label('Preview draft')->icon('heroicon-o-eye')->url(fn ($record) => route('legal.preview', $record))->openUrlInNewTab(),
             A\Action::make('publish')->icon('heroicon-o-globe-alt')->color('success')->form([
+                F\DatePicker::make('effective_on')->label('Effective date')
+                    ->default(fn (LegalDocument $record) => $record->effective_on?->toDateString() ?? today()->toDateString())
+                    ->required()->maxDate(today())
+                    ->helperText('Uses the saved draft date, or today for a new policy. Choose the date this version takes effect; future dates are not supported.'),
                 F\Placeholder::make('checklist')->content('Confirm the text matches the shipped app, provider disclosures, actual retention/deletion process and supported billing. This does not certify Play approval or replace legal review.'),
                 F\Checkbox::make('reviewed')->label('I have reviewed the policy and confirmed these facts.')->accepted()->required(),
-            ])->action(function (LegalDocument $record) {
-                app(LegalPageService::class)->publish($record);
+            ])->modalSubmitActionLabel('Publish policy')->action(function (LegalDocument $record, array $data) {
+                app(LegalPageService::class)->publish($record, $data['effective_on']);
                 Notification::make()->title('Policy published')->body('The public URL now serves the new version. The previous version remains in publication history.')->success()->send();
             }),
             A\Action::make('public')->label('Public page')->url(fn ($record) => url('/'.$record->slug))->openUrlInNewTab(),

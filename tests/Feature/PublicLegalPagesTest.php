@@ -73,6 +73,98 @@ class PublicLegalPagesTest extends TestCase
         $this->assertSame(0, LegalDocumentRevision::count());
     }
 
+    public function test_seeded_policies_can_be_published_without_editing_the_draft_date_first(): void
+    {
+        $this->configureIdentity();
+        foreach (LegalDocument::all() as $document) {
+            $this->assertNull($document->effective_on);
+            Livewire::test(ManageLegalDocuments::class)
+                ->mountTableAction('publish', $document)
+                ->assertTableActionDataSet(['effective_on' => today()->toDateString()])
+                ->setTableActionData(['effective_on' => today()->toDateString(), 'reviewed' => true])
+                ->callMountedTableAction()->assertHasNoTableActionErrors();
+            $document->refresh();
+            $this->assertSame(today()->toDateString(), $document->effective_on->toDateString());
+            $this->assertSame(today()->toDateString(), $document->published_effective_on->toDateString());
+            $this->assertSame($this->admin->id, $document->updated_by);
+            $this->assertSame(today()->toDateString(), $document->revisions()->firstOrFail()->effective_on->toDateString());
+            $this->get('/'.$document->slug)->assertOk()->assertSee(today()->format('j F Y'));
+        }
+    }
+
+    public function test_publish_dialog_keeps_the_saved_effective_date_and_allows_a_different_date(): void
+    {
+        $this->configureIdentity();
+        $document = LegalDocument::firstOrFail();
+        $originalDate = today()->subDays(10)->toDateString();
+        $newDate = today()->subDay()->toDateString();
+        $document->update(['effective_on' => $originalDate]);
+        app(LegalPageService::class)->publish($document);
+        Livewire::test(ManageLegalDocuments::class)
+            ->mountTableAction('publish', $document)
+            ->assertTableActionDataSet(['effective_on' => $originalDate])
+            ->setTableActionData(['effective_on' => $newDate, 'reviewed' => true])
+            ->callMountedTableAction()->assertHasNoTableActionErrors();
+        $document->refresh();
+        $this->assertSame($newDate, $document->effective_on->toDateString());
+        $this->assertSame($newDate, $document->published_effective_on->toDateString());
+        $this->assertSame($originalDate, $document->revisions()->where('version', 1)->firstOrFail()->effective_on->toDateString());
+        $this->assertSame($newDate, $document->revisions()->where('version', 2)->firstOrFail()->effective_on->toDateString());
+    }
+
+    public function test_publish_dialog_rejects_missing_or_future_dates_without_writing_anything(): void
+    {
+        $this->configureIdentity();
+        $document = LegalDocument::firstOrFail();
+        foreach ([null, 'not-a-date', today()->addDay()->toDateString()] as $date) {
+            Livewire::test(ManageLegalDocuments::class)->callTableAction('publish', $document, [
+                'effective_on' => $date, 'reviewed' => true,
+            ])->assertHasTableActionErrors(['effective_on']);
+            $this->assertNull($document->fresh()->effective_on);
+            $this->assertNull($document->fresh()->published_at);
+            $this->assertSame(0, $document->revisions()->count());
+        }
+    }
+
+    public function test_failed_publication_does_not_save_the_date_selected_in_the_dialog(): void
+    {
+        $this->configureIdentity();
+        $document = LegalDocument::firstOrFail();
+        $document->update(['draft_content' => '<p>[Insert policy text]</p>']);
+        Livewire::test(ManageLegalDocuments::class)->callTableAction('publish', $document, [
+            'effective_on' => today()->toDateString(), 'reviewed' => true,
+        ])->assertHasTableActionErrors();
+        $this->assertNull($document->fresh()->effective_on);
+        $this->assertNull($document->fresh()->updated_by);
+        $this->assertSame(0, $document->revisions()->count());
+    }
+
+    public function test_publish_dialog_still_requires_confirmation_before_saving_the_date(): void
+    {
+        $this->configureIdentity();
+        $document = LegalDocument::firstOrFail();
+        Livewire::test(ManageLegalDocuments::class)->callTableAction('publish', $document, [
+            'effective_on' => today()->toDateString(), 'reviewed' => false,
+        ])->assertHasTableActionErrors(['reviewed']);
+        $this->assertNull($document->fresh()->effective_on);
+        $this->assertNull($document->fresh()->published_at);
+        $this->assertSame(0, $document->revisions()->count());
+    }
+
+    public function test_publication_service_rejects_an_explicit_future_date(): void
+    {
+        $this->configureIdentity();
+        $document = LegalDocument::firstOrFail();
+        try {
+            app(LegalPageService::class)->publish($document, today()->addDay()->toDateString());
+            $this->fail('An explicit future date must be rejected by the service too.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('effective_on', $exception->errors());
+        }
+        $this->assertNull($document->fresh()->effective_on);
+        $this->assertSame(0, $document->revisions()->count());
+    }
+
     public function test_published_pages_are_anonymous_html_with_actual_backend_disclosures(): void
     {
         $this->configureIdentity();
