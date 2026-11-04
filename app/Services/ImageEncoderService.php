@@ -12,12 +12,12 @@ use RuntimeException;
 class ImageEncoderService
 {
     private const DEFAULT_LAYOUT = 'story';
+
     private const SMART_OVERLAY_LAYOUT = 'smart_overlay';
+
     private const FLOATING_ADVERT_LAYOUT = 'floating_advert';
 
-    public function __construct(private readonly InvisibleImageWatermarkService $watermarks)
-    {
-    }
+    public function __construct(private readonly InvisibleImageWatermarkService $watermarks) {}
 
     /**
      * @return array<int, string>
@@ -101,21 +101,27 @@ class ImageEncoderService
         int $canvasWidth,
         int $canvasHeight
     ): void {
-        $templatePath = public_path('images/not_full_sample.jpeg');
+        $brandLogoPath = \App\Models\SiteSetting::current()->logoLocalPath();
+        $templatePath = $brandLogoPath ?: public_path('images/not_full_sample.jpeg');
 
         if (! is_file($templatePath)) {
             return;
         }
 
         $header = $manager->read($templatePath);
-        $headerHeight = $header->height();
-        $logo = $header->crop(
-            $headerHeight,
-            $headerHeight,
-            max(0, $header->width() - $headerHeight),
-            0
-        );
-        $logo->scale(width: 104);
+        if ($brandLogoPath) {
+            $logo = $header->scale(width: 104);
+            $logo->scaleDown(height: 104);
+        } else {
+            $headerHeight = $header->height();
+            $logo = $header->crop(
+                $headerHeight,
+                $headerHeight,
+                max(0, $header->width() - $headerHeight),
+                0
+            );
+            $logo->scale(width: 104);
+        }
 
         $canvas->place(
             $logo,
@@ -423,7 +429,7 @@ class ImageEncoderService
     }
 
     /**
-     * @param array{0: int, 1: int, 2: int} $rgb
+     * @param  array{0: int, 1: int, 2: int}  $rgb
      */
     private function placeEllipseGlow(
         ImageManager $manager,
@@ -588,8 +594,7 @@ class ImageEncoderService
     }
 
     /**
-     * @param resource|\GdImage $source
-     *
+     * @param  resource|\GdImage  $source
      * @return array{0: int, 1: int, 2: int, 3: int}|null
      */
     private function opaqueBounds($source, int $width, int $height): ?array

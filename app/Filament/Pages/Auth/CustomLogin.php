@@ -27,7 +27,7 @@ class CustomLogin extends Login
 
     public function getHeading(): string
     {
-        return 'Welcome to Visible';
+        return 'Welcome to '.\App\Models\SiteSetting::current()->app_name;
     }
 
     public function getSubheading(): string
