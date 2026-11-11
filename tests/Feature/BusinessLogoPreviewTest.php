@@ -7,6 +7,7 @@ use App\Filament\Resources\CampaignOwnerLogoResource\Pages\ManageCampaignOwnerLo
 use App\Models\CampaignOwnerLogo;
 use App\Models\CampaignOwnerProfile;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -48,6 +49,41 @@ class BusinessLogoPreviewTest extends TestCase
             ->assertSet('mountedTableActions', ['preview'])
             ->assertSee('Open original image')
             ->assertSee('The checked background shows transparent areas');
+    }
+
+    public function test_modal_lifecycle_events_include_the_id_needed_to_clear_the_selected_logo(): void
+    {
+        $html = Blade::render('<x-filament::modal id="logo-preview-regression" heading="Preview">Logo</x-filament::modal>');
+
+        foreach (['modal-opened', 'modal-closed'] as $event) {
+            $this->assertStringContainsString(
+                "new CustomEvent('{$event}', { detail: { id: 'logo-preview-regression' } })",
+                $html,
+            );
+        }
+    }
+
+    public function test_different_logos_can_be_previewed_repeatedly_after_closing_without_a_reload(): void
+    {
+        $first = $this->logo('First business');
+        $second = $this->logo('Second business');
+        $page = Livewire::test(ManageCampaignOwnerLogos::class);
+
+        foreach ([$first, $second, $first, $second] as $index => $logo) {
+            if ($index % 2 === 0) {
+                $page->callTableColumnAction('logo_path', $logo);
+            } else {
+                $page->mountTableAction('preview', $logo);
+            }
+            $page->assertSet('mountedTableActions', ['preview'])
+                ->assertSet('mountedTableActionRecord', $logo->getKey())
+                ->assertSee($logo->profile->business_name.' — logo')
+                ->assertSeeHtml('href="'.Storage::disk('admin_media')->url($logo->logo_path).'"')
+                // This is the cleanup triggered by the modal-closed browser event.
+                ->call('unmountTableAction', false, false)
+                ->assertSet('mountedTableActions', [])
+                ->assertSet('mountedTableActionRecord', null);
+        }
     }
 
     public function test_preview_works_for_additional_logos_without_changing_the_primary_logo(): void
