@@ -16,7 +16,7 @@ class TokenUsageService
      *   submission_tokens + reach_tokens = tokens_required
      *
      * VIDEO submission_tokens = 5
-     * IMAGE submission_tokens = 3
+     * IMAGE / ADS_IMAGE submission_tokens = 3 (separate token wallets and prices)
      * TEXT submission_tokens = 1
      * reach_tokens = ceil(target_reach / people_per_token)
      */
@@ -69,6 +69,7 @@ class TokenUsageService
         return [
             'token_type' => $tokenType->code,
             'media_type' => $tokenType->media_type,
+            'posting_format' => $tokenType->media_type === TokenType::IMAGE ? 'FULL_IMAGE' : $tokenType->media_type,
             'target_reach' => $targetReach,
             'video_duration_seconds' => $tokenType->media_type === TokenType::VIDEO
                 ? $videoDurationSeconds
@@ -88,7 +89,7 @@ class TokenUsageService
         int $targetReach,
         ?int $videoDurationSeconds = null
     ): array {
-        $tokenType = TokenType::where('media_type', strtoupper($mediaType))
+        $tokenType = TokenType::where('media_type', TokenType::normalizeMediaType($mediaType))
             ->where('is_active', true)
             ->firstOrFail();
 
@@ -112,6 +113,9 @@ class TokenUsageService
 
         if (! $submission->tokenType) {
             throw new RuntimeException('Token type is missing from this advert submission.');
+        }
+        if ($submission->type && TokenType::normalizeMediaType($submission->type) !== $submission->tokenType->media_type) {
+            throw ValidationException::withMessages(['type' => 'The submission format does not match its reserved token type.']);
         }
 
         $duration = $submission->tokenType->media_type === TokenType::VIDEO
@@ -137,7 +141,7 @@ class TokenUsageService
     {
         return match ($tokenType->media_type) {
             TokenType::VIDEO => 5,
-            TokenType::IMAGE => 3,
+            TokenType::IMAGE, TokenType::ADS_IMAGE => 3,
             TokenType::TEXT => 1,
             default => throw new RuntimeException("Unsupported media type: {$tokenType->media_type}"),
         };

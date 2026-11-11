@@ -9,6 +9,7 @@ use App\Services\TokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TokenController extends Controller
@@ -21,6 +22,8 @@ class TokenController extends Controller
                 'code' => $type->code,
                 'name' => $type->name,
                 'media_type' => $type->media_type,
+                'posting_format' => $type->media_type === TokenType::IMAGE ? 'FULL_IMAGE' : $type->media_type,
+                'people_per_token' => $type->people_per_token,
                 'unit_price' => $type->unit_price,
                 'currency' => $type->currency,
                 'seconds_per_token' => $type->seconds_per_token,
@@ -42,7 +45,7 @@ class TokenController extends Controller
     public function quote(Request $request, TokenService $tokenService): JsonResponse
     {
         $validated = $request->validate([
-            'token_type' => ['required', 'string', 'in:GOLD,PLATINUM,SILVER'],
+            'token_type' => ['required', 'string', Rule::in(TokenType::codes())],
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
         ]);
 
@@ -119,7 +122,7 @@ class TokenController extends Controller
     public function purchase(Request $request, TokenService $tokenService): JsonResponse
     {
         $validated = $request->validate([
-            'token_type' => ['required', 'string', 'in:GOLD,PLATINUM,SILVER'],
+            'token_type' => ['required', 'string', Rule::in(TokenType::codes())],
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
         ]);
 
@@ -185,6 +188,8 @@ class TokenController extends Controller
         ]);
 
         $type = DB::transaction(function () use ($code, $validated, $tokenService) {
+            // Serialize pricing updates across all token types before checking their relationships.
+            TokenType::orderBy('id')->lockForUpdate()->get();
             $type = $tokenService->getTypeByCode($code);
 
             if (isset($validated['currency'])) {
@@ -197,6 +202,10 @@ class TokenController extends Controller
 
             $type->fill($validated);
             $type->save();
+
+            if ($type->is_active && ($type->unit_price === null || (float) $type->unit_price <= 0)) {
+                throw ValidationException::withMessages(['unit_price' => 'Set a positive token price before making this token available.']);
+            }
 
             if ($type->media_type === TokenType::VIDEO && (int) $type->seconds_per_token < 1) {
                 throw ValidationException::withMessages([
@@ -222,7 +231,7 @@ class TokenController extends Controller
 
         $validated = $request->validate([
             'user_id' => ['required', 'uuid', 'exists:users,id'],
-            'token_type' => ['required', 'string', 'in:GOLD,PLATINUM,SILVER'],
+            'token_type' => ['required', 'string', Rule::in(TokenType::codes())],
             'amount' => ['required', 'integer', 'not_in:0'],
             'reason' => ['required', 'string', 'max:255'],
         ]);
@@ -255,20 +264,26 @@ class TokenController extends Controller
         $prices = TokenType::whereIn('code', [
             TokenType::GOLD,
             TokenType::PLATINUM,
+            TokenType::EMERALD,
             TokenType::SILVER,
         ])->pluck('unit_price', 'code');
 
-        if ($prices->count() !== 3 || $prices->contains(fn ($price) => $price === null)) {
-            return;
+        foreach ([TokenType::PLATINUM, TokenType::EMERALD] as $imageCode) {
+            $imagePrice = $prices[$imageCode] ?? null;
+            if ($imagePrice === null) {
+                continue;
+            }
+            if ((isset($prices[TokenType::GOLD]) && (float) $prices[TokenType::GOLD] <= (float) $imagePrice)
+                || (isset($prices[TokenType::SILVER]) && (float) $imagePrice <= (float) $prices[TokenType::SILVER])) {
+                throw ValidationException::withMessages([
+                    'unit_price' => 'Gold must cost more than each image token, and each image token must cost more than Silver.',
+                ]);
+            }
         }
-
-        $gold = (float) $prices[TokenType::GOLD];
-        $platinum = (float) $prices[TokenType::PLATINUM];
-        $silver = (float) $prices[TokenType::SILVER];
-
-        if (! ($gold > $platinum && $platinum > $silver)) {
+        if (isset($prices[TokenType::PLATINUM], $prices[TokenType::EMERALD])
+            && (float) $prices[TokenType::PLATINUM] === (float) $prices[TokenType::EMERALD]) {
             throw ValidationException::withMessages([
-                'unit_price' => 'Token pricing must remain Gold > Platinum > Silver.',
+                'unit_price' => 'Full-image Platinum and attached-image Emerald must have different prices.',
             ]);
         }
     }

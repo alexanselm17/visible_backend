@@ -8,12 +8,55 @@ use Illuminate\Support\Str;
 class TokenType extends Model
 {
     public const GOLD = 'GOLD';
+
     public const PLATINUM = 'PLATINUM';
+
+    public const EMERALD = 'EMERALD';
+
     public const SILVER = 'SILVER';
 
     public const VIDEO = 'VIDEO';
+
     public const IMAGE = 'IMAGE';
+
+    public const ADS_IMAGE = 'ADS_IMAGE';
+
     public const TEXT = 'TEXT';
+
+    public static function codes(): array
+    {
+        return [self::GOLD, self::PLATINUM, self::EMERALD, self::SILVER];
+    }
+
+    public static function mediaOptions(): array
+    {
+        return [self::VIDEO => 'Video', self::IMAGE => 'Full image (standalone)', self::ADS_IMAGE => 'Ads image (attached to a member’s image)', self::TEXT => 'Text'];
+    }
+
+    public static function normalizeMediaType(string $type): string
+    {
+        return match (strtoupper(trim($type))) {
+            'ADS' => self::ADS_IMAGE,
+            'FULL_IMAGE' => self::IMAGE,
+            default => strtoupper(trim($type)),
+        };
+    }
+
+    public static function isImageMedia(?string $type): bool
+    {
+        return in_array(self::normalizeMediaType($type ?? ''), [self::IMAGE, self::ADS_IMAGE], true);
+    }
+
+    public static function codeForMedia(string $type): ?string
+    {
+        return match (self::normalizeMediaType($type)) {
+            self::VIDEO => self::GOLD,
+            self::IMAGE => self::PLATINUM,
+            self::ADS_IMAGE => self::EMERALD,
+            self::TEXT => self::SILVER,
+            default => null,
+        };
+    }
 
     protected $fillable = [
         'code',
@@ -30,6 +73,7 @@ class TokenType extends Model
     ];
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $casts = [

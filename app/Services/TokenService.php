@@ -31,7 +31,7 @@ class TokenService
 
     public function getTypeForMedia(string $mediaType): TokenType
     {
-        return TokenType::where('media_type', strtoupper($mediaType))
+        return TokenType::where('media_type', TokenType::normalizeMediaType($mediaType))
             ->where('is_active', true)
             ->firstOrFail();
     }
@@ -42,7 +42,7 @@ class TokenService
             return 1;
         }
 
-        if (!$durationSeconds || $durationSeconds < 1) {
+        if (! $durationSeconds || $durationSeconds < 1) {
             throw ValidationException::withMessages([
                 'video_duration_seconds' => 'Video duration is required for a video campaign.',
             ]);
@@ -73,7 +73,7 @@ class TokenService
 
         $type = $this->getTypeByCode($code);
 
-        if (!$type->is_active) {
+        if (! $type->is_active) {
             throw ValidationException::withMessages([
                 'token_type' => 'This token type is currently unavailable.',
             ]);
@@ -91,6 +91,7 @@ class TokenService
             'token_type' => $type->code,
             'name' => $type->name,
             'media_type' => $type->media_type,
+            'posting_format' => $type->media_type === TokenType::IMAGE ? 'FULL_IMAGE' : $type->media_type,
             'quantity' => $quantity,
             'unit_price' => number_format($unitPrice, 2, '.', ''),
             'total_amount' => number_format($unitPrice * $quantity, 2, '.', ''),
@@ -118,6 +119,7 @@ class TokenService
                 'token_type' => $type->code,
                 'name' => $type->name,
                 'media_type' => $type->media_type,
+                'posting_format' => $type->media_type === TokenType::IMAGE ? 'FULL_IMAGE' : $type->media_type,
                 'balance' => (int) $wallet->balance,
                 'locked_balance' => (int) $wallet->locked_balance,
                 'total_balance' => (int) $wallet->total_balance,
@@ -245,6 +247,11 @@ class TokenService
         }
 
         return DB::transaction(function () use ($userId, $submission, $tokenType, $amount) {
+            if (($submission->token_type_id && $submission->token_type_id !== $tokenType->id)
+                || ($submission->submitted_by && $submission->submitted_by !== $userId)
+                || ($submission->type && TokenType::normalizeMediaType($submission->type) !== $tokenType->media_type)) {
+                throw ValidationException::withMessages(['tokens' => 'The reservation must use the owner and token type selected for this advert format.']);
+            }
             $existingHold = TokenHold::where('advert_submission_id', $submission->id)
                 ->lockForUpdate()
                 ->first();
@@ -296,7 +303,7 @@ class TokenService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$hold) {
+            if (! $hold) {
                 throw new RuntimeException('No token reservation exists for this submission.');
             }
 
@@ -305,6 +312,9 @@ class TokenService
             }
 
             $wallet = TokenWallet::whereKey($hold->token_wallet_id)->lockForUpdate()->firstOrFail();
+            if ($submission->token_type_id && $wallet->token_type_id !== $submission->token_type_id) {
+                throw ValidationException::withMessages(['tokens' => 'The reserved wallet does not match the submission token type.']);
+            }
             $reserved = (int) $hold->amount_locked;
             $extraRequired = max(0, $actualTokens - $reserved);
             $released = max(0, $reserved - $actualTokens);
@@ -367,7 +377,7 @@ class TokenService
                 ->lockForUpdate()
                 ->first();
 
-            if (!$hold || $hold->status !== TokenHold::ACTIVE) {
+            if (! $hold || $hold->status !== TokenHold::ACTIVE) {
                 return $hold;
             }
 

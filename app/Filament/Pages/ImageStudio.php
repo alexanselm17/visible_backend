@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\AdvertImages;
+use App\Models\TokenType;
 use App\Services\AdvertQrCodeService;
 use App\Services\ImageEncoderService;
 use App\Support\AdminAccess;
@@ -42,7 +43,9 @@ class ImageStudio extends Page
     {
         return $form->schema([
             \App\Filament\Support\Fields::user()->required()->helperText('The image will be linked to this member and the selected advert.'),
-            \App\Filament\Support\Fields::advert()->required(),
+            \App\Filament\Support\Fields::advert()->required()->helperText('Attached-image ads only. Full-image adverts are downloaded on their own.')
+                ->getSearchResultsUsing(fn (string $search) => AdvertImages::whereIn('type', [TokenType::ADS_IMAGE, 'ads', 'ADS'])
+                    ->where('name', 'like', "%{$search}%")->latest()->limit(50)->pluck('name', 'id')->all()),
             F\Select::make('layout')->options(array_combine(ImageEncoderService::supportedLayouts(), [
                 'Story · personal image first', 'Balanced · equal space', 'Advert focus', 'Smart overlay · transparent advert', 'Floating advert',
             ]))->required(),
@@ -56,6 +59,9 @@ class ImageStudio extends Page
         $data = $this->form->getState();
         $member = \App\Models\User::findOrFail($data['user_id']);
         $advert = AdvertImages::findOrFail($data['advert_id']);
+        if (! $advert->requiresPersonalImage()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['data.advert_id' => 'Choose an attached-image ad. Full-image adverts cannot use the layout studio.']);
+        }
         $source = public_path('storage/'.ltrim((string) $advert->image_path, '/'));
         if (! is_file($source)) {
             throw \Illuminate\Validation\ValidationException::withMessages(['data.advert_id' => 'The advert image is missing from storage.']);

@@ -28,7 +28,7 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
     Route::get('/download/advert/{path}', function ($path) {
-        $fullPath = public_path('storage/' . $path);
+        $fullPath = public_path('storage/'.$path);
         if (! file_exists($fullPath)) {
             return response()->json(['error' => 'File not found.'], 404);
         }
@@ -37,7 +37,7 @@ Route::group(['prefix' => 'v1'], function () {
 
         return response()->make(file_get_contents($fullPath), 200, [
             'Content-Type' => 'application/octet-stream',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Content-Transfer-Encoding' => 'binary',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
@@ -139,7 +139,8 @@ Route::group(['prefix' => 'v1'], function () {
     });
 
     Route::prefix('image')->group(function () {
-        Route::post('/stamp', [ImageManipulationController::class, 'encodeImage']);
+        Route::post('/stamp', [ImageManipulationController::class, 'encodeImage'])
+            ->middleware(['auth:sanctum', 'check.active']);
         Route::post('/decode', [ImageManipulationController::class, 'decodeScreenshot'])
             ->middleware(['auth:sanctum', 'check.active']);
         Route::get('/download/{filename}', [ImageManipulationController::class, 'downloadImage']);

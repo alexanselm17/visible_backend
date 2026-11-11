@@ -41,6 +41,7 @@ class TokenUsageServiceTest extends TestCase
         return [
             'video' => [TokenType::GOLD, TokenType::VIDEO, 5],
             'image' => [TokenType::PLATINUM, TokenType::IMAGE, 3],
+            'attached ads image' => [TokenType::EMERALD, TokenType::ADS_IMAGE, 3],
             'text' => [TokenType::SILVER, TokenType::TEXT, 1],
         ];
     }

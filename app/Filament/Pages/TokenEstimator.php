@@ -70,6 +70,7 @@ class TokenEstimator extends Page
         $quote = app(TokenUsageService::class)->quote($type, (int) $data['target_reach'], isset($data['video_duration_seconds']) ? (int) $data['video_duration_seconds'] : null);
         $this->quote = [
             'Token' => $quote['token_type'], 'Target reach' => $quote['target_reach'],
+            'Posting format' => TokenType::mediaOptions()[$quote['media_type']] ?? $quote['media_type'],
             'Submission tokens' => $quote['submission_tokens'], 'Reach tokens' => $quote['reach_tokens'],
             'Total tokens required' => $quote['tokens_required'],
         ];

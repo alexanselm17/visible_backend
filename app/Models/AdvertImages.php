@@ -46,6 +46,41 @@ class AdvertImages extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+
+        static::saving(function (self $advert) {
+            if ($advert->exists && $advert->isDirty('type') && $advert->submission_id) {
+                $fundedType = $advert->submission()->value('type');
+                if ($fundedType && TokenType::normalizeMediaType($fundedType) !== $advert->mediaType()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'type' => 'A funded advert must keep the format paid for by its submission. Submit a new advert to change formats.',
+                    ]);
+                }
+            }
+        });
+    }
+
+    public function mediaType(): string
+    {
+        return TokenType::normalizeMediaType($this->type ?: ($this->video_path ? TokenType::VIDEO : TokenType::IMAGE));
+    }
+
+    public function requiresPersonalImage(): bool
+    {
+        return $this->mediaType() === TokenType::ADS_IMAGE;
+    }
+
+    public function deliveryDetails(): array
+    {
+        $type = $this->mediaType();
+
+        return [
+            'media_type' => $type,
+            'posting_format' => $type === TokenType::IMAGE ? 'FULL_IMAGE' : $type,
+            'token_type' => TokenType::codeForMedia($type),
+            'requires_personal_image' => $this->requiresPersonalImage(),
+            'download_url' => $this->requiresPersonalImage() ? null : route('download.advert.personalized', ['advertId' => $this->id]),
+            'stamp_url' => $this->requiresPersonalImage() ? url('/api/v1/image/stamp') : null,
+        ];
     }
 
     public function campaign()

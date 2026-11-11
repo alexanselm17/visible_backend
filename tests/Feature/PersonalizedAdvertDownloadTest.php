@@ -41,6 +41,7 @@ class PersonalizedAdvertDownloadTest extends TestCase
             $table->uuid('id')->primary();
             $table->string('image_path')->nullable();
             $table->string('name');
+            $table->string('type')->nullable();
             $table->timestamps();
         });
         Schema::create('advert_qr_codes', function (Blueprint $table) {
@@ -209,12 +210,14 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
     public function test_stamp_layout_keeps_the_advert_image_visible_in_the_lower_section(): void
     {
+        $this->actingAsStampMember();
         $footerPath = $this->sourceDirectory.'/footer-red.png';
         $this->createSolidPng($footerPath, 900, 300, [230, 15, 15]);
 
         $advert = AdvertImages::create([
             'id' => '99999999-9999-4999-8999-999999999999',
             'name' => 'Visible Footer Advert',
+            'type' => 'ADS_IMAGE',
             'image_path' => 'personalized-advert-tests/footer-red.png',
         ]);
 
@@ -255,12 +258,14 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
     public function test_stamp_can_generate_each_supported_layout_option(): void
     {
+        $this->actingAsStampMember();
         $footerPath = $this->sourceDirectory.'/footer-blue.png';
         $this->createSolidPng($footerPath, 900, 300, [10, 80, 220]);
 
         $advert = AdvertImages::create([
             'id' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             'name' => 'Layout Options Advert',
+            'type' => 'ADS_IMAGE',
             'image_path' => 'personalized-advert-tests/footer-blue.png',
         ]);
 
@@ -290,12 +295,14 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
     public function test_smart_overlay_layout_keeps_a_transparent_advert_visible(): void
     {
+        $this->actingAsStampMember();
         $transparentAdvertPath = $this->sourceDirectory.'/transparent-advert.png';
         $this->createTransparentPngWithRectangle($transparentAdvertPath, 900, 420, [22, 180, 85]);
 
         $advert = AdvertImages::create([
             'id' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
             'name' => 'Transparent Advert',
+            'type' => 'ADS_IMAGE',
             'image_path' => 'personalized-advert-tests/transparent-advert.png',
         ]);
 
@@ -338,9 +345,11 @@ class PersonalizedAdvertDownloadTest extends TestCase
 
     public function test_stamp_rejects_an_unknown_layout_option(): void
     {
+        $this->actingAsStampMember();
         $advert = AdvertImages::create([
             'id' => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
             'name' => 'Invalid Layout Advert',
+            'type' => 'ADS_IMAGE',
             'image_path' => 'personalized-advert-tests/source.png',
         ]);
 
@@ -352,6 +361,14 @@ class PersonalizedAdvertDownloadTest extends TestCase
         ], ['Accept' => 'application/json'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('layout');
+    }
+
+    private function actingAsStampMember(): void
+    {
+        $member = new User;
+        $member->id = '22222222-2222-4222-8222-222222222222';
+        $member->my_code = '1234567890';
+        $this->withoutMiddleware()->actingAs($member, 'sanctum');
     }
 
     public function test_qr_token_cannot_be_reused_for_another_user_or_advert(): void

@@ -8,6 +8,7 @@ use App\Services\TokenService;
 use App\Services\TokenUsageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TokenUsageController extends Controller
@@ -19,12 +20,12 @@ class TokenUsageController extends Controller
     ): JsonResponse {
         if ($request->filled('type')) {
             $request->merge([
-                'type' => strtoupper((string) $request->input('type')),
+                'type' => TokenType::normalizeMediaType((string) $request->input('type')),
             ]);
         }
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:VIDEO,IMAGE,TEXT'],
+            'type' => ['required', 'string', Rule::in(array_keys(TokenType::mediaOptions()))],
             'target_reach' => ['required', 'integer', 'min:1', 'max:1000000'],
             'video_duration_seconds' => ['required_if:type,VIDEO', 'nullable', 'integer', 'min:1'],
         ]);
@@ -118,7 +119,7 @@ class TokenUsageController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (!$user->isAdmin() && !$user->isDeveloper())) {
+        if (! $user || (! $user->isAdmin() && ! $user->isDeveloper())) {
             abort(403, 'You are not authorized to manage token usage rules.');
         }
     }

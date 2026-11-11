@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\CampaignOwner;
 
+use App\Models\TokenType;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SubmitAdvertRequest extends FormRequest
 {
@@ -15,7 +17,7 @@ class SubmitAdvertRequest extends FormRequest
     {
         if ($this->filled('type')) {
             $this->merge([
-                'type' => strtoupper((string) $this->input('type')),
+                'type' => TokenType::normalizeMediaType((string) $this->input('type')),
             ]);
         }
     }
@@ -28,10 +30,10 @@ class SubmitAdvertRequest extends FormRequest
             'description' => ['required', 'string'],
             'target_audience' => ['nullable', 'json'],
             'target_reach' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'type' => ['required', 'string', 'in:VIDEO,IMAGE,TEXT'],
+            'type' => ['required', 'string', Rule::in(array_keys(TokenType::mediaOptions()))],
             'video_duration_seconds' => ['required_if:type,VIDEO', 'nullable', 'integer', 'min:1'],
 
-            'images' => ['required_if:type,IMAGE', 'nullable', 'array', 'min:1', 'max:1'],
+            'images' => ['required_if:type,IMAGE,ADS_IMAGE', 'nullable', 'array', 'min:1', 'max:1'],
             'images.*' => ['file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
 
             'videos' => ['required_if:type,VIDEO', 'nullable', 'array', 'min:1', 'max:1'],

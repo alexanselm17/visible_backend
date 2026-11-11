@@ -32,7 +32,7 @@ class TokenWalletResource extends OperationsResource
     {
         return parent::table($table)->modifyQueryUsing(fn ($query) => $query->with(['user', 'tokenType']))->columns([
             C\TextColumn::make('user.fullname')->label('Owner')->searchable()->sortable(),
-            C\TextColumn::make('tokenType.code')->badge(),
+            C\TextColumn::make('tokenType.code')->badge()->description(fn ($record) => $record->tokenType?->name),
             C\TextColumn::make('balance')->label('Available')->numeric()->sortable(),
             C\TextColumn::make('locked_balance')->label('Reserved')->numeric()->sortable(),
             C\TextColumn::make('total_balance')->label('Total')->numeric(),

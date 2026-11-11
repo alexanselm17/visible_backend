@@ -2,11 +2,20 @@
 
 namespace App\Http\Requests;
 
+use App\Models\TokenType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 
 class ProductAdvertRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('type')) {
+            $this->merge(['type' => TokenType::normalizeMediaType((string) $this->input('type'))]);
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -35,7 +44,7 @@ class ProductAdvertRequest extends FormRequest
             'capital_invested' => 'required|numeric|min:0',
             'valid_until' => ['required', 'date', "before_or_equal:$minDateTime"],
             'capacity' => 'required|integer|min:1',
-            'type' => ['required', 'string', 'in:ads,image'],
+            'type' => ['required', 'string', Rule::in([TokenType::IMAGE, TokenType::ADS_IMAGE])],
         ];
     }
 }

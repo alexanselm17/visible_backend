@@ -176,10 +176,14 @@ class TokenOnlyAdvertSubmissionController extends Controller
                     ]);
                 }
 
-                if ($submission->type === TokenType::IMAGE && ! $request->hasFile('final_image')) {
+                if (TokenType::isImageMedia($submission->type) && ! $request->hasFile('final_image')) {
                     throw ValidationException::withMessages([
                         'final_image' => 'An image campaign requires a final image.',
                     ]);
+                }
+
+                if (TokenType::isImageMedia($submission->type) && $request->hasFile('final_video')) {
+                    throw ValidationException::withMessages(['final_video' => 'An image-token submission cannot publish a video. Submit a separate video advert.']);
                 }
 
                 if ($submission->type === TokenType::VIDEO && ! $request->hasFile('final_video')) {
@@ -319,7 +323,7 @@ class TokenOnlyAdvertSubmissionController extends Controller
                     ]);
                 }
 
-                if ($submission->type === TokenType::IMAGE && ! $submission->final_image_path) {
+                if (TokenType::isImageMedia($submission->type) && ! $submission->final_image_path) {
                     throw ValidationException::withMessages(['media' => 'Final image is missing.']);
                 }
 
@@ -436,18 +440,18 @@ class TokenOnlyAdvertSubmissionController extends Controller
 
     private function storeFile($file, string $folder, array &$storedFiles): string
     {
-        $directory = public_path('storage/' . $folder);
+        $directory = public_path('storage/'.$folder);
         if (! is_dir($directory)) {
             mkdir($directory, 0755, true);
         }
 
         $safe = preg_replace('/[^A-Za-z0-9\-\_\.]/', '_', $file->getClientOriginalName());
-        $name = time() . '_' . Str::random(8) . '_' . $safe;
+        $name = time().'_'.Str::random(8).'_'.$safe;
         $file->move($directory, $name);
 
-        $storedFiles[] = $directory . DIRECTORY_SEPARATOR . $name;
+        $storedFiles[] = $directory.DIRECTORY_SEPARATOR.$name;
 
-        return $folder . '/' . $name;
+        return $folder.'/'.$name;
     }
 
     private function manager(Request $request): void

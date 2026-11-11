@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\AdvertImagesResource\Pages;
 use App\Filament\Support\OperationsResource;
 use App\Models\AdvertImages;
+use App\Models\TokenType;
 use App\Support\AdminWorkflow;
 use Filament\Forms\Components as F;
 use Filament\Forms\Form;
@@ -39,7 +40,9 @@ class AdvertImagesResource extends OperationsResource
                 F\TextInput::make('name')->required()->maxLength(255),
                 F\Select::make('campaign_id')->relationship('campaign', 'name')->required()->searchable()->preload(),
                 F\TextInput::make('category')->required()->maxLength(100)->default('General'),
-                F\Select::make('type')->options(['IMAGE' => 'Image', 'VIDEO' => 'Video', 'TEXT' => 'Text', 'ads' => 'Legacy overlay advert', 'image' => 'Legacy image'])->required()->default('IMAGE')->live(),
+                F\Select::make('type')->label('Posting format')->options(TokenType::mediaOptions() + ['ads' => 'Ads image (legacy)', 'image' => 'Full image (legacy)'])
+                    ->required()->default('IMAGE')->live()->disabled(fn ($record) => filled($record?->submission_id))
+                    ->helperText('Full images are downloaded on their own; Ads images must be attached to a member’s image. Funded adverts keep the format paid for.'),
                 F\TextInput::make('capacity')->label('Maximum participants')->integer()->minValue(1)->required(),
                 F\DateTimePicker::make('valid_until')->required()->default(now()->addWeek()),
                 F\TagsInput::make('badge')->default(['Sponsored']),
@@ -68,7 +71,7 @@ class AdvertImagesResource extends OperationsResource
         ]))->columns([
             C\ImageColumn::make('image_path')->disk('admin_media')->label('Creative')->square()->size(56),
             C\TextColumn::make('name')->searchable()->sortable()->weight('semibold')->description(fn ($record) => $record->campaign?->name),
-            C\TextColumn::make('type')->badge(),
+            C\TextColumn::make('type')->label('Posting format')->badge()->formatStateUsing(fn ($state) => TokenType::mediaOptions()[TokenType::normalizeMediaType($state ?? 'IMAGE')] ?? $state),
             C\TextColumn::make('capacity')->label('Capacity')->numeric()->sortable(),
             C\TextColumn::make('completions_count')->label('Completed')->numeric(),
             C\TextColumn::make('screenshots_count')->label('Screenshots')->numeric(),
@@ -76,7 +79,13 @@ class AdvertImagesResource extends OperationsResource
             C\TextColumn::make('availability')->state(fn ($record) => $record->valid_until >= now() ? 'Live' : 'Ended')->badge()->color(fn ($state) => $state === 'Live' ? 'success' : 'gray'),
         ])->filters([
             T\SelectFilter::make('campaign_id')->relationship('campaign', 'name')->searchable()->label('Campaign'),
-            T\SelectFilter::make('type')->options(['IMAGE' => 'Image', 'VIDEO' => 'Video', 'TEXT' => 'Text', 'ads' => 'Legacy overlay', 'image' => 'Legacy image']),
+            T\SelectFilter::make('type')->options(TokenType::mediaOptions())->query(function ($query, array $data) {
+                return $query->when($data['value'] ?? null, fn ($query, $type) => $query->whereIn('type', match ($type) {
+                    TokenType::IMAGE => ['IMAGE', 'image', 'FULL_IMAGE'],
+                    TokenType::ADS_IMAGE => ['ADS_IMAGE', 'ads', 'ADS'],
+                    default => [$type],
+                }));
+            }),
             T\Filter::make('live')->query(fn ($query) => $query->where('valid_until', '>=', now())),
         ])->actions([
             A\EditAction::make(),

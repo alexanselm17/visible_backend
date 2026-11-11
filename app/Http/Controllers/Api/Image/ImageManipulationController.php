@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Image;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdvertImages;
+use App\Models\TokenType;
 use App\Services\AdvertQrCodeService;
 use App\Services\ImageDecoderService;
 use App\Services\ImageEncoderService;
@@ -14,58 +15,64 @@ use Illuminate\Validation\ValidationException;
 
 class ImageManipulationController extends Controller
 {
-    public function encodeImage(Request $request, ImageEncoderService $encoder)
+    public function encodeImage(Request $request, ImageEncoderService $encoder, AdvertQrCodeService $qrCodes)
     {
         $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240',
-            'identifier' => 'required|numeric|digits:10',
+            'image' => 'required|image|mimes:jpeg,png,jpg,webp|max:10240',
+            'identifier' => 'nullable|numeric|digits:10',
             'advert_id' => 'required|string|exists:advert_images,id',
             'header_text' => 'nullable|string|max:1000',
             'caption' => 'nullable|string|max:120',
             'layout' => ['nullable', 'string', Rule::in(ImageEncoderService::supportedLayouts())],
         ]);
 
-        $identifier = $request->input('identifier');
+        $member = $request->user();
+        abort_unless($member, 401);
+        $identifier = trim((string) $member->my_code);
+        if (! preg_match('/^\d{10}$/', $identifier)) {
+            throw ValidationException::withMessages(['identifier' => 'Your account needs a valid 10-digit image identifier.']);
+        }
+        if ($request->filled('identifier') && (string) $request->input('identifier') !== $identifier) {
+            throw ValidationException::withMessages(['identifier' => 'The image identifier must belong to the authenticated member.']);
+        }
         $uploadedFile = $request->file('image');
         $advertId = $request->input('advert_id');
         $layout = $request->input('layout', 'story');
 
         $advertRecord = AdvertImages::findOrFail($advertId);
-        $adImagePath = public_path('storage/' . ltrim($advertRecord->image_path, '/'));
+        if (! $advertRecord->requiresPersonalImage()) {
+            throw ValidationException::withMessages(['advert_id' => 'Only attached-image ads can use this layout. Download full-image adverts on their own.']);
+        }
+        $adImagePath = public_path('storage/'.ltrim($advertRecord->image_path, '/'));
 
-        if (!file_exists($adImagePath)) {
+        if (! file_exists($adImagePath)) {
             return response()->json([
-                'message' => 'Advert image file not found.'
+                'message' => 'Advert image file not found.',
             ], 404);
         }
 
-        $watermarkRef = $this->watermarkReference((string) $identifier, (string) $advertId);
+        $watermarkRef = $qrCodes->issue($member, $advertRecord);
         $encoded = $encoder->encode(
             $uploadedFile->getPathname(),
             $watermarkRef,
             $adImagePath,
             null,
             null,
-            null,
+            $qrCodes->visibleCodeFor($member, $advertRecord),
             $layout
         );
 
         return response()->json([
             'message' => 'Layout generated successfully',
             'filename' => $encoded['filename'],
-            'download_url' => url('/storage/image_ads/encoded/' . $encoded['filename']),
+            'download_url' => url('/storage/image_ads/encoded/'.$encoded['filename']),
             'watermark_ref' => $watermarkRef,
             'advert_id' => $advertId,
             'layout' => $layout,
             'available_layouts' => ImageEncoderService::supportedLayouts(),
+            'posting_format' => TokenType::ADS_IMAGE,
+            'token_type' => TokenType::EMERALD,
         ]);
-    }
-
-    private function watermarkReference(string $identifier, string $advertId): string
-    {
-        $key = (string) config('app.key');
-
-        return 'IMG_REF_'.strtoupper(substr(hash_hmac('sha256', $identifier.'|'.$advertId, $key), 0, 16));
     }
 
     public function downloadPersonalizedAdvert(
@@ -75,6 +82,9 @@ class ImageManipulationController extends Controller
         AdvertQrCodeService $qrCodes
     ) {
         $advert = AdvertImages::findOrFail($advertId);
+        if ($advert->requiresPersonalImage()) {
+            throw ValidationException::withMessages(['advert_id' => 'This advert must be attached to your own image. Use the image/stamp endpoint instead.']);
+        }
         $identifier = trim((string) $request->user()?->my_code);
 
         if (! preg_match('/^\d{10}$/', $identifier)) {
@@ -148,11 +158,11 @@ class ImageManipulationController extends Controller
     public function downloadImage($filename)
     {
         $filename = basename($filename);
-        $path = storage_path('app/public/image_ads/encoded/' . $filename);
+        $path = storage_path('app/public/image_ads/encoded/'.$filename);
 
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             return response()->json([
-                'message' => 'Image not found.'
+                'message' => 'Image not found.',
             ], 404);
         }
 

@@ -6,6 +6,7 @@ use App\Filament\Support\Fields;
 use App\Filament\Support\OperationsResource;
 use App\Http\Controllers\Api\CampaignOwner\TokenOnlyAdvertSubmissionController as Workflow;
 use App\Models\AdvertSubmission;
+use App\Models\TokenType;
 use App\Support\AdminWorkflow;
 use Filament\Forms\Components as F;
 use Filament\Forms\Form;
@@ -28,7 +29,7 @@ class AdvertSubmissionResource extends OperationsResource
 
     protected static string $area = 'campaigns';
 
-    protected static array $exportColumns = ['id', 'name', 'user.fullname', 'type', 'status', 'target_reach', 'tokens_reserved', 'tokens_spent', 'created_at'];
+    protected static array $exportColumns = ['id', 'name', 'user.fullname', 'type', 'tokenType.code', 'status', 'target_reach', 'tokens_reserved', 'tokens_spent', 'created_at'];
 
     public static function form(Form $form): Form
     {
@@ -61,14 +62,16 @@ class AdvertSubmissionResource extends OperationsResource
             ->columns([
                 C\TextColumn::make('name')->searchable()->sortable()->description(fn ($record) => $record->campaign?->name)->weight('semibold'),
                 C\TextColumn::make('user.fullname')->label('Owner')->searchable(),
-                C\TextColumn::make('type')->badge(), Fields::status(),
+                C\TextColumn::make('type')->label('Posting format')->badge()->formatStateUsing(fn ($state) => TokenType::mediaOptions()[$state] ?? $state), Fields::status(),
+                C\TextColumn::make('tokenType.code')->label('Token')->badge(),
                 C\TextColumn::make('target_reach')->label('Reach')->numeric()->sortable(),
                 C\TextColumn::make('tokens_reserved')->label('Reserved')->numeric(),
                 C\TextColumn::make('tokens_spent')->label('Spent')->numeric(),
                 C\TextColumn::make('created_at')->since()->label('Submitted')->sortable(),
             ])->filters([
                 SelectFilter::make('status')->options(array_combine(\App\Enums\AdvertSubmissionStatus::all(), \App\Enums\AdvertSubmissionStatus::all())),
-                SelectFilter::make('type')->options(['IMAGE' => 'Image', 'VIDEO' => 'Video', 'TEXT' => 'Text']),
+                SelectFilter::make('type')->options(TokenType::mediaOptions()),
+                SelectFilter::make('token_type_id')->relationship('tokenType', 'name')->label('Token type'),
                 SelectFilter::make('submitted_by')->relationship('user', 'fullname')->searchable()->label('Owner'),
                 SelectFilter::make('designed_by')->relationship('designer', 'fullname')->searchable()->label('Designer'),
                 SelectFilter::make('reviewed_by')->relationship('reviewer', 'fullname')->searchable()->label('Reviewer'),
@@ -83,7 +86,7 @@ class AdvertSubmissionResource extends OperationsResource
                         ->visible(fn ($record) => $record->status === 'PENDING_DESIGN')
                         ->form([
                             F\FileUpload::make('final_image')->image()->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])->maxSize(10240)->storeFiles(false)
-                                ->required(fn ($record) => $record->type === 'IMAGE')->visible(fn ($record) => $record->type === 'IMAGE'),
+                                ->required(fn ($record) => TokenType::isImageMedia($record->type))->visible(fn ($record) => TokenType::isImageMedia($record->type)),
                             F\FileUpload::make('final_video')->acceptedFileTypes(['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'])->maxSize(51200)->storeFiles(false)
                                 ->required(fn ($record) => $record->type === 'VIDEO')->visible(fn ($record) => $record->type === 'VIDEO'),
                             F\FileUpload::make('thumbnail_image')->image()->maxSize(10240)->storeFiles(false)
