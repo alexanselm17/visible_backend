@@ -9,6 +9,7 @@ use Filament\Tables\Actions as A;
 use Filament\Tables\Columns as C;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class CampaignOwnerLogoResource extends OperationsResource
 {
@@ -25,11 +26,28 @@ class CampaignOwnerLogoResource extends OperationsResource
     public static function table(Table $table): Table
     {
         return parent::table($table)->modifyQueryUsing(fn ($query) => $query->with('profile'))->columns([
-            C\ImageColumn::make('logo_path')->disk('admin_media')->size(64),
+            C\ImageColumn::make('logo_path')->label('Logo preview')->disk('admin_media')->height(64)->width(96)
+                ->extraImgAttributes(fn (CampaignOwnerLogo $record) => [
+                    'alt' => ($record->profile?->business_name ?: 'Business').' logo',
+                    'style' => 'object-fit: contain; padding: 6px; border-radius: 8px; background: #e5e7eb;',
+                ])
+                ->tooltip('Preview logo')
+                ->action(fn (CampaignOwnerLogo $record, $livewire) => $livewire->mountTableAction('preview', $record->getKey())),
             C\TextColumn::make('profile.business_name')->label('Business')->searchable(),
             C\IconColumn::make('is_primary')->boolean(), C\TextColumn::make('created_at')->dateTime()->sortable(),
         ])->filters([SelectFilter::make('profile_id')->relationship('profile', 'business_name')->searchable()])
             ->actions([
+                A\Action::make('preview')->label('Preview')->icon('heroicon-o-eye')
+                    ->authorize(fn () => static::canViewAny())
+                    ->modalHeading(fn (CampaignOwnerLogo $record) => ($record->profile?->business_name ?: 'Business').' — logo')
+                    ->modalDescription(fn (CampaignOwnerLogo $record) => $record->is_primary ? 'Primary business logo' : 'Additional business logo')
+                    ->modalSubmitAction(false)->modalCancelActionLabel('Close')->modalWidth('3xl')
+                    ->modalContent(fn (CampaignOwnerLogo $record) => view('filament.components.business-logo-preview', [
+                        'logo' => $record,
+                        'url' => filled($record->logo_path) && Storage::disk('admin_media')->exists($record->logo_path)
+                            ? Storage::disk('admin_media')->url($record->logo_path)
+                            : null,
+                    ])),
                 A\Action::make('primary')->label('Make primary')->visible(fn ($record) => ! $record->is_primary)->requiresConfirmation()
                     ->action(fn ($record) => AdminWorkflow::run(\App\Http\Controllers\Api\CampaignOwner\CampaignOwnerProfileController::class, 'makeLogoPrimary', parameters: ['profileId' => $record->profile_id, 'logoId' => $record->id])),
                 A\Action::make('remove')->color('danger')->requiresConfirmation()
