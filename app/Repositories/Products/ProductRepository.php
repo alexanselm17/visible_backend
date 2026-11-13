@@ -232,10 +232,12 @@ class ProductRepository implements ProductRepositoryInterface
                     // 1. If target_audience is null, allow all records (target everyone)
                     $query->whereNull('target_audience')
 
-                        // 2. If gender is set, filter by gender
+                        // 2. "all" targets both genders; otherwise match the member's gender.
                         ->orWhere(function ($subQuery) use ($user) {
+                            $subQuery->whereJsonContains('target_audience->gender', 'all');
+
                             if ($user->gender) {
-                                $subQuery->whereJsonContains('target_audience->gender', $user->gender);
+                                $subQuery->orWhereJsonContains('target_audience->gender', $user->gender);
                             }
                         })
 
