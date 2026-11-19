@@ -51,6 +51,7 @@ class AdminPanelProvider extends PanelProvider
 
             ])
             ->widgets([
+                \App\Filament\Widgets\NcbaPaymentNotifications::class,
                 \App\Filament\Widgets\OperationsGuide::class,
                 \App\Filament\Widgets\OperationsOverview::class,
                 \App\Filament\Widgets\ViewsChart::class,

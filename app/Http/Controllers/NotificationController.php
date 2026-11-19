@@ -36,6 +36,7 @@ class NotificationController extends Controller
      */
     public function getUserNotifications(Request $request): JsonResponse
     {
+        $this->ensureNotificationOwner($request);
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'per_page' => 'nullable|integer|min:1|max:100',
@@ -67,6 +68,7 @@ class NotificationController extends Controller
      */
     public function markAsRead(Request $request): JsonResponse
     {
+        $this->ensureNotificationOwner($request);
         $request->validate([
             'notification_id' => 'required|exists:notifications,id',
             'user_id' => 'required|exists:users,id',
@@ -89,6 +91,7 @@ class NotificationController extends Controller
      */
     public function markAllAsRead(Request $request): JsonResponse
     {
+        $this->ensureNotificationOwner($request);
         $request->validate([
             'user_id' => 'required|exists:users,id',
         ]);
@@ -111,6 +114,7 @@ class NotificationController extends Controller
      */
     public function deleteNotification(Request $request): JsonResponse
     {
+        $this->ensureNotificationOwner($request);
         $request->validate([
             'notification_id' => 'required|exists:notifications,id',
             'user_id' => 'required|exists:users,id',
@@ -158,7 +162,7 @@ class NotificationController extends Controller
                 $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
             }
         }
 
@@ -209,7 +213,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
                 } catch (\Exception $e) {
-                    \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                    \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
                 }
             }
         }
@@ -280,7 +284,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($admin->fcm_token, $title, $message);
                 } catch (\Exception $e) {
-                    \Log::error("FCM error for admin [{$admin->id}]: " . $e->getMessage());
+                    \Log::error("FCM error for admin [{$admin->id}]: ".$e->getMessage());
                 }
             }
         }
@@ -333,7 +337,7 @@ class NotificationController extends Controller
                 $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
             }
         }
 
@@ -354,6 +358,7 @@ class NotificationController extends Controller
      */
     public function getNotificationStats(Request $request): JsonResponse
     {
+        $this->ensureNotificationOwner($request);
         $request->validate([
             'user_id' => 'required|exists:users,id',
         ]);
@@ -371,6 +376,12 @@ class NotificationController extends Controller
         ];
 
         return response()->json($stats);
+    }
+
+    private function ensureNotificationOwner(Request $request): void
+    {
+        // Payment confirmations must not be readable or changeable by another member.
+        abort_unless($request->user() && (string) $request->user()->id === (string) $request->input('user_id'), 403);
     }
 
     /**
@@ -408,7 +419,7 @@ class NotificationController extends Controller
                 $firebase = new FirebaseService;
                 $firebase->sendToDevice($user->fcm_token, $title, $message);
             } catch (\Exception $e) {
-                \Log::error("FCM error for user [{$user->id}]: " . $e->getMessage());
+                \Log::error("FCM error for user [{$user->id}]: ".$e->getMessage());
             }
         }
 
@@ -469,7 +480,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
                 } catch (\Exception $e) {
-                    Log::error("FCM error for role user [{$user->id}]: " . $e->getMessage());
+                    Log::error("FCM error for role user [{$user->id}]: ".$e->getMessage());
                 }
             }
         }
@@ -481,11 +492,10 @@ class NotificationController extends Controller
         ], 200);
     }
 
-
     public function notifyUser(Request $request): JsonResponse
     {
         $request->validate([
-            'userId'   => 'required|array|min:1',
+            'userId' => 'required|array|min:1',
             'userId.*' => 'required|uuid|exists:users,id',
             'title' => 'required|string|max:255',
             'message' => 'required|string',
@@ -522,7 +532,7 @@ class NotificationController extends Controller
                 try {
                     $firebase->sendToDevice($user->fcm_token, $request->title, $request->message);
                 } catch (\Exception $e) {
-                    Log::error("FCM error for role user [{$user->id}]: " . $e->getMessage());
+                    Log::error("FCM error for role user [{$user->id}]: ".$e->getMessage());
                 }
             }
         }

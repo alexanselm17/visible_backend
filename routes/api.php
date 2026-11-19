@@ -16,6 +16,8 @@ use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'v1'], function () {
+    Route::post('/payments/ncba/notifications', \App\Http\Controllers\Api\Tokens\NcbaNotificationController::class)
+        ->withoutMiddleware('throttle:api')->middleware('throttle:ncba-notifications')->name('ncba.notifications');
     Route::group(['prefix' => 'auth'], function () {
         Route::post('/fcm-token', [NotificationController::class, 'updateFcmToken']);
         Route::post('/signup', [AuthController::class, 'signup']);
@@ -158,6 +160,9 @@ Route::group(['prefix' => 'v1'], function () {
         Route::get('/transactions', [TokenController::class, 'transactions']);
         Route::get('/purchases', [TokenController::class, 'purchases']);
         Route::post('/purchases', [TokenController::class, 'purchase']);
+        Route::get('/purchases/{purchaseId}', [TokenController::class, 'showPurchase'])->whereUuid('purchaseId');
+        Route::post('/purchases/{purchaseId}/receipt', [TokenController::class, 'submitReceipt'])
+            ->whereUuid('purchaseId')->middleware('throttle:ncba-receipt-claims');
         Route::post('/purchases/{purchaseId}/cancel', [TokenController::class, 'cancelPurchase']);
         Route::post('/purchases/{purchaseId}/confirm', [TokenController::class, 'confirmPurchase']);
         Route::put('/types/{code}', [TokenController::class, 'updateType']);

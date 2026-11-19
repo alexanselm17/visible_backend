@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        $schedule->command('ncba:reconcile-receipts')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('campaigns:cleanup-expired')->hourly();
         $schedule->command('rewards:close-periods')
             ->hourly()

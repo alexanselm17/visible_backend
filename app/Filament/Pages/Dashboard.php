@@ -20,6 +20,7 @@ class Dashboard extends BaseDashboard
             \App\Filament\Widgets\ScreenshotsSubmissionChart::class,
         ];
         if (AdminAccess::allows('finance')) {
+            array_unshift($widgets, \App\Filament\Widgets\NcbaPaymentNotifications::class);
             $widgets[] = \App\Filament\Widgets\TokenRevenueChart::class;
             $widgets[] = \App\Filament\Widgets\RewardsChart::class;
         }

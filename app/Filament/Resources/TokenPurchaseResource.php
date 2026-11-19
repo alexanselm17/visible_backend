@@ -44,6 +44,8 @@ class TokenPurchaseResource extends OperationsResource
             C\TextColumn::make('user.fullname')->searchable()->label('Owner'), C\TextColumn::make('tokenType.code')->badge()->description(fn ($record) => $record->tokenType?->name),
             C\TextColumn::make('quantity')->numeric()->sortable(), C\TextColumn::make('total_amount')->money(fn ($record) => $record->currency),
             Fields::status(), C\TextColumn::make('payment_reference')->copyable()->searchable()->placeholder('Awaiting payment'),
+            C\TextColumn::make('payment_code')->label('Internal purchase reference')->copyable()->searchable()->placeholder('Historical purchase'),
+            C\TextColumn::make('receipt_claims_count')->label('Receipt attempts')->counts('receiptClaims')->numeric(),
             C\TextColumn::make('paid_at')->dateTime()->placeholder('—'), C\TextColumn::make('created_at')->since()->sortable(),
         ])->filters([
             SelectFilter::make('status')->options(array_combine(['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED'], ['Pending', 'Paid', 'Failed', 'Cancelled', 'Refunded'])),
@@ -57,6 +59,8 @@ class TokenPurchaseResource extends OperationsResource
                         Notification::make()->title('Purchase recorded; confirm after receiving payment')->success()->send();
                     }),
             ])->actions([
+                A\Action::make('receipts')->label('Receipt claims')
+                    ->url(fn ($record) => NcbaReceiptClaimResource::getUrl('index', ['tableSearch' => $record->payment_code ?? $record->id])),
                 A\Action::make('confirm')->label('Confirm payment')->color('success')->requiresConfirmation()
                     ->modalDescription('Only confirm money already received. This credits the owner’s token wallet.')
                     ->visible(fn ($record) => $record->status === TokenPurchase::PENDING)
@@ -66,7 +70,7 @@ class TokenPurchaseResource extends OperationsResource
                         Notification::make()->title('Payment confirmed and wallet credited')->success()->send();
                     }),
                 A\Action::make('cancel')->color('danger')->requiresConfirmation()->visible(fn ($record) => $record->status === TokenPurchase::PENDING)
-                    ->action(fn ($record) => app(TokenService::class)->cancelPurchase($record->id, $record->user_id)),
+                    ->action(fn ($record) => app(TokenService::class)->cancelPurchase($record->id, $record->user_id, auth()->user())),
             ]);
     }
 

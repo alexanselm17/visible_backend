@@ -8,9 +8,13 @@ use Illuminate\Support\Str;
 class TokenPurchase extends Model
 {
     public const PENDING = 'PENDING';
+
     public const PAID = 'PAID';
+
     public const FAILED = 'FAILED';
+
     public const CANCELLED = 'CANCELLED';
+
     public const REFUNDED = 'REFUNDED';
 
     protected $fillable = [
@@ -22,11 +26,13 @@ class TokenPurchase extends Model
         'currency',
         'status',
         'payment_reference',
+        'payment_code',
         'paid_at',
         'metadata',
     ];
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $casts = [
@@ -43,6 +49,10 @@ class TokenPurchase extends Model
             if (empty($purchase->id)) {
                 $purchase->id = (string) Str::uuid();
             }
+            do {
+                $code = 'VD'.strtoupper(bin2hex(random_bytes(5)));
+            } while (static::where('payment_code', $code)->exists());
+            $purchase->payment_code = $code;
         });
     }
 
@@ -54,5 +64,10 @@ class TokenPurchase extends Model
     public function tokenType()
     {
         return $this->belongsTo(TokenType::class);
+    }
+
+    public function receiptClaims()
+    {
+        return $this->hasMany(NcbaReceiptClaim::class, 'token_purchase_id');
     }
 }

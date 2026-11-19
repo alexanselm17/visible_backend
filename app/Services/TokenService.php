@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Models\AdvertSubmission;
+use App\Models\NcbaPayment;
 use App\Models\TokenHold;
 use App\Models\TokenPurchase;
 use App\Models\TokenTransaction;
 use App\Models\TokenType;
 use App\Models\TokenWallet;
+use App\Models\User;
+use App\Support\PaymentAmount;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -85,7 +88,10 @@ class TokenService
             ]);
         }
 
-        $unitPrice = (float) $type->unit_price;
+        $unitPrice = PaymentAmount::minor($type->unit_price);
+        if ($quantity > intdiv(999999999999999, $unitPrice)) {
+            throw ValidationException::withMessages(['quantity' => 'The purchase total exceeds the supported amount. Reduce the quantity.']);
+        }
 
         return [
             'token_type' => $type->code,
@@ -93,8 +99,8 @@ class TokenService
             'media_type' => $type->media_type,
             'posting_format' => $type->media_type === TokenType::IMAGE ? 'FULL_IMAGE' : $type->media_type,
             'quantity' => $quantity,
-            'unit_price' => number_format($unitPrice, 2, '.', ''),
-            'total_amount' => number_format($unitPrice * $quantity, 2, '.', ''),
+            'unit_price' => PaymentAmount::decimal($unitPrice),
+            'total_amount' => PaymentAmount::decimal($unitPrice * $quantity),
             'currency' => $type->currency,
         ];
     }
@@ -160,7 +166,23 @@ class TokenService
     public function confirmPurchase(string $purchaseId, string $paymentReference): TokenPurchase
     {
         return DB::transaction(function () use ($purchaseId, $paymentReference) {
+            $normalized = strtoupper(trim($paymentReference));
+            if (preg_match('/^[A-Z0-9]{1,32}$/D', $normalized)) {
+                app(NcbaPaymentService::class)->lockReceipt($normalized);
+                $paymentReference = $normalized;
+            }
+            // Keep the same receipt -> purchase -> wallet locking order as the bank callback.
+            $bankPayment = NcbaPayment::where('transaction_id', strtoupper($paymentReference))->lockForUpdate()->first();
             $purchase = TokenPurchase::lockForUpdate()->findOrFail($purchaseId);
+            if (! $bankPayment && \App\Models\NcbaReceiptClaim::where('receipt_number', $normalized)->exists()) {
+                throw ValidationException::withMessages(['payment_reference' => 'This receipt was submitted for NCBA verification. Wait for its bank callback and use the NCBA inbox.']);
+            }
+            if ($bankPayment && ($bankPayment->token_purchase_id !== $purchase->id
+                || $bankPayment->status === NcbaPayment::RESOLVED || $bankPayment->conflict_count > 0
+                || $bankPayment->currency !== $purchase->currency
+                || $bankPayment->amount_minor !== PaymentAmount::minor($purchase->total_amount))) {
+                throw ValidationException::withMessages(['payment_reference' => 'Match this bank receipt through the NCBA payments inbox.']);
+            }
 
             if ($purchase->status === TokenPurchase::PAID) {
                 if ($purchase->payment_reference !== $paymentReference) {
@@ -216,9 +238,9 @@ class TokenService
         });
     }
 
-    public function cancelPurchase(string $purchaseId, string $userId): TokenPurchase
+    public function cancelPurchase(string $purchaseId, string $userId, ?User $actor = null): TokenPurchase
     {
-        return DB::transaction(function () use ($purchaseId, $userId) {
+        return DB::transaction(function () use ($purchaseId, $userId, $actor) {
             $purchase = TokenPurchase::where('user_id', $userId)
                 ->lockForUpdate()
                 ->findOrFail($purchaseId);
@@ -231,6 +253,12 @@ class TokenService
 
             $purchase->status = TokenPurchase::CANCELLED;
             $purchase->save();
+            $event = app(NcbaPaymentAudit::class)->record('PURCHASE_CANCELLED', purchase: $purchase, actor: $actor);
+            foreach ($purchase->receiptClaims()->whereIn('status', [\App\Models\NcbaReceiptClaim::WAITING_BANK, \App\Models\NcbaReceiptClaim::REVIEW])->get() as $claim) {
+                app(NcbaReceiptClaimService::class)->transition($claim, \App\Models\NcbaReceiptClaim::REJECTED, 'PURCHASE_CANCELLED', $actor);
+                app(NcbaPaymentAudit::class)->notifyAdmins($event, 'Purchase cancelled with a receipt claim',
+                    "Purchase {$purchase->id} was cancelled. Receipt {$claim->receipt_number} must be reconciled if funds arrive; no automatic refund is performed.");
+            }
 
             return $purchase->fresh('tokenType');
         });

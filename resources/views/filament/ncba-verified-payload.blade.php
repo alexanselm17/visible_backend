@@ -1,0 +1,1 @@
+<pre class="whitespace-pre-wrap break-all text-xs">{{ $payment->verified_payload ? json_encode($payment->verified_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : 'Historical receipt: original verified fields were not captured by this version.' }}</pre>

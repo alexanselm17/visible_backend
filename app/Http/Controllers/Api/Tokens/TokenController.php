@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Api\Tokens;
 
 use App\Http\Controllers\Controller;
+use App\Models\NcbaReceiptClaim;
 use App\Models\TokenPurchase;
 use App\Models\TokenType;
+use App\Services\NcbaPaymentService;
+use App\Services\NcbaReceiptClaimService;
 use App\Services\TokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -109,7 +112,7 @@ class TokenController extends Controller
 
         return response()->json([
             'ok' => true,
-            'data' => $purchases->items(),
+            'data' => $purchases->getCollection()->map(fn ($purchase) => $this->purchaseData($purchase))->all(),
             'meta' => [
                 'current_page' => $purchases->currentPage(),
                 'last_page' => $purchases->lastPage(),
@@ -135,19 +138,51 @@ class TokenController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Token purchase created. Credit the wallet only after payment is confirmed.',
-            'data' => $purchase,
+            'data' => $this->purchaseData($purchase),
         ], 201);
     }
 
     public function cancelPurchase(Request $request, string $purchaseId, TokenService $tokenService): JsonResponse
     {
-        $purchase = $tokenService->cancelPurchase($purchaseId, $request->user()->id);
+        $purchase = $tokenService->cancelPurchase($purchaseId, $request->user()->id, $request->user());
 
         return response()->json([
             'ok' => true,
             'message' => 'Token purchase cancelled.',
-            'data' => $purchase,
+            'data' => $this->purchaseData($purchase),
         ]);
+    }
+
+    public function showPurchase(Request $request, string $purchaseId): JsonResponse
+    {
+        $purchase = TokenPurchase::where('user_id', $request->user()->id)->with('tokenType')->findOrFail($purchaseId);
+
+        return response()->json(['ok' => true, 'data' => $this->purchaseData($purchase)]);
+    }
+
+    private function purchaseData(TokenPurchase $purchase): array
+    {
+        $claims = $purchase->receiptClaims()->orderByDesc('sequence')->get();
+
+        return array_merge($purchase->toArray(), [
+            'payment_instructions' => app(NcbaPaymentService::class)->instructions($purchase),
+            'receipt_claim' => ($purchase->status === TokenPurchase::PAID ? ($claims->firstWhere('status', NcbaReceiptClaim::APPROVED) ?? $claims->first()) : $claims->first())?->ownerData(),
+            'receipt_claims' => $claims->map->ownerData()->values()->all(),
+        ]);
+    }
+
+    public function submitReceipt(Request $request, string $purchaseId, NcbaReceiptClaimService $service): JsonResponse
+    {
+        $data = $request->validate(['receipt_number' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z0-9]{1,32}$/D']]);
+        $claim = $service->submit($request->user(), $purchaseId, $data['receipt_number']);
+        $status = match ($claim->status) {
+            NcbaReceiptClaim::APPROVED => 200, NcbaReceiptClaim::REJECTED => 409, default => 202,
+        };
+
+        return response()->json([
+            'ok' => $status !== 409, 'message' => $claim->ownerData()['message'],
+            'data' => ['claim' => $claim->ownerData(), 'purchase' => $this->purchaseData($claim->purchase->load('tokenType'))],
+        ], $status);
     }
 
     public function confirmPurchase(
@@ -166,7 +201,7 @@ class TokenController extends Controller
         return response()->json([
             'ok' => true,
             'message' => 'Payment confirmed and tokens credited successfully.',
-            'data' => $purchase,
+            'data' => $this->purchaseData($purchase),
         ]);
     }
 

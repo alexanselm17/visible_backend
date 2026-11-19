@@ -77,6 +77,11 @@ class User extends Authenticatable implements FilamentUser, HasName
 
     protected static function booted()
     {
+        static::updating(function (User $user) {
+            if ($user->isDirty('phone')) {
+                $user->phone_verified_at = null;
+            }
+        });
         static::creating(function ($transProduct) {
             $transProduct->id = (string) Str::uuid();  // Automatically generate UUID
         });
