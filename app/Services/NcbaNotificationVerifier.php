@@ -45,12 +45,14 @@ class NcbaNotificationVerifier
             'Currency' => ['sometimes', 'string', Rule::in(['KES'])],
         ])->validate();
 
-        // if (! hash_equals(config('ncba.username'), $data['Username'])
-        //     || ! hash_equals(config('ncba.password'), $data['Password'])
-        //     || ! hash_equals(config('ncba.alias'), $data['BillRefNumber'])
-        //     || ! hash_equals($this->signature($data), $data['Hash'])) {
-        //     throw new HttpException(401, 'Notification authentication failed.');
-        // }
+        if (
+            ! hash_equals(config('ncba.username'), $data['Username'])
+            || ! hash_equals(config('ncba.password'), $data['Password'])
+            || ! hash_equals(config('ncba.alias'), $data['BillRefNumber'])
+            || ! hash_equals($this->signature($data), $data['Hash'])
+        ) {
+            throw new HttpException(401, 'Notification authentication failed.');
+        }
         if (PaymentAmount::minor($data['TransAmount']) < 1) {
             throw new HttpException(422, 'Payment amount must be positive.');
         }
