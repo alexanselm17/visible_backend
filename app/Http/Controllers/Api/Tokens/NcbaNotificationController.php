@@ -47,8 +47,24 @@ class NcbaNotificationController extends Controller
             }
 
             return response()->json(['ResultCode' => '0', 'ResultDesc' => 'Notification received.']);
-        } catch (JsonException|ValidationException $exception) {
-            return response()->json(['ResultCode' => '1', 'ResultDesc' => 'Invalid notification format.'], 422);
+        } catch (JsonException $exception) {
+            Log::warning('NCBA: malformed JSON.', [
+                'error_code' => $exception->getCode(),
+            ]);
+
+            return response()->json([
+                'ResultCode' => '1',
+                'ResultDesc' => 'Invalid notification format.',
+            ], 422);
+        } catch (ValidationException $exception) {
+            Log::warning('NCBA: notification validation failed.', [
+                'invalid_fields' => array_keys($exception->errors()),
+            ]);
+
+            return response()->json([
+                'ResultCode' => '1',
+                'ResultDesc' => 'Invalid notification format.',
+            ], 422);
         } catch (HttpException $exception) {
             return response()->json(['ResultCode' => '1', 'ResultDesc' => $exception->getMessage()], $exception->getStatusCode());
         } catch (Throwable $exception) {
