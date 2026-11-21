@@ -59,6 +59,15 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Widgets\TokenRevenueChart::class,
                 \App\Filament\Widgets\RewardsChart::class,
                 \App\Filament\Widgets\RecentActivityWidget::class,
+                \App\Filament\Widgets\Income\IncomeSummary::class,
+                \App\Filament\Widgets\Income\IncomeTrendChart::class,
+                \App\Filament\Widgets\Income\IncomeMonthlyChart::class,
+                \App\Filament\Widgets\Income\IncomeYearlyChart::class,
+                \App\Filament\Widgets\Income\IncomeTokenChart::class,
+                \App\Filament\Widgets\Income\IncomeOrderStatusChart::class,
+                \App\Filament\Widgets\Income\IncomeBankStatusChart::class,
+                \App\Filament\Widgets\Income\IncomePurchasesTable::class,
+                \App\Filament\Widgets\Income\IncomePaymentsTable::class,
             ])
             ->middleware([
                 EncryptCookies::class,
