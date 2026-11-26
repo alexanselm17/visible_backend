@@ -134,6 +134,9 @@ Route::group(['prefix' => 'v1'], function () {
         Route::post('/submissions/{submissionId}/rollout', [TokenOnlyAdvertSubmissionController::class, 'rolloutSubmission'])
             ->middleware(['auth:sanctum', 'check.active']);
         Route::get('/submissions/pending', [AdvertSubmissionController::class, 'pendingDesign']);
+        Route::get('/submissions/designer/{designerId?}', [AdvertSubmissionController::class, 'designerSubmissions'])
+            ->middleware(['auth:sanctum', 'check.active'])
+            ->whereUuid('designerId');
         Route::post('/{profileId}/logos', [CampaignOwnerProfileController::class, 'uploadLogo']);
         Route::get('/{profileId}/logos', [CampaignOwnerProfileController::class, 'listLogos']);
         Route::post('/{profileId}/logos/{logoId}/make-primary', [CampaignOwnerProfileController::class, 'makeLogoPrimary']);

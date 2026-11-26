@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class AdvertSubmissionController extends Controller
 {
@@ -745,6 +746,64 @@ class AdvertSubmissionController extends Controller
                 'top_active_adverts' => $topActiveAdverts,
                 'latest_submitted_adverts' => $latestSubmittedAdverts,
 
+            ],
+        ]);
+    }
+
+    public function designerSubmissions(Request $request, ?string $designerId = null): JsonResponse
+    {
+        $user = $request->user();
+        $canViewOtherDesigners = $user && ($user->isAdmin() || $user->isDeveloper() || $user->isManager());
+        abort_unless($user && $user->is_active && ($user->hasRole('designer') || $canViewOtherDesigners), 403, 'Not authorized to view designer submissions.');
+
+        $designerId ??= (string) $user->id;
+        abort_unless($canViewOtherDesigners || $designerId === (string) $user->id, 403, 'You may only view your own designer submissions.');
+        // Archived designers retain their design history for authorized staff.
+        User::withTrashed()->whereKey($designerId)->firstOrFail(['id']);
+
+        $filters = $request->validate([
+            'status' => ['sometimes', 'string', Rule::in(['all', ...AdvertSubmissionStatus::all()])],
+            'campaign_id' => ['sometimes', 'uuid'],
+            'submitted_by' => ['sometimes', 'uuid'],
+            'from' => ['sometimes', 'date_format:Y-m-d'],
+            'to' => ['sometimes', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        // Unassigned jobs belong to the shared queue, never to every designer.
+        $query = AdvertSubmission::query()->where('designed_by', $designerId)
+            ->when(isset($filters['campaign_id']), fn ($query) => $query->where('campaign_id', $filters['campaign_id']))
+            ->when(isset($filters['submitted_by']), fn ($query) => $query->where('submitted_by', $filters['submitted_by']))
+            ->when(isset($filters['from']), fn ($query) => $query->whereDate('created_at', '>=', $filters['from']))
+            ->when(isset($filters['to']), fn ($query) => $query->whereDate('created_at', '<=', $filters['to']));
+
+        // Counts cover this designer's filtered history, independently of the selected status/page.
+        $counts = array_fill_keys(AdvertSubmissionStatus::all(), 0);
+        foreach ((clone $query)->selectRaw('status, COUNT(*) AS submission_count')->groupBy('status')->get() as $row) {
+            $counts[$row->status] = (int) $row->submission_count;
+        }
+
+        $submissions = $query
+            ->when(isset($filters['status']) && $filters['status'] !== 'all', fn ($query) => $query->where('status', $filters['status']))
+            ->with([
+                'campaign', 'user:id,fullname',
+                'user.campaignOwnerProfile:id,user_id,business_name,business_category,website,logo_path',
+                'user.campaignOwnerProfile.logos', 'media', 'designer:id,fullname',
+            ])
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->paginate((int) ($filters['per_page'] ?? 20));
+
+        return response()->json([
+            'ok' => true,
+            'designer_id' => $designerId,
+            'data' => $submissions->items(),
+            'summary' => ['total' => array_sum($counts), 'by_status' => $counts],
+            'meta' => [
+                'current_page' => $submissions->currentPage(),
+                'per_page' => $submissions->perPage(),
+                'total' => $submissions->total(),
+                'last_page' => $submissions->lastPage(),
             ],
         ]);
     }
